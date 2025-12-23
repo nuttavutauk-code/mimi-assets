@@ -1,0 +1,482 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  email     String   @unique
+  password  String
+  firstName String?
+  lastName  String?
+  company   String?
+  vendor    String?
+  phone     String?
+  initials  String?
+  role      Role     @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  documents Document[]
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+model LibrarySES {
+  id          Int      @id @default(autoincrement())
+  category    String? // หมวดหมู่ เช่น Wall Module
+  imageUrl    String? // URL รูป เช่น https://cdn.domain.com/images/a.jpg
+  assetName   String // ชื่อสินค้า
+  code        String?
+  barcode     String?
+  dimensionMm String? // ขนาด
+  status      String?
+  remark      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model LibrarySIS {
+  id         Int      @id @default(autoincrement())
+  barcode    String?
+  assetName  String?
+  assetType  String?
+  dimension  String?
+  warehouse  String?
+  pictureUrl String? // ✅ ลิงก์รูป
+  status     String?
+  remark     String?
+  digit      String? // ✅ ถ้ายังต้องการเก็บ column นี้ไว้ก่อน
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Shop {
+  id        Int      @id @default(autoincrement())
+  mcsCode   String   @unique
+  shopName  String?
+  region    String?
+  state     String?
+  shopType  String? // SHOP TYPE - เพิ่มใหม่
+  status    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Asset {
+  id            Int      @id @default(autoincrement())
+  barcode       String   @unique
+  assetName     String?
+  size          String?
+  warehouse     String? // 👈 โกดังที่เก็บ (ต้องตรงกับ User.vendor)
+  startWarranty String? // 👈 เปลี่ยนจาก DateTime → String
+  endWarranty   String? // 👈 เปลี่ยนจาก DateTime → String
+  cheilPO       String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([barcode])
+  @@index([warehouse])
+}
+
+model Document {
+  id           Int      @id @default(autoincrement())
+  docCode      String   @unique // เช่น DP25011701
+  documentType String // withdraw, routing2shops, routing3shops ...
+  createdAt    DateTime @default(now())
+  createdById  Int
+  createdBy    User     @relation(fields: [createdById], references: [id])
+
+  // 🔹 ข้อมูลผู้เบิก
+  fullName String?
+  company  String?
+  phone    String?
+
+  // 🔹 หมายเหตุ + สถานะ
+  note   String?
+  status String? // draft | submitted | approved | rejected
+
+  // 🔹 ข้อมูลเพิ่มเติมสำหรับใบย้ายของ (transfer)
+  operation   String? // Event, ส่งคืนผู้ผลิต, ส่งคืนโกดังเช่า, อื่นๆ
+  otherDetail String? // รายละเอียดเมื่อเลือก "อื่นๆ"
+
+  // 🔹 ประเภทการยืม (สำหรับใบยืม borrow, borrowsecurity)
+  borrowType String? // "EVENT" | "TEMP SHOP"
+
+  // 🔹 เงื่อนไขการเก็บกลับ (สำหรับใบเก็บ Asset กลับ)
+  returnCondition String? // "normal" = เก็บกลับปกติ, "from_borrow" = เก็บกลับจากการยืม
+
+  // 🔹 Other Activities (Admin เลือกตอนอนุมัติ)
+  otherActivity String? // "outToRentalWarehouse" | "inToRentalWarehouse" | "discarded" | "adjustError"
+
+  // 🔹 Transaction Status (Admin เลือกตอนอนุมัติ - สำหรับบันทึกลง Transaction History)
+  transactionStatus String? // "Shop", "Discarded", "Repairing", "Send to Rental warehouse", etc.
+
+  // 🔹 รูปเอกสารใบย้ายของ (สำหรับ Receive Transfer)
+  transferDocImageUrl String? // รูปถ่ายเอกสารใบย้ายของ
+
+  // ✅ ความสัมพันธ์กับร้านค้า
+  shops DocumentShop[] // 1 Document มีหลายร้าน
+
+  // ✅ ความสัมพันธ์กับ Transaction History
+  transactions AssetTransactionHistory[]
+
+  // ✅ ความสัมพันธ์กับ Pick Asset Tasks
+  pickTasks PickAssetTask[]
+
+  // ✅ ความสัมพันธ์กับ Repair Tasks
+  repairTasks RepairTask[]
+
+  // ✅ ความสัมพันธ์กับ Security Set Transactions
+  securitySetTransactions SecuritySetTransaction[]
+
+  // ✅ ความสัมพันธ์กับ Transfer Receive Tasks
+  transferReceiveTasks TransferReceiveTask[]
+}
+
+model DocumentShop {
+  id         Int      @id @default(autoincrement())
+  documentId Int
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  // 🔹 ข้อมูลร้านค้า
+  shopCode         String?
+  shopName         String?
+  startInstallDate DateTime?
+  endInstallDate   DateTime?
+  q7b7             String?
+  shopFocus        String?
+
+  // ✅ ความสัมพันธ์กับสินค้าภายในร้าน (Asset + Security)
+  assets       DocumentAsset[]
+  securitySets DocumentSecuritySet[]
+}
+
+model DocumentAsset {
+  id     Int          @id @default(autoincrement())
+  shopId Int
+  shop   DocumentShop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  name        String
+  size        String?
+  kv          String?
+  qty         Int
+  withdrawFor String?
+  barcode     String? // Barcode ที่ User กรอก (สำหรับ returnasset, shoptoshop)
+  grade       String? // เกรด Asset
+}
+
+model DocumentSecuritySet {
+  id     Int          @id @default(autoincrement())
+  shopId Int
+  shop   DocumentShop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  name        String
+  qty         Int
+  withdrawFor String?
+  barcode     String? // Barcode สำหรับ CONTROLBOX (เฉพาะ returnasset)
+}
+
+// ✅ ========== AssetTransactionHistory Model (ตารางประวัติการเคลื่อนไหวของ Asset) ==========
+model AssetTransactionHistory {
+  id Int @id @default(autoincrement())
+
+  // 🔗 อ้างอิงเอกสารต้นทาง
+  documentId Int
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  // 🟨 ========== 1. เกี่ยวกับ Asset (7 คอลัมน์) ==========
+  barcode       String  @db.VarChar(50)
+  assetName     String
+  startWarranty String? // วันที่เริ่มประกัน (เก็บเป็น String ตาม schema เดิม)
+  endWarranty   String? // วันที่สิ้นสุดประกัน
+  cheilPO       String? // เลขที่ PO
+  size          String? // ขนาด
+  grade         String? // เกรด (A, AB, B, BC, C, CD, D)
+
+  // 🟦 ========== 2. ขา IN (7 คอลัมน์) ==========
+  warehouseIn String? // โกดังที่รับเข้า
+  inStockDate DateTime? // วันที่รับเข้า
+  unitIn      Int? // จำนวนที่รับเข้า
+  fromVendor  String? // จาก Vendor ไหน
+  mcsCodeIn   String? // MCS Code ต้นทาง
+  fromShop    String? // จากร้านไหน
+  remarkIn    String?   @db.Text // หมายเหตุขาเข้า
+
+  // 🟥 ========== 3. ขา OUT (7 คอลัมน์) ==========
+  outDate    DateTime? // วันที่เบิกออก
+  unitOut    Int? // จำนวนที่เบิกออก
+  toVendor   String? // ไป Vendor ไหน
+  status     String? // สถานะ (ACTIVE, INACTIVE, etc.)
+  shopType   String? // Shop Type จาก Shop table (SES, QSS, NO MCS, etc.)
+  mcsCodeOut String? // MCS Code ปลายทาง
+  toShop     String? // ไปร้านไหน
+  remarkOut  String?   @db.Text // หมายเหตุขาออก
+
+  // 🟩 ========== 4. Auto by Logic (14 คอลัมน์) ==========
+
+  // 4.1 Asset Status (คำนวณอัตโนมัติ)
+  assetStatus String? // NEW, USED, REFURBISHED
+
+  // 4.2 Balance (คำนวณอัตโนมัติ)
+  balance Int @default(1) // 1 = มีของอยู่, 0 = ออกไปแล้ว
+
+  // 4.3 Transaction Category (Admin เลือก)
+  transactionCategory String? // "WK OUT-IN", "Borrow-Return", "Discarded", etc.
+
+  // 4.4 คอลัมน์สถิติ (คำนวณจาก In/Out Date) - Format: "2025 WK 23"
+  wkOut                String? @db.VarChar(20) // WK OUT
+  wkIn                 String? @db.VarChar(20) // WK IN
+  wkOutForRepair       String? @db.VarChar(20) // WK OUT for Repair
+  wkInForRepair        String? @db.VarChar(20) // WK IN for Repair
+  newInStock           String? @db.VarChar(20) // New In Stock
+  refurbishedInStock   String? @db.VarChar(20) // Refurbished Instock
+  borrow               String? @db.VarChar(20) // Borrow
+  return               String? @db.VarChar(20) // Return
+  repair               String? @db.VarChar(20) // Repair (ส่งซ่อม)
+  outToRentalWarehouse String? @db.VarChar(20) // Out to Rental Warehouse
+  inToRentalWarehouse  String? @db.VarChar(20) // In to Rental Warehouse
+  discarded            String? @db.VarChar(20) // Discarded
+  adjustError          String? @db.VarChar(20) // Adjust Error (ไว้ว่าง)
+
+  // 📅 Metadata
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  approvedAt DateTime? // วันที่อนุมัติ
+  approvedBy Int? // User ID ของ Admin ที่อนุมัติ
+
+  // 🔍 Indexes สำหรับค้นหาเร็วขึ้น
+  @@index([documentId])
+  @@index([barcode])
+  @@index([inStockDate])
+  @@index([outDate])
+  @@index([assetStatus])
+  @@index([balance])
+}
+
+// ✅ ========== PickAssetTask Model (งานที่รอ Picker กรอก Barcode) ==========
+model PickAssetTask {
+  id         Int      @id @default(autoincrement())
+  documentId Int
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  // 🔹 ข้อมูล Asset/Security ที่ต้อง Pick
+  assetName     String
+  size          String?
+  grade         String?
+  qty           Int     @default(1) // จำนวนต่อรายการ (มักจะเป็น 1)
+  isSecuritySet Boolean @default(false) // true = Security Set, false = Asset
+
+  // 🔹 โกดังที่ต้อง Pick (สำคัญ! ใช้กรอง Picker)
+  warehouse String
+
+  // 🔹 ข้อมูลจากเอกสาร (สำหรับแสดงใน UI)
+  shopCode         String?
+  shopName         String?
+  startInstallDate DateTime?
+  endInstallDate   DateTime?
+  q7b7             String?
+  shopFocus        String?
+
+  // 🔹 ข้อมูลผู้เบิก (สำหรับแสดงใน UI)
+  requesterName    String?
+  requesterCompany String?
+  requesterPhone   String?
+
+  // 🔹 Transaction Status (จาก Document - สำหรับบันทึกลง Transaction History)
+  transactionStatus String? // "Shop", "Discarded", "Repairing", etc.
+
+  // 🔹 สถานะ
+  status String @default("pending") // pending, picking, completed
+
+  // 🔹 Barcode ที่ Pick แล้ว
+  barcode         String? // Barcode ที่ Picker กรอก
+  barcodeImageUrl String? // รูปถ่าย Barcode
+  assetImageUrl   String? // รูปถ่าย Asset
+
+  // 📅 Metadata
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  completedAt DateTime?
+  completedBy Int? // User ID ของ Picker ที่ Complete
+
+  // 🔍 Indexes
+  @@index([documentId])
+  @@index([warehouse])
+  @@index([status])
+}
+
+// ✅ ========== RepairTask Model (งานซ่อมที่รอดำเนินการ) ==========
+model RepairTask {
+  id         Int      @id @default(autoincrement())
+  documentId Int
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  // 🔹 ข้อมูล Asset ที่ต้องซ่อม
+  barcode   String
+  assetName String
+  size      String?
+  grade     String?
+
+  // 🔹 โกดังที่ซ่อม (ดึงจากฟิลด์ "ซ่อมที่โกดัง")
+  repairWarehouse String
+
+  // 🔹 ข้อมูลผู้แจ้งซ่อม
+  reporterName    String?
+  reporterCompany String?
+  reporterPhone   String?
+  reporterVendor  String? // Vendor ของผู้แจ้งซ่อม (ใช้ตอนสร้าง Transaction)
+
+  // 🔹 สถานะ
+  status String @default("pending") // pending = รอดำเนินการ, repairing = กำลังซ่อม, completed = ซ่อมเสร็จ
+
+  // 🔹 วันที่ซ่อม
+  repairStartDate DateTime? // วันที่เริ่มซ่อม
+  repairEndDate   DateTime? // วันที่ซ่อมเสร็จ
+
+  // 🔹 Transaction ID ที่เกี่ยวข้อง (สำหรับอัปเดตขา OUT)
+  transactionId Int? // ID ของ AssetTransactionHistory ที่สร้างตอน Admin อนุมัติ
+
+  // 📅 Metadata
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  completedAt DateTime?
+  completedBy Int? // User ID ของผู้ทำการซ่อม
+
+  // 🔍 Indexes
+  @@index([documentId])
+  @@index([repairWarehouse])
+  @@index([status])
+  @@index([barcode])
+}
+
+// ✅ ========== SecuritySetTransaction Model (ตารางประวัติการเคลื่อนไหวของ Security Set) ==========
+model SecuritySetTransaction {
+  id Int @id @default(autoincrement())
+
+  // 🔗 เลขที่เอกสารอ้างอิง (คอลัมน์แรก)
+  docCode String @db.VarChar(50)
+
+  // 🔗 อ้างอิงเอกสารต้นทาง
+  documentId Int
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  // 🟨 ========== 1. เกี่ยวกับ Security Set (7 คอลัมน์) ==========
+  // ⚠️ รองรับเฉพาะ 3 Asset Names:
+  // 1. CONTROLBOX 6 PORT (M-60000R) with power cable (มี Barcode)
+  // 2. Security Type C Ver.7.1 (ไม่มี Barcode)
+  // 3. Security Type C Ver.7.0 (ไม่มี Barcode)
+  barcode       String? @db.VarChar(50) // เฉพาะ CONTROLBOX เท่านั้นที่มี Barcode
+  assetName     String
+  startWarranty String? // วันที่เริ่มประกัน
+  endWarranty   String? // วันที่สิ้นสุดประกัน
+  cheilPO       String? // เลขที่ PO
+  size          String? // ขนาด
+  grade         String? // เกรด (A, AB, B, BC, C, CD, D)
+
+  // 🟦 ========== 2. ขา IN (7 คอลัมน์) ==========
+  warehouseIn String? // โกดังที่รับเข้า
+  inStockDate DateTime? // วันที่รับเข้า
+  unitIn      Int? // จำนวนที่รับเข้า
+  fromVendor  String? // จาก Vendor ไหน
+  mcsCodeIn   String? // MCS Code ต้นทาง
+  fromShop    String? // จากร้านไหน
+  remarkIn    String?   @db.Text // หมายเหตุขาเข้า
+
+  // 🟥 ========== 3. ขา OUT (7 คอลัมน์) ==========
+  outDate    DateTime? // วันที่เบิกออก
+  unitOut    Int? // จำนวนที่เบิกออก
+  toVendor   String? // ไป Vendor ไหน
+  status     String? // สถานะ (ACTIVE, INACTIVE, etc.)
+  mcsCodeOut String? // MCS Code ปลายทาง
+  toShop     String? // ไปร้านไหน
+  remarkOut  String?   @db.Text // หมายเหตุขาออก
+
+  // 🟩 ========== 4. Auto by Logic (14 คอลัมน์) ==========
+
+  // 4.1 Asset Status (คำนวณอัตโนมัติ)
+  assetStatus String? // NEW, USED, REFURBISHED
+
+  // 4.2 Balance (คำนวณอัตโนมัติ)
+  balance Int @default(1) // 1 = มีของอยู่, 0 = ออกไปแล้ว
+
+  // 4.3 Transaction Category (Admin เลือก)
+  transactionCategory String? // "WK OUT-IN", "Borrow-Return", "Discarded", etc.
+
+  // 4.4 คอลัมน์สถิติ (คำนวณจาก In/Out Date) - Format: "2025 WK 23"
+  wkOut                String? @db.VarChar(20) // WK OUT
+  wkIn                 String? @db.VarChar(20) // WK IN
+  wkOutForRepair       String? @db.VarChar(20) // WK OUT for Repair
+  wkInForRepair        String? @db.VarChar(20) // WK IN for Repair
+  newInStock           String? @db.VarChar(20) // New In Stock
+  refurbishedInStock   String? @db.VarChar(20) // Refurbished Instock
+  borrow               String? @db.VarChar(20) // Borrow
+  return               String? @db.VarChar(20) // Return
+  outToRentalWarehouse String? @db.VarChar(20) // Out to Rental Warehouse
+  repair               String? @db.VarChar(20) // Repair (ส่งซ่อม)
+  inToRentalWarehouse  String? @db.VarChar(20) // In to Rental Warehouse
+  discarded            String? @db.VarChar(20) // Discarded
+  adjustError          String? @db.VarChar(20) // Adjust Error (ไว้ว่าง)
+
+  // 📅 Metadata
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  approvedAt DateTime? // วันที่อนุมัติ
+  approvedBy Int? // User ID ของ Admin ที่อนุมัติ
+
+  // 🔍 Indexes สำหรับค้นหาเร็วขึ้น
+  @@index([documentId])
+  @@index([docCode])
+  @@index([barcode])
+  @@index([assetName])
+  @@index([inStockDate])
+  @@index([outDate])
+  @@index([balance])
+}
+
+// ✅ ========== TransferReceiveTask Model (งานรับของโอนย้าย) ==========
+model TransferReceiveTask {
+  id         Int      @id @default(autoincrement())
+  documentId Int
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  // 🔗 อ้างอิง PickAssetTask ที่ Picker ต้นทางทำ
+  pickAssetTaskId Int
+
+  // 🔹 ข้อมูล Asset
+  barcode   String
+  assetName String
+  size      String?
+  grade     String?
+
+  // 🔹 โกดังต้นทาง - ปลายทาง
+  fromWarehouse String  // โกดังต้นทาง (ที่ส่งของมา)
+  toWarehouse   String  // โกดังปลายทาง (ที่รับของ)
+
+  // 🔹 สถานะ
+  status       String  @default("pending") // pending = รอตรวจสอบ, received = รับแล้ว, rejected = ปฏิเสธ
+  rejectReason String? // เหตุผลที่ปฏิเสธ
+
+  // 🔹 รูปถ่าย
+  assetImageUrl String? // รูปถ่าย Asset (สำหรับแต่ละรายการ)
+
+  // 📅 Metadata
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  receivedAt DateTime? // วันที่รับของ
+  receivedBy Int?      // User ID ของผู้รับของ
+
+  // 🔍 Indexes
+  @@index([documentId])
+  @@index([toWarehouse])
+  @@index([status])
+  @@index([pickAssetTaskId])
+}
