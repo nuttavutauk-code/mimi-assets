@@ -1,10 +1,17 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import * as XLSX from "xlsx";
-import { promises as fs } from "fs";
 import { requireAdmin } from "@/lib/auth-helpers";
 
 export const dynamic = "force-dynamic";
+
+// ✅ ฟังก์ชันแปลงค่าให้เป็น string ที่ปลอดภัย
+const safeString = (value: any): string | null => {
+  if (value === undefined || value === null) return null;
+  if (typeof value === "number" && isNaN(value)) return null;
+  const str = String(value).trim();
+  return str === "" || str === "NaN" || str === "undefined" ? null : str;
+};
 
 export async function POST(req: Request) {
   try {
@@ -26,15 +33,15 @@ export async function POST(req: Request) {
     const json = XLSX.utils.sheet_to_json(sheet);
 
     const parsed = json.map((r: any) => ({
-      barcode: r["BARCODE"] ?? null,
-      assetName: r["ASSET NAME"] ?? null,
-      assetType: r["ASSET TYPE"] ?? null,
-      dimension: r["DIMENSION"] ?? null,
-      warehouse: r["WAREHOUSE"] ?? null,
-      pictureUrl: r["IMAGE"] ?? null,
-      status: r["STATUS"] ?? null,
-      remark: r["REMARK"] ?? null,
-      digit: r["DIGIT"] ? String(r["DIGIT"]) : null,
+      barcode: safeString(r["BARCODE"]),
+      assetName: safeString(r["ASSET NAME"]),
+      assetType: safeString(r["ASSET TYPE"]),
+      dimension: safeString(r["DIMENSION"]),
+      warehouse: safeString(r["WAREHOUSE"]),
+      pictureUrl: safeString(r["IMAGE"]),
+      status: safeString(r["STATUS"]),
+      remark: safeString(r["REMARK"]),
+      digit: safeString(r["DIGIT"]),
     }));
 
     await prisma.librarySIS.deleteMany();

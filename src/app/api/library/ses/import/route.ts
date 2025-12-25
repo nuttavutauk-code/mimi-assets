@@ -6,6 +6,14 @@ import { requireAdmin } from "@/lib/auth-helpers";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+// ✅ ฟังก์ชันแปลงค่าให้เป็น string ที่ปลอดภัย
+const safeString = (value: any): string | null => {
+  if (value === undefined || value === null) return null;
+  if (typeof value === "number" && isNaN(value)) return null;
+  const str = String(value).trim();
+  return str === "" || str === "NaN" || str === "undefined" ? null : str;
+};
+
 /**
  * 📦 API: /api/library/ses/import
  * Method: POST
@@ -33,14 +41,14 @@ export async function POST(req: Request) {
 
     // แปลงข้อมูลเป็นรูปแบบที่ตรงกับ Prisma model
     const parsed = rows.map((r) => ({
-      category: r["CATEGORY"] ?? null,
-      imageUrl: r["IMAGE_URL"] ?? null,
-      assetName: r["ASSET NAME"] ?? "",
-      code: r["CODE"] ?? null,
-      barcode: r["BARCODE"] ?? null,
-      dimensionMm: r["DIMENSION(mm)"] ?? null,
-      status: r["STATUS"] ?? null,
-      remark: r["REMARK"] ?? null,
+      category: safeString(r["CATEGORY"]),
+      imageUrl: safeString(r["IMAGE_URL"]),
+      assetName: safeString(r["ASSET NAME"]) ?? "",
+      code: safeString(r["CODE"]),
+      barcode: safeString(r["BARCODE"]),
+      dimensionMm: safeString(r["DIMENSION(mm)"]),
+      status: safeString(r["STATUS"]),
+      remark: safeString(r["REMARK"]),
     }));
 
     // ลบข้อมูลเก่าทั้งหมดก่อนเพิ่มใหม่
