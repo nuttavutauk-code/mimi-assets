@@ -50,7 +50,7 @@ export async function POST(req: Request) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // ✅ อ่านไฟล์ Excel
+    // ✅ อ่านไฟล์ Excel (รองรับ .xlsx, .xls, .xlsb อัตโนมัติ)
     const workbook = XLSX.read(buffer, { type: "buffer" });
     const sheetNames = workbook.SheetNames;
 
@@ -68,6 +68,14 @@ export async function POST(req: Request) {
       }, { status: 400 });
     }
 
+    // ✅ ฟังก์ชันแปลงค่าให้เป็น string ที่ปลอดภัย (ป้องกัน NaN, undefined)
+    const safeString = (value: any): string | null => {
+      if (value === undefined || value === null) return null;
+      if (typeof value === "number" && isNaN(value)) return null;
+      const str = String(value).trim();
+      return str === "" || str === "NaN" || str === "undefined" ? null : str;
+    };
+
     // ✅ ฟังก์ชันอ่านข้อมูลจาก Sheet
     const parseSheet = (sheetName: string, status: string): any[] => {
       if (!sheetNames.includes(sheetName)) {
@@ -80,19 +88,33 @@ export async function POST(req: Request) {
 
       console.log(`📊 Sheet "${sheetName}": ${rows.length} rows`);
 
-      return rows.map((row) => {
-        const mcsCode = row["Site ID"] ? String(row["Site ID"]).trim() : "";
+      let skippedNewShop = 0;
+
+      const result = rows.map((row) => {
+        const mcsCode = safeString(row["Site ID"]);
         if (!mcsCode) return null;
+
+        // ✅ ข้าม row ที่ Site ID มีคำว่า "NEW SHOP"
+        if (mcsCode.toUpperCase().includes("NEW SHOP")) {
+          skippedNewShop++;
+          return null;
+        }
 
         return {
           mcsCode,
-          shopName: row["Site Name"] ? String(row["Site Name"]).trim() : null,
-          region: row["Region"] ? String(row["Region"]).trim() : null,
-          state: row["State"] ? String(row["State"]).trim() : null,
-          shopType: row["MOBILE/Shop Investment Type"] ? String(row["MOBILE/Shop Investment Type"]).trim() : null,
+          shopName: safeString(row["Site Name"]),
+          region: safeString(row["Region"]),
+          state: safeString(row["State"]),
+          shopType: safeString(row["MOBILE/Shop Investment Type"]),
           status,
         };
       }).filter(Boolean);
+
+      if (skippedNewShop > 0) {
+        console.log(`⏭️ Sheet "${sheetName}": Skipped ${skippedNewShop} rows with "NEW SHOP"`);
+      }
+
+      return result;
     };
 
     // ✅ อ่านข้อมูลจากทั้ง 2 Sheet
