@@ -7,10 +7,23 @@ import * as XLSX from "xlsx";
 // ✅ ขนาด Batch (ปรับได้ตามความเหมาะสม)
 const BATCH_SIZE = 500;
 
+// ✅ ชื่อ Sheet ที่ต้องการอ่าน
+const SHEET_OPEN = "MX Channel Master";
+const SHEET_CLOSED = "MX Shop Closed";
+
+// ✅ Mapping คอลัมน์จากไฟล์ดิบ -> ระบบเรา
+const COLUMN_MAPPING = {
+  "Site ID": "mcsCode",
+  "Site Name": "shopName",
+  "Region": "region",
+  "State": "state",
+  "MOBILE/Shop Investment Type": "shopType",
+};
+
 /**
  * 📦 API: POST /api/shop/import
  * อ่านไฟล์ Excel แล้ว update/create ข้อมูล Shop ตาม mcsCode
- * รองรับข้อมูล 10,000+ รายการด้วย Batch Processing
+ * รองรับไฟล์ดิบที่มี Sheet "MX Channel Master" (OPEN) และ "MX Shop Closed" (CLOSED)
  */
 export async function POST(req: Request) {
   try {
@@ -39,38 +52,61 @@ export async function POST(req: Request) {
 
     // ✅ อ่านไฟล์ Excel
     const workbook = XLSX.read(buffer, { type: "buffer" });
-    const sheetName = workbook.SheetNames[0];
-    const sheet = workbook.Sheets[sheetName];
-    const rows: any[] = XLSX.utils.sheet_to_json(sheet);
+    const sheetNames = workbook.SheetNames;
 
-    if (!rows.length) {
+    console.log(`📊 Found sheets: ${sheetNames.join(", ")}`);
+
+    // ✅ เช็คว่ามี Sheet ที่ต้องการอย่างน้อย 1 อัน
+    const hasOpenSheet = sheetNames.includes(SHEET_OPEN);
+    const hasClosedSheet = sheetNames.includes(SHEET_CLOSED);
+
+    if (!hasOpenSheet && !hasClosedSheet) {
+      return NextResponse.json({
+        error: `ไม่พบ Sheet ที่ต้องการ!`,
+        hint: `ต้องมี Sheet "${SHEET_OPEN}" หรือ "${SHEET_CLOSED}" อย่างน้อย 1 อัน`,
+        foundSheets: sheetNames,
+      }, { status: 400 });
+    }
+
+    // ✅ ฟังก์ชันอ่านข้อมูลจาก Sheet
+    const parseSheet = (sheetName: string, status: string): any[] => {
+      if (!sheetNames.includes(sheetName)) {
+        console.log(`⏭️ Sheet "${sheetName}" not found, skipping...`);
+        return [];
+      }
+
+      const sheet = workbook.Sheets[sheetName];
+      const rows: any[] = XLSX.utils.sheet_to_json(sheet);
+
+      console.log(`📊 Sheet "${sheetName}": ${rows.length} rows`);
+
+      return rows.map((row) => {
+        const mcsCode = row["Site ID"] ? String(row["Site ID"]).trim() : "";
+        if (!mcsCode) return null;
+
+        return {
+          mcsCode,
+          shopName: row["Site Name"] ? String(row["Site Name"]).trim() : null,
+          region: row["Region"] ? String(row["Region"]).trim() : null,
+          state: row["State"] ? String(row["State"]).trim() : null,
+          shopType: row["MOBILE/Shop Investment Type"] ? String(row["MOBILE/Shop Investment Type"]).trim() : null,
+          status,
+        };
+      }).filter(Boolean);
+    };
+
+    // ✅ อ่านข้อมูลจากทั้ง 2 Sheet
+    const openShops = parseSheet(SHEET_OPEN, "OPEN");
+    const closedShops = parseSheet(SHEET_CLOSED, "CLOSED");
+
+    // ✅ รวมข้อมูลทั้งหมด
+    const allShops = [...openShops, ...closedShops];
+
+    if (allShops.length === 0) {
       return NextResponse.json({ error: "ไม่พบข้อมูลในไฟล์" }, { status: 400 });
     }
 
-    // ✅ ตรวจสอบคอลัมน์ในไฟล์
-    const REQUIRED_COLUMNS = ["MCS CODE"];
-    const EXPECTED_COLUMNS = ["MCS CODE", "SHOP NAME", "REGION", "STATE", "SHOP TYPE", "STATUS"];
-    const fileColumns = Object.keys(rows[0] || {});
-    const missingColumns = REQUIRED_COLUMNS.filter(col => !fileColumns.includes(col));
-    
-    if (missingColumns.length > 0) {
-      return NextResponse.json({ 
-        error: `ไฟล์ไม่ถูกต้อง! ไม่พบคอลัมน์: ${missingColumns.join(", ")}`,
-        expectedColumns: EXPECTED_COLUMNS,
-        foundColumns: fileColumns,
-        hint: "กรุณาใช้ไฟล์เทมเพลต Shop ที่ถูกต้อง"
-      }, { status: 400 });
-    }
-
-    // ✅ ตรวจสอบว่าไม่ใช่ไฟล์ Asset (มีคอลัมน์ BARCODE)
-    if (fileColumns.includes("BARCODE")) {
-      return NextResponse.json({ 
-        error: "ไฟล์นี้เป็นเทมเพลต Asset ไม่ใช่เทมเพลต Shop!",
-        hint: "กรุณาใช้ไฟล์เทมเพลต Shop ที่มีคอลัมน์: " + EXPECTED_COLUMNS.join(", ")
-      }, { status: 400 });
-    }
-
-    console.log(`📊 Total rows in Excel: ${rows.length}`);
+    console.log(`📊 Total shops: ${allShops.length} (OPEN: ${openShops.length}, CLOSED: ${closedShops.length})`);
 
     // ✅ ดึง mcsCode ที่มีอยู่แล้วทั้งหมด (ทำครั้งเดียว)
     const existingShops = await prisma.shop.findMany({
@@ -81,30 +117,19 @@ export async function POST(req: Request) {
     // ✅ เตรียมข้อมูลแยก create และ update
     const shopsToCreate: any[] = [];
     const shopsToUpdate: any[] = [];
-    let skipped = 0;
+    const processedMcsCodes = new Set<string>();
 
-    for (const row of rows) {
-      const mcsCode = String(row["MCS CODE"] || "").trim();
-      if (!mcsCode) {
-        skipped++;
+    for (const shop of allShops) {
+      // ข้ามถ้า mcsCode ซ้ำในไฟล์เดียวกัน (เอาตัวแรกที่เจอ)
+      if (processedMcsCodes.has(shop.mcsCode)) {
         continue;
       }
+      processedMcsCodes.add(shop.mcsCode);
 
-      const shopData = {
-        mcsCode,
-        shopName: row["SHOP NAME"] ? String(row["SHOP NAME"]).trim() : null,
-        region: row["REGION"] ? String(row["REGION"]).trim() : null,
-        state: row["STATE"] ? String(row["STATE"]).trim() : null,
-        shopType: row["SHOP TYPE"] ? String(row["SHOP TYPE"]).trim() : null,
-        status: row["STATUS"] ? String(row["STATUS"]).trim() : null,
-      };
-
-      if (existingMcsCodes.has(mcsCode)) {
-        shopsToUpdate.push(shopData);
+      if (existingMcsCodes.has(shop.mcsCode)) {
+        shopsToUpdate.push(shop);
       } else {
-        shopsToCreate.push(shopData);
-        // เพิ่มเข้า Set เพื่อป้องกัน duplicate ในไฟล์เดียวกัน
-        existingMcsCodes.add(mcsCode);
+        shopsToCreate.push(shop);
       }
     }
 
@@ -153,10 +178,7 @@ export async function POST(req: Request) {
     let message = `นำเข้าข้อมูล Shop สำเร็จ`;
     message += ` | เพิ่มใหม่ ${createdCount} รายการ`;
     message += ` | อัปเดต ${updatedCount} รายการ`;
-
-    if (skipped > 0) {
-      message += ` | ข้าม ${skipped} แถวที่ไม่มี MCS CODE`;
-    }
+    message += ` | (OPEN: ${openShops.length}, CLOSED: ${closedShops.length})`;
 
     console.log(`🎉 Import completed: ${message}`);
 
@@ -165,7 +187,8 @@ export async function POST(req: Request) {
       message,
       created: createdCount,
       updated: updatedCount,
-      skipped,
+      openCount: openShops.length,
+      closedCount: closedShops.length,
       total: createdCount + updatedCount,
     });
   } catch (error) {

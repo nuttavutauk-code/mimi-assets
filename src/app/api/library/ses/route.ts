@@ -26,7 +26,7 @@ export async function GET(req: Request) {
         })
       : ({} );
 
-    const [items, total] = await Promise.all([
+    const [items, total, lastRecord] = await Promise.all([
       prisma.librarySES.findMany({
         where,
         orderBy: { id: "asc" },
@@ -34,6 +34,10 @@ export async function GET(req: Request) {
         take: limit,
       }),
       prisma.librarySES.count({ where }),
+      prisma.librarySES.findFirst({
+        orderBy: { updatedAt: "desc" },
+        select: { updatedAt: true },
+      }),
     ]);
 
     return NextResponse.json({
@@ -41,6 +45,7 @@ export async function GET(req: Request) {
       total,
       page,
       totalPages: Math.ceil(total / limit),
+      lastUpdated: lastRecord?.updatedAt || null,
     });
   } catch (err) {
     console.error("[GET Library SES ERROR]", err);

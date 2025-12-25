@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { Input } from "@/components/ui/input";
-import { BookOpenText, Search, ChevronLeft, ChevronRight, Loader2, ImageIcon, Warehouse } from "lucide-react";
+import { BookOpenText, Search, ChevronLeft, ChevronRight, Loader2, ImageIcon, Warehouse, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
@@ -15,6 +15,12 @@ export default function UserLibrarySIS() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("th-TH", { day: "2-digit", month: "2-digit", year: "numeric" });
+  };
 
   const fetchLibrarySIS = async (searchValue = "", pageNum = 1) => {
     try {
@@ -25,6 +31,7 @@ export default function UserLibrarySIS() {
       if (res.ok) {
         setData(json.data);
         setTotalPages(json.totalPages);
+        if (json.lastUpdated) setLastUpdated(json.lastUpdated);
       } else {
         toast.error(json.error || "โหลดข้อมูลไม่สำเร็จ");
       }
@@ -55,7 +62,11 @@ export default function UserLibrarySIS() {
           </div>
           <h1 className="text-xl sm:text-2xl font-semibold text-foreground">Library SIS</h1>
         </div>
-        <p className="text-sm text-muted-foreground">คลังข้อมูล Security Installation Standard</p>
+        {lastUpdated && (
+          <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+            <Calendar className="w-3 h-3" /> Update {formatDate(lastUpdated)}
+          </p>
+        )}
       </div>
 
       {/* Search */}

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, Search, ChevronLeft, ChevronRight, RefreshCw, Shield, Filter } from "lucide-react";
+import { Loader2, Search, ChevronLeft, ChevronRight, RefreshCw, Shield, Filter, Pencil, Save, X, Download } from "lucide-react";
 
 interface SecuritySetData {
   id: number; docCode: string; barcode: string; assetName: string; startWarranty: string; endWarranty: string;
@@ -41,6 +41,30 @@ const orderedColumns = [
   { name: "Adjust Error", group: "auto" },
 ];
 
+// ✅ คอลัมน์ที่สามารถแก้ไขได้ (map ชื่อคอลัมน์ -> field name)
+const EDITABLE_COLUMNS: Record<string, string> = {
+  "Asset Name": "assetName",
+  "Size": "size",
+  "Grade": "grade",
+  "Start Warranty": "startWarranty",
+  "End Warranty": "endWarranty",
+  "Cheil PO": "cheilPO",
+  "From Vendor": "fromVendor",
+  "MCS Code (In)": "mcsCodeIn",
+  "From Shop": "fromShop",
+  "Remark IN": "remarkIn",
+  "To Vendor": "toVendor",
+  "Status": "status",
+  "MCS Code (Out)": "mcsCodeOut",
+  "To Shop": "toShop",
+  "Remark OUT": "remarkOut",
+  "Transaction Category": "transactionCategory",
+  "WK OUT": "wkOut",
+  "WK IN": "wkIn",
+  "WK OUT for Repair": "wkOutForRepair",
+  "WK IN for Repair": "wkInForRepair",
+};
+
 export default function AdminDatabaseSecuritySet() {
   const [data, setData] = useState<SecuritySetData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,6 +72,39 @@ export default function AdminDatabaseSecuritySet() {
   const [pagination, setPagination] = useState<Pagination>({ currentPage: 1, totalPages: 1, totalCount: 0, limit: 50 });
   const [filters, setFilters] = useState({ docCode: "", barcode: "", assetName: "", mcsCode: "", shopName: "", noMcs: false });
   const [appliedFilters, setAppliedFilters] = useState(filters);
+
+  // ✅ Edit Mode States
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editedData, setEditedData] = useState<SecuritySetData[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+
+  // ✅ Export State
+  const [exporting, setExporting] = useState(false);
+
+  // ✅ Export Function
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const res = await fetch("/api/database-security-set/export");
+      if (!res.ok) throw new Error("Export failed");
+      
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `SecuritySet_Database_${new Date().toISOString().split("T")[0]}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error("Export error:", error);
+      alert("เกิดข้อผิดพลาดในการ Export");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const fetchData = useCallback(async (page: number = 1) => {
     setLoading(true);
@@ -68,13 +125,119 @@ export default function AdminDatabaseSecuritySet() {
 
   useEffect(() => { fetchData(1); }, [fetchData]);
 
-  const handleSearch = () => { setAppliedFilters(filters); setPagination((prev) => ({ ...prev, currentPage: 1 })); setShowFilters(false); };
+  const handleSearch = () => { setAppliedFilters(filters); setPagination((prev) => ({ ...prev, currentPage: 1 })); setShowFilters(false); setIsEditMode(false); };
   const handlePageChange = (newPage: number) => { if (newPage >= 1 && newPage <= pagination.totalPages) fetchData(newPage); };
 
   const getHeaderColor = (group: string) => columnGroups[group as keyof typeof columnGroups]?.headerColor || "bg-gray-100";
   const getCellColor = (group: string) => columnGroups[group as keyof typeof columnGroups]?.color || "";
 
-  const renderCellValue = (item: SecuritySetData, columnName: string) => {
+  // ✅ เช็คว่าคอลัมน์นี้แก้ไขได้ไหม
+  const isEditableColumn = (columnName: string) => columnName in EDITABLE_COLUMNS;
+
+  // ✅ เข้า Edit Mode
+  const handleEnterEditMode = () => {
+    // ต้องมี filter อย่างน้อย 1 อย่าง
+    if (!appliedFilters.docCode && !appliedFilters.barcode && !appliedFilters.assetName && !appliedFilters.mcsCode && !appliedFilters.shopName && !appliedFilters.noMcs) {
+      alert("กรุณากรอก Filter อย่างน้อย 1 ช่อง ก่อนเข้าโหมดแก้ไข");
+      return;
+    }
+    setEditedData(JSON.parse(JSON.stringify(data))); // Deep copy
+    setIsEditMode(true);
+  };
+
+  // ✅ ยกเลิก Edit Mode
+  const handleCancelEdit = () => {
+    setIsEditMode(false);
+    setEditedData([]);
+  };
+
+  // ✅ อัปเดตค่าใน editedData
+  const handleCellChange = (rowIndex: number, fieldName: string, value: string) => {
+    setEditedData((prev) => {
+      const newData = [...prev];
+      (newData[rowIndex] as any)[fieldName] = value;
+      return newData;
+    });
+  };
+
+  // ✅ บันทึกข้อมูล
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      // หา rows ที่มีการเปลี่ยนแปลง
+      const updates = editedData
+        .map((edited, index) => {
+          const original = data[index];
+          const changes: Record<string, any> = { id: edited.id };
+          let hasChanges = false;
+
+          for (const [colName, fieldName] of Object.entries(EDITABLE_COLUMNS)) {
+            const originalValue = (original as any)[fieldName];
+            const editedValue = (edited as any)[fieldName];
+            if (originalValue !== editedValue) {
+              changes[fieldName] = editedValue;
+              hasChanges = true;
+            }
+          }
+
+          return hasChanges ? changes : null;
+        })
+        .filter(Boolean);
+
+      if (updates.length === 0) {
+        alert("ไม่มีข้อมูลที่เปลี่ยนแปลง");
+        setShowConfirmDialog(false);
+        setSaving(false);
+        return;
+      }
+
+      const res = await fetch("/api/database-security-set/update", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ updates }),
+      });
+
+      const result = await res.json();
+
+      if (result.success) {
+        alert(`บันทึกสำเร็จ! อัปเดต ${result.updatedCount} รายการ`);
+        setIsEditMode(false);
+        setEditedData([]);
+        fetchData(pagination.currentPage); // Refresh data
+      } else {
+        alert(`เกิดข้อผิดพลาด: ${result.message}`);
+      }
+    } catch (error) {
+      console.error("Error saving:", error);
+      alert("เกิดข้อผิดพลาดในการบันทึก");
+    } finally {
+      setSaving(false);
+      setShowConfirmDialog(false);
+    }
+  };
+
+  // ✅ Render cell value (ปกติ หรือ Input ถ้าอยู่ใน Edit Mode)
+  const renderCellValue = (item: SecuritySetData, columnName: string, rowIndex: number) => {
+    const fieldName = EDITABLE_COLUMNS[columnName];
+    const isEditable = isEditableColumn(columnName);
+    const currentData = isEditMode ? editedData[rowIndex] : item;
+
+    // ✅ ถ้าอยู่ใน Edit Mode และคอลัมน์แก้ไขได้
+    if (isEditMode && isEditable && currentData) {
+      const value = (currentData as any)[fieldName] ?? "";
+      const displayValue = value === "-" ? "" : value;
+      return (
+        <input
+          type="text"
+          value={displayValue}
+          onChange={(e) => handleCellChange(rowIndex, fieldName, e.target.value)}
+          className="w-full px-1 py-0.5 text-xs border border-red-300 rounded bg-white text-red-600 focus:outline-none focus:ring-1 focus:ring-red-400"
+          style={{ minWidth: "60px" }}
+        />
+      );
+    }
+
+    // ✅ โหมดปกติ หรือ คอลัมน์ที่แก้ไม่ได้
     const map: Record<string, any> = {
       "เลขที่เอกสาร": <span className="font-medium text-primary">{item.docCode}</span>,
       "Barcode": <span className="font-mono text-xs">{item.barcode}</span>, "Asset Name": item.assetName, "Size": item.size, "Grade": item.grade,
@@ -105,30 +268,51 @@ export default function AdminDatabaseSecuritySet() {
           <button onClick={() => setShowFilters(!showFilters)} className="sm:hidden glass-button px-4 py-2.5 text-sm font-medium flex items-center gap-2">
             <Filter className="w-4 h-4" />กรอง
           </button>
-          <button onClick={() => fetchData(pagination.currentPage)} className="glass-button px-4 py-2.5 text-sm font-medium flex items-center gap-2">
-            <RefreshCw className="w-4 h-4" />รีเฟรช
-          </button>
+          {!isEditMode ? (
+            <>
+              <button onClick={() => fetchData(pagination.currentPage)} className="glass-button px-4 py-2.5 text-sm font-medium flex items-center gap-2">
+                <RefreshCw className="w-4 h-4" />รีเฟรช
+              </button>
+              <button onClick={handleExport} disabled={exporting} className="glass-button px-4 py-2.5 text-sm font-medium flex items-center gap-2 text-green-600 border-green-300 hover:bg-green-50">
+                {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                Export
+              </button>
+              <button onClick={handleEnterEditMode} className="glass-button px-4 py-2.5 text-sm font-medium flex items-center gap-2 text-amber-600 border-amber-300 hover:bg-amber-50">
+                <Pencil className="w-4 h-4" />แก้ไขข้อมูล
+              </button>
+            </>
+          ) : (
+            <>
+              <button onClick={handleCancelEdit} className="glass-button px-4 py-2.5 text-sm font-medium flex items-center gap-2 text-gray-600">
+                <X className="w-4 h-4" />ยกเลิก
+              </button>
+              <button onClick={() => setShowConfirmDialog(true)} disabled={saving} className="gradient-button px-4 py-2.5 text-sm font-medium flex items-center gap-2">
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                บันทึกข้อมูล
+              </button>
+            </>
+          )}
         </div>
       </div>
 
       {/* Filters - Desktop */}
       <div className="glass-card p-4 sm:p-5 hidden sm:block">
         <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 mb-4">
-          <Input placeholder="เลขที่เอกสาร" value={filters.docCode} onChange={(e) => setFilters({ ...filters, docCode: e.target.value })} onKeyDown={(e) => e.key === "Enter" && handleSearch()} className="glass-input" />
-          <Input placeholder="Barcode" value={filters.barcode} onChange={(e) => setFilters({ ...filters, barcode: e.target.value })} onKeyDown={(e) => e.key === "Enter" && handleSearch()} className="glass-input" />
-          <Input placeholder="Asset Name" value={filters.assetName} onChange={(e) => setFilters({ ...filters, assetName: e.target.value })} onKeyDown={(e) => e.key === "Enter" && handleSearch()} className="glass-input" />
-          <Input placeholder="MCS Code" value={filters.mcsCode} onChange={(e) => setFilters({ ...filters, mcsCode: e.target.value })} onKeyDown={(e) => e.key === "Enter" && handleSearch()} className="glass-input" />
-          <Input placeholder="Shop Name" value={filters.shopName} onChange={(e) => setFilters({ ...filters, shopName: e.target.value })} onKeyDown={(e) => e.key === "Enter" && handleSearch()} className="glass-input" />
-          <button onClick={handleSearch} className="gradient-button py-2 flex items-center justify-center gap-2 text-sm font-medium"><Search className="w-4 h-4" />ค้นหา</button>
+          <Input placeholder="เลขที่เอกสาร" value={filters.docCode} onChange={(e) => setFilters({ ...filters, docCode: e.target.value })} onKeyDown={(e) => e.key === "Enter" && handleSearch()} className="glass-input" disabled={isEditMode} />
+          <Input placeholder="Barcode" value={filters.barcode} onChange={(e) => setFilters({ ...filters, barcode: e.target.value })} onKeyDown={(e) => e.key === "Enter" && handleSearch()} className="glass-input" disabled={isEditMode} />
+          <Input placeholder="Asset Name" value={filters.assetName} onChange={(e) => setFilters({ ...filters, assetName: e.target.value })} onKeyDown={(e) => e.key === "Enter" && handleSearch()} className="glass-input" disabled={isEditMode} />
+          <Input placeholder="MCS Code" value={filters.mcsCode} onChange={(e) => setFilters({ ...filters, mcsCode: e.target.value })} onKeyDown={(e) => e.key === "Enter" && handleSearch()} className="glass-input" disabled={isEditMode} />
+          <Input placeholder="Shop Name" value={filters.shopName} onChange={(e) => setFilters({ ...filters, shopName: e.target.value })} onKeyDown={(e) => e.key === "Enter" && handleSearch()} className="glass-input" disabled={isEditMode} />
+          <button onClick={handleSearch} disabled={isEditMode} className="gradient-button py-2 flex items-center justify-center gap-2 text-sm font-medium disabled:opacity-50"><Search className="w-4 h-4" />ค้นหา</button>
         </div>
         <div className="flex items-center gap-2">
-          <Checkbox id="noMcs" checked={filters.noMcs} onCheckedChange={(checked) => setFilters({ ...filters, noMcs: !!checked })} />
+          <Checkbox id="noMcs" checked={filters.noMcs} onCheckedChange={(checked) => setFilters({ ...filters, noMcs: !!checked })} disabled={isEditMode} />
           <label htmlFor="noMcs" className="text-sm text-muted-foreground cursor-pointer">แสดงเฉพาะที่ไม่มี MCS Code</label>
         </div>
       </div>
 
       {/* Filters - Mobile */}
-      {showFilters && (
+      {showFilters && !isEditMode && (
         <div className="glass-card p-4 sm:hidden space-y-3">
           <Input placeholder="เลขที่เอกสาร" value={filters.docCode} onChange={(e) => setFilters({ ...filters, docCode: e.target.value })} className="glass-input" />
           <Input placeholder="Barcode" value={filters.barcode} onChange={(e) => setFilters({ ...filters, barcode: e.target.value })} className="glass-input" />
@@ -140,13 +324,16 @@ export default function AdminDatabaseSecuritySet() {
         </div>
       )}
 
-      {/* Legend */}
+      {/* Legend + Edit Mode Indicator */}
       <div className="flex flex-wrap gap-2 text-xs">
         <span className="px-2 py-1 rounded-md bg-orange-100 text-orange-800">🟧 Doc</span>
         <span className="px-2 py-1 rounded-md bg-amber-100 text-amber-800">🟨 Asset</span>
         <span className="px-2 py-1 rounded-md bg-blue-100 text-blue-800">🟦 IN</span>
         <span className="px-2 py-1 rounded-md bg-rose-100 text-rose-800">🟥 OUT</span>
         <span className="px-2 py-1 rounded-md bg-emerald-100 text-emerald-800">🟩 Auto</span>
+        {isEditMode && (
+          <span className="px-2 py-1 rounded-md bg-red-100 text-red-600 font-medium">✏️ โหมดแก้ไข (ตัวอักษรสีแดง = แก้ไขได้)</span>
+        )}
         <span className="ml-auto text-muted-foreground">รวม {pagination.totalCount.toLocaleString()} รายการ</span>
       </div>
 
@@ -162,19 +349,25 @@ export default function AdminDatabaseSecuritySet() {
               <table className="w-full text-xs border-collapse whitespace-nowrap">
                 <thead className="sticky top-0 z-10">
                   <tr>
-                    {orderedColumns.map((col, i) => (
-                      <th key={i} className={`px-2 py-2 text-left whitespace-nowrap font-semibold border-b border-black/10 ${getHeaderColor(col.group)}`}>
-                        {col.name}
-                      </th>
-                    ))}
+                    {orderedColumns.map((col, i) => {
+                      const isEditable = isEditableColumn(col.name);
+                      return (
+                        <th 
+                          key={i} 
+                          className={`px-2 py-2 text-left whitespace-nowrap font-semibold border-b border-black/10 ${getHeaderColor(col.group)} ${isEditMode && isEditable ? "text-red-600" : ""}`}
+                        >
+                          {col.name}
+                        </th>
+                      );
+                    })}
                   </tr>
                 </thead>
                 <tbody>
-                  {data.map((item, idx) => (
+                  {(isEditMode ? editedData : data).map((item, idx) => (
                     <tr key={idx} className="hover:bg-black/2 transition-colors">
                       {orderedColumns.map((col, i) => (
                         <td key={i} className={`px-2 py-1.5 whitespace-nowrap border-b border-black/5 ${getCellColor(col.group)}`}>
-                          {renderCellValue(item, col.name)}
+                          {renderCellValue(data[idx], col.name, idx)}
                         </td>
                       ))}
                     </tr>
@@ -185,14 +378,43 @@ export default function AdminDatabaseSecuritySet() {
             <div className="flex justify-between items-center p-4 border-t border-black/5 bg-white/50">
               <span className="text-sm text-muted-foreground">หน้า {pagination.currentPage}/{pagination.totalPages}</span>
               <div className="flex items-center gap-2">
-                <button onClick={() => handlePageChange(pagination.currentPage - 1)} disabled={pagination.currentPage === 1} className="p-2 rounded-lg hover:bg-black/5 disabled:opacity-50"><ChevronLeft className="w-4 h-4" /></button>
+                <button onClick={() => handlePageChange(pagination.currentPage - 1)} disabled={pagination.currentPage === 1 || isEditMode} className="p-2 rounded-lg hover:bg-black/5 disabled:opacity-50"><ChevronLeft className="w-4 h-4" /></button>
                 <span className="px-3 text-sm font-medium">{pagination.currentPage}</span>
-                <button onClick={() => handlePageChange(pagination.currentPage + 1)} disabled={pagination.currentPage === pagination.totalPages} className="p-2 rounded-lg hover:bg-black/5 disabled:opacity-50"><ChevronRight className="w-4 h-4" /></button>
+                <button onClick={() => handlePageChange(pagination.currentPage + 1)} disabled={pagination.currentPage === pagination.totalPages || isEditMode} className="p-2 rounded-lg hover:bg-black/5 disabled:opacity-50"><ChevronRight className="w-4 h-4" /></button>
               </div>
             </div>
           </>
         )}
       </div>
+
+      {/* Confirm Dialog */}
+      {showConfirmDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl">
+            <h3 className="text-lg font-semibold mb-2">ยืนยันการบันทึก</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              คุณต้องการบันทึกการเปลี่ยนแปลงข้อมูลใช่หรือไม่?
+            </p>
+            <div className="flex justify-end gap-2">
+              <button 
+                onClick={() => setShowConfirmDialog(false)} 
+                disabled={saving}
+                className="px-4 py-2 text-sm rounded-lg border border-gray-300 hover:bg-gray-50"
+              >
+                ยกเลิก
+              </button>
+              <button 
+                onClick={handleSave} 
+                disabled={saving}
+                className="px-4 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-2"
+              >
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                ยืนยัน
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
