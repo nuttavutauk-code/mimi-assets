@@ -37,6 +37,8 @@ import {
     LogOut,
     ChevronDown,
     LayoutDashboard,
+    Eye, // ✅ เพิ่ม icon สำหรับ View
+    Truck, // ✅ เพิ่ม icon สำหรับ รับของโอนย้าย
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 
@@ -46,7 +48,7 @@ const USER_MENU = [
     { href: "/dashboard/user-document", label: "สร้างเอกสาร", icon: FileText },
     { href: "/dashboard/user-list", label: "รายการเอกสาร", icon: ListChecks },
     { href: "/dashboard/user-pick", label: "Pick Asset", icon: PackageOpen },
-    { href: "/dashboard/receive-transfer", label: "รับของโอนย้าย", icon: Package },
+    { href: "/dashboard/receive-transfer", label: "รับของโอนย้าย", icon: Truck }, // ✅ เพิ่มกลับมา
     { href: "/dashboard/repair-asset", label: "Repair Asset", icon: Wrench },
     {
         group: "คลังข้อมูล",
@@ -58,12 +60,21 @@ const USER_MENU = [
     },
 ];
 
-// แยกเมนู ADMIN
+// ✅ แก้ไขเมนู ADMIN - เพิ่ม 3 หน้าใหม่
 const ADMIN_MENU = [
     { href: "/dashboard", label: "แดชบอร์ด", icon: LayoutDashboard },
     { href: "/dashboard/admin-list", label: "รายการเอกสาร", icon: ListChecks },
     { href: "/dashboard/admin-database", label: "Database", icon: Database },
     { href: "/dashboard/admin-database-security-set", label: "Database Security Set", icon: ShieldCheck },
+    {
+        group: "ดูรายการทำงาน",
+        icon: Eye,
+        items: [
+            { href: "/dashboard/admin-pick", label: "Pick Asset", icon: PackageOpen },
+            { href: "/dashboard/admin-receive-transfer", label: "รับของโอนย้าย", icon: Truck },
+            { href: "/dashboard/admin-repair-asset", label: "Repair Asset", icon: Wrench },
+        ],
+    },
     {
         group: "จัดการระบบ",
         icon: Settings2,
@@ -82,7 +93,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const router = useRouter();
     const pathname = usePathname();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-    const [expandedGroups, setExpandedGroups] = useState<string[]>(["คลังข้อมูล", "จัดการระบบ"]);
+    const [expandedGroups, setExpandedGroups] = useState<string[]>(["คลังข้อมูล", "จัดการระบบ", "ดูรายการทำงาน"]);
 
     useEffect(() => {
         if (status === "unauthenticated") router.push("/login");
@@ -198,8 +209,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <header className="lg:hidden sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-black/5">
                 <div className="flex items-center justify-between px-4 py-3">
                     <div className="flex items-center gap-3">
-                        <div className="w-9 h-9">
-                            <img src="/mimi-logo.png" alt="MiMi Assets" className="w-full h-full object-contain" />
+                        <div className="gradient-icon w-9 h-9">
+                            <Package className="w-4 h-4 text-white" />
                         </div>
                         <div>
                             <h1 className="text-sm font-semibold text-foreground">MiMi Assets</h1>
@@ -282,8 +293,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     {/* Brand */}
                     <div className="p-5 border-b border-black/5">
                         <div className="flex items-center gap-3">
-                            <div className="w-11 h-11">
-                                <img src="/mimi-logo.png" alt="MiMi Assets" className="w-full h-full object-contain" />
+                            <div className="gradient-icon w-11 h-11">
+                                <Package className="w-5 h-5 text-white" />
                             </div>
                             <div>
                                 <h1 className="text-base font-semibold text-foreground">MiMi Assets</h1>

@@ -6,6 +6,37 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
+// Helper: Format date string to DD/MM/YYYY
+const formatDateString = (value: any): string => {
+    if (!value) return "-";
+    
+    // ถ้าเป็น Date object
+    if (value instanceof Date) {
+        return value.toLocaleDateString("en-GB");
+    }
+    
+    // ถ้าเป็น string ที่เป็นวันที่
+    if (typeof value === "string") {
+        const str = value.trim();
+        if (!str) return "-";
+        
+        // ถ้าเป็น format DD/MM/YYYY อยู่แล้ว
+        if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(str)) {
+            return str;
+        }
+        
+        // ลอง parse เป็น Date
+        const date = new Date(str);
+        if (!isNaN(date.getTime())) {
+            return date.toLocaleDateString("en-GB");
+        }
+        
+        return str;
+    }
+    
+    return "-";
+};
+
 export async function GET(req: NextRequest) {
     try {
         // 1. เช็ค Authentication
@@ -110,15 +141,15 @@ export async function GET(req: NextRequest) {
             assetName: t.assetName,
             warehouseIn: t.warehouseIn || "-",
             assetStatus: t.assetStatus || "-",
-            inStockDate: t.inStockDate ? new Date(t.inStockDate).toLocaleDateString("th-TH") : "-",
-            startWarranty: t.startWarranty || "-",
-            endWarranty: t.endWarranty || "-",
+            inStockDate: t.inStockDate ? new Date(t.inStockDate).toLocaleDateString("en-GB") : "-",
+            startWarranty: formatDateString(t.startWarranty),
+            endWarranty: formatDateString(t.endWarranty),
             cheilPO: t.cheilPO || "-",
             unitIn: t.unitIn ?? "-",
             fromVendor: t.fromVendor || "-",
             mcsCodeIn: t.mcsCodeIn || "-",
             fromShop: t.fromShop || "-",
-            outDate: t.outDate ? new Date(t.outDate).toLocaleDateString("th-TH") : "-",
+            outDate: t.outDate ? new Date(t.outDate).toLocaleDateString("en-GB") : "-",
             unitOut: t.unitOut ?? "-",
             toVendor: t.toVendor || "-",
             status: t.status || "-",

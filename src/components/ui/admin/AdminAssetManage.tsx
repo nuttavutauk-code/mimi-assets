@@ -2,8 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
-import { Package, Upload, Search, Loader2, ChevronLeft, ChevronRight, Download, Warehouse, Calendar } from "lucide-react";
+import { Package, Upload, Search, Loader2, ChevronLeft, ChevronRight, Download, Warehouse, Calendar, Pencil, Check, X } from "lucide-react";
 import { toast } from "sonner";
+
+type EditData = {
+  barcode: string;
+  assetName: string;
+  size: string;
+  warehouse: string;
+  startWarranty: string;
+  endWarranty: string;
+  cheilPO: string;
+};
 
 export default function AdminAssetManage() {
   const [data, setData] = useState<any[]>([]);
@@ -12,6 +22,9 @@ export default function AdminAssetManage() {
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editData, setEditData] = useState<EditData>({ barcode: "", assetName: "", size: "", warehouse: "", startWarranty: "", endWarranty: "", cheilPO: "" });
+  const [saving, setSaving] = useState(false);
 
   const fetchAssets = async (searchValue = "", pageNum = 1) => {
     try {
@@ -75,6 +88,61 @@ export default function AdminAssetManage() {
 
   const handleSearch = () => { setPage(1); fetchAssets(search, 1); };
 
+  // ✅ Handle edit (เฉพาะ NO Barcode status)
+  const handleStartEdit = (item: any) => {
+    setEditingId(item.id);
+    setEditData({
+      barcode: item.barcode || "",
+      assetName: item.assetName || "",
+      size: item.size || "",
+      warehouse: item.warehouse || "",
+      startWarranty: item.startWarranty || "",
+      endWarranty: item.endWarranty || "",
+      cheilPO: item.cheilPO || "",
+    });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setEditData({ barcode: "", assetName: "", size: "", warehouse: "", startWarranty: "", endWarranty: "", cheilPO: "" });
+  };
+
+  const handleSave = async (id: number) => {
+    if (!editData.barcode.trim()) {
+      toast.error("กรุณากรอก Barcode");
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await fetch("/api/asset/update-nobarcode", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, ...editData }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success("อัปเดตข้อมูลสำเร็จ");
+        setEditingId(null);
+        setEditData({ barcode: "", assetName: "", size: "", warehouse: "", startWarranty: "", endWarranty: "", cheilPO: "" });
+        fetchAssets(search, page);
+      } else {
+        toast.error(json.message || "เกิดข้อผิดพลาด");
+      }
+    } catch (err) {
+      toast.error("เกิดข้อผิดพลาด");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ✅ Get status badge style
+  const getStatusBadge = (status: string) => {
+    if (status === "NO Barcode") {
+      return "bg-orange-100 text-orange-700";
+    }
+    return "bg-green-100 text-green-700";
+  };
+
   return (
     <div className="space-y-4 sm:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -117,17 +185,72 @@ export default function AdminAssetManage() {
           <>
             <div className="overflow-x-auto">
               <table className="glass-table w-full">
-                <thead><tr className="bg-black/2"><th>Barcode</th><th>Asset Name</th><th>Size</th><th>Warehouse</th><th>Start Warranty</th><th>End Warranty</th><th>Cheil PO</th></tr></thead>
+                <thead><tr className="bg-black/2"><th>Barcode</th><th>Asset Name</th><th>Size</th><th>Warehouse</th><th>Start Warranty</th><th>End Warranty</th><th>Cheil PO</th><th>Status Asset</th><th></th></tr></thead>
                 <tbody>
                   {data.map((item, idx) => (
                     <tr key={idx}>
-                      <td className="font-mono text-sm">{item.barcode}</td>
-                      <td className="font-medium">{item.assetName}</td>
-                      <td><span className="px-2 py-1 rounded-md bg-orange-50 text-orange-600 text-xs font-medium">{item.size || "-"}</span></td>
-                      <td><div className="flex items-center gap-1"><Warehouse className="w-3.5 h-3.5 text-muted-foreground" />{item.warehouse || "-"}</div></td>
-                      <td><div className="flex items-center gap-1 text-muted-foreground"><Calendar className="w-3.5 h-3.5" />{item.startWarranty || "-"}</div></td>
-                      <td><div className="flex items-center gap-1 text-muted-foreground"><Calendar className="w-3.5 h-3.5" />{item.endWarranty || "-"}</div></td>
-                      <td>{item.cheilPO || "-"}</td>
+                      <td className="font-mono text-sm">
+                        {editingId === item.id ? (
+                          <Input value={editData.barcode} onChange={(e) => setEditData({ ...editData, barcode: e.target.value })} className="glass-input h-8 text-sm w-32" />
+                        ) : (
+                          <span>{item.barcode}</span>
+                        )}
+                      </td>
+                      <td className="font-medium">
+                        {editingId === item.id ? (
+                          <Input value={editData.assetName} onChange={(e) => setEditData({ ...editData, assetName: e.target.value })} className="glass-input h-8 text-sm w-32" />
+                        ) : (
+                          item.assetName
+                        )}
+                      </td>
+                      <td>
+                        {editingId === item.id ? (
+                          <Input value={editData.size} onChange={(e) => setEditData({ ...editData, size: e.target.value })} className="glass-input h-8 text-sm w-20" />
+                        ) : (
+                          <span className="px-2 py-1 rounded-md bg-orange-50 text-orange-600 text-xs font-medium">{item.size || "-"}</span>
+                        )}
+                      </td>
+                      <td>
+                        {editingId === item.id ? (
+                          <Input value={editData.warehouse} onChange={(e) => setEditData({ ...editData, warehouse: e.target.value })} className="glass-input h-8 text-sm w-24" />
+                        ) : (
+                          <div className="flex items-center gap-1"><Warehouse className="w-3.5 h-3.5 text-muted-foreground" />{item.warehouse || "-"}</div>
+                        )}
+                      </td>
+                      <td>
+                        {editingId === item.id ? (
+                          <Input value={editData.startWarranty} onChange={(e) => setEditData({ ...editData, startWarranty: e.target.value })} className="glass-input h-8 text-sm w-24" />
+                        ) : (
+                          <div className="flex items-center gap-1 text-muted-foreground"><Calendar className="w-3.5 h-3.5" />{item.startWarranty || "-"}</div>
+                        )}
+                      </td>
+                      <td>
+                        {editingId === item.id ? (
+                          <Input value={editData.endWarranty} onChange={(e) => setEditData({ ...editData, endWarranty: e.target.value })} className="glass-input h-8 text-sm w-24" />
+                        ) : (
+                          <div className="flex items-center gap-1 text-muted-foreground"><Calendar className="w-3.5 h-3.5" />{item.endWarranty || "-"}</div>
+                        )}
+                      </td>
+                      <td>
+                        {editingId === item.id ? (
+                          <Input value={editData.cheilPO} onChange={(e) => setEditData({ ...editData, cheilPO: e.target.value })} className="glass-input h-8 text-sm w-24" />
+                        ) : (
+                          item.cheilPO || "-"
+                        )}
+                      </td>
+                      <td><span className={`px-2 py-1 rounded-md text-xs font-medium ${getStatusBadge(item.statusAsset || "Ready")}`}>{item.statusAsset || "Ready"}</span></td>
+                      <td>
+                        {item.statusAsset === "NO Barcode" && (
+                          editingId === item.id ? (
+                            <div className="flex items-center gap-1">
+                              <button onClick={() => handleSave(item.id)} disabled={saving} className="p-1.5 rounded bg-green-100 text-green-600 hover:bg-green-200 disabled:opacity-50"><Check className="w-4 h-4" /></button>
+                              <button onClick={handleCancelEdit} disabled={saving} className="p-1.5 rounded bg-red-100 text-red-600 hover:bg-red-200 disabled:opacity-50"><X className="w-4 h-4" /></button>
+                            </div>
+                          ) : (
+                            <button onClick={() => handleStartEdit(item)} className="p-1.5 rounded hover:bg-black/5"><Pencil className="w-4 h-4 text-muted-foreground" /></button>
+                          )
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -159,7 +282,10 @@ export default function AdminAssetManage() {
                     <p className="font-semibold text-foreground">{item.assetName}</p>
                     <p className="text-xs font-mono text-muted-foreground mt-0.5">{item.barcode}</p>
                   </div>
-                  <span className="px-2 py-1 rounded-md bg-orange-50 text-orange-600 text-xs font-medium">{item.size || "-"}</span>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className="px-2 py-1 rounded-md bg-orange-50 text-orange-600 text-xs font-medium">{item.size || "-"}</span>
+                    <span className={`px-2 py-0.5 rounded-md text-xs font-medium ${getStatusBadge(item.statusAsset || "Ready")}`}>{item.statusAsset || "Ready"}</span>
+                  </div>
                 </div>
                 <div className="flex items-center gap-3 text-xs text-muted-foreground">
                   <span className="flex items-center gap-1"><Warehouse className="w-3 h-3" />{item.warehouse || "-"}</span>

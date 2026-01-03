@@ -7,6 +7,37 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import * as XLSX from "xlsx";
 
+// Helper: Format date string to DD/MM/YYYY
+const formatDateString = (value: any): string => {
+    if (!value) return "";
+    
+    // ถ้าเป็น Date object
+    if (value instanceof Date) {
+        return value.toLocaleDateString("en-GB");
+    }
+    
+    // ถ้าเป็น string ที่เป็นวันที่
+    if (typeof value === "string") {
+        const str = value.trim();
+        if (!str) return "";
+        
+        // ถ้าเป็น format DD/MM/YYYY อยู่แล้ว
+        if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(str)) {
+            return str;
+        }
+        
+        // ลอง parse เป็น Date
+        const date = new Date(str);
+        if (!isNaN(date.getTime())) {
+            return date.toLocaleDateString("en-GB");
+        }
+        
+        return str;
+    }
+    
+    return "";
+};
+
 export async function GET(req: NextRequest) {
   try {
     // 1. เช็ค Authentication
@@ -33,22 +64,22 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: "asc" },
     });
 
-    // 4. Format data สำหรับ Excel
+    // 4. Format data สำหรับ Excel (DD/MM/YYYY ค.ศ.)
     const excelData = transactions.map((t) => ({
       "Doc Code": t.docCode || "",
       "Barcode": t.barcode || "",
       "Asset Name": t.assetName,
       "Warehouse": t.warehouseIn || "",
       "Asset Status": t.assetStatus || "",
-      "In stock Date": t.inStockDate ? new Date(t.inStockDate).toLocaleDateString("th-TH") : "",
-      "Start Warranty": t.startWarranty || "",
-      "End Warranty": t.endWarranty || "",
+      "In stock Date": t.inStockDate ? new Date(t.inStockDate).toLocaleDateString("en-GB") : "",
+      "Start Warranty": formatDateString(t.startWarranty),
+      "End Warranty": formatDateString(t.endWarranty),
       "Cheil PO": t.cheilPO || "",
       "Unit In": t.unitIn ?? "",
       "From Vendor": t.fromVendor || "",
       "MCS Code (In)": t.mcsCodeIn || "",
       "From Shop": t.fromShop || "",
-      "Out Date": t.outDate ? new Date(t.outDate).toLocaleDateString("th-TH") : "",
+      "Out Date": t.outDate ? new Date(t.outDate).toLocaleDateString("en-GB") : "",
       "Unit Out": t.unitOut ?? "",
       "To Vendor": t.toVendor || "",
       "Status": t.status || "",

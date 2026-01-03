@@ -17,7 +17,7 @@ import OtherActivitiesSelect, { OtherActivity } from "@/components/ui/admin/Othe
 import StatusSelect, { StatusOption } from "@/components/ui/admin/StatusSelect";
 
 type ShopItem = { mcsCode: string; shopName: string };
-type AssetRow = { id: number; barcode: string; name: string; size: string; grade: string; qty: number };
+type AssetRow = { id: number; barcode: string; name: string; size: string; grade: string; qty: number; noBarcode?: boolean };
 type FormMode = "user" | "admin";
 
 const FormReturnAsset = ({ mode = "user" }: { mode?: FormMode }) => {
@@ -47,6 +47,9 @@ const FormReturnAsset = ({ mode = "user" }: { mode?: FormMode }) => {
   const [transactionStatus, setTransactionStatus] = useState<StatusOption>("");
   const [barcodeSearchResults, setBarcodeSearchResults] = useState<{ barcode: string; assetName: string; size?: string }[]>([]);
   const [showBarcodeDropdown, setShowBarcodeDropdown] = useState<Record<number, boolean>>({});
+  const [assetNames, setAssetNames] = useState<string[]>([]);
+  const [showAssetNameDropdown, setShowAssetNameDropdown] = useState<Record<number, boolean>>({});
+  const [assetNameSearch, setAssetNameSearch] = useState<Record<number, string>>({});
 
   useEffect(() => {
     if (!editIdFromUrl || dataLoaded) return;
@@ -60,7 +63,7 @@ const FormReturnAsset = ({ mode = "user" }: { mode?: FormMode }) => {
         if (shop) {
           setShopCode(shop.shopCode || ""); setShopName(shop.shopName || "");
           if (shop.startInstallDate) setReturnDate(new Date(shop.startInstallDate).toISOString().split('T')[0]);
-          if (shop.assets?.length > 0) setAssets(shop.assets.map((a: any, idx: number) => ({ id: idx + 1, barcode: a.barcode || "", name: a.name || "", size: a.size || "", grade: a.grade || "", qty: a.qty || 1 })));
+          if (shop.assets?.length > 0) setAssets(shop.assets.map((a: any, idx: number) => ({ id: idx + 1, barcode: a.barcode || "", name: a.name || "", size: a.size || "", grade: a.grade || "", qty: a.qty || 1, noBarcode: a.barcode?.startsWith("NOBC-") || false })));
         }
         setNote(doc.note || "");
         // ✅ Load returnCondition
@@ -69,6 +72,13 @@ const FormReturnAsset = ({ mode = "user" }: { mode?: FormMode }) => {
       setDataLoaded(true);
     }).finally(() => setLoading(false));
   }, [editIdFromUrl, dataLoaded]);
+
+  // ✅ Fetch asset names สำหรับ NO BARCODE dropdown
+  useEffect(() => {
+    fetch("/api/asset/names").then(r => r.json()).then(json => {
+      if (json.success) setAssetNames(json.names || []);
+    });
+  }, []);
 
   useEffect(() => {
     if (dataLoaded || isEdit) return;
@@ -97,6 +107,30 @@ const FormReturnAsset = ({ mode = "user" }: { mode?: FormMode }) => {
     setShowBarcodeDropdown(p => ({ ...p, [rowId]: true }));
   };
   const debouncedBarcode = useMemo(() => debounce(fetchBarcodes, 300), []);
+
+  // ✅ Handle NO BARCODE toggle - generate barcode อัตโนมัติ
+  const handleNoBarcodeToggle = async (rowId: number, checked: boolean) => {
+    if (checked) {
+      // Generate NOBC barcode
+      const res = await fetch("/api/asset/generate-nobc");
+      const json = await res.json();
+      if (json.success) {
+        setAssets(p => p.map(a => a.id === rowId ? { ...a, noBarcode: true, barcode: json.barcode, name: "", size: "" } : a));
+      } else {
+        toast.error("ไม่สามารถสร้าง Barcode ได้");
+      }
+    } else {
+      // Clear และกลับไปโหมดปกติ
+      setAssets(p => p.map(a => a.id === rowId ? { ...a, noBarcode: false, barcode: "", name: "", size: "" } : a));
+    }
+  };
+
+  // ✅ Filter asset names ตาม search
+  const getFilteredAssetNames = (rowId: number) => {
+    const search = assetNameSearch[rowId] || "";
+    if (!search) return assetNames.slice(0, 50); // แสดงแค่ 50 รายการแรกถ้าไม่ได้ค้นหา
+    return assetNames.filter(name => name.toLowerCase().includes(search.toLowerCase())).slice(0, 50);
+  };
 
   const handleSubmit = async (action: string) => {
     if (isSubmitting) return;
@@ -172,7 +206,10 @@ const FormReturnAsset = ({ mode = "user" }: { mode?: FormMode }) => {
         <div className="flex items-center gap-2 mb-4"><div className="icon-container cyan !w-8 !h-8"><Store className="w-4 h-4" /></div><h2 className="font-semibold">ข้อมูล Shop</h2></div>
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-end gap-4">
-            <div className="flex items-center gap-2"><Checkbox checked={noMcs} onCheckedChange={(c) => { setNoMcs(!!c); if (c) { setShopCode(""); setShopName(""); } }} /><label className="text-sm font-medium">NO MCS</label></div>
+            <div className="flex items-center gap-2">
+              <Checkbox id="no-mcs" checked={noMcs} onCheckedChange={(c) => { setNoMcs(!!c); if (c) { setShopCode(""); setShopName(""); } }} className="border-2 border-gray-400" />
+              <label htmlFor="no-mcs" className="text-sm font-medium text-foreground cursor-pointer">NO MCS</label>
+            </div>
             <div className="flex-1 relative">
               <label className="block text-xs text-muted-foreground mb-1">MCS Code</label>
               <Input value={shopCode} onChange={(e) => { setShopCode(e.target.value); debouncedSearch(e.target.value); }} onFocus={() => searchResults.length > 0 && setShowDropdown(true)} onBlur={() => setTimeout(() => setShowDropdown(false), 200)} disabled={noMcs} placeholder="พิมพ์ MCS Code..." className="glass-input" />
@@ -192,14 +229,42 @@ const FormReturnAsset = ({ mode = "user" }: { mode?: FormMode }) => {
         <div className="space-y-3">
           {assets.map((asset) => (
             <div key={asset.id} className="p-4 rounded-xl bg-black/2 border border-black/5">
+              {/* NO BARCODE Checkbox */}
+              <div className="flex items-center gap-2 mb-3">
+                <Checkbox id={`no-barcode-${asset.id}`} checked={asset.noBarcode || false} onCheckedChange={(c) => handleNoBarcodeToggle(asset.id, !!c)} className="border-2 border-gray-400" />
+                <label htmlFor={`no-barcode-${asset.id}`} className="text-sm font-medium text-foreground cursor-pointer">NO BARCODE</label>
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
                 <div className="sm:col-span-3 relative">
                   <label className="block text-xs text-muted-foreground mb-1">Barcode</label>
-                  <Input value={asset.barcode} onChange={(e) => { setAssets(p => p.map(a => a.id === asset.id ? { ...a, barcode: e.target.value } : a)); debouncedBarcode(e.target.value, asset.id); }} onFocus={() => { fetchBarcodes(asset.barcode, asset.id); }} onBlur={() => setTimeout(() => setShowBarcodeDropdown(p => ({ ...p, [asset.id]: false })), 200)} placeholder="สแกน Barcode..." className="glass-input" />
-                  {showBarcodeDropdown[asset.id] && barcodeSearchResults.length > 0 && <div className="absolute top-full left-0 z-20 mt-1 w-full bg-white border rounded-xl shadow-lg max-h-48 overflow-auto">{barcodeSearchResults.map(b => <div key={b.barcode} className="px-3 py-2 hover:bg-black/5 cursor-pointer text-sm" onClick={() => { setAssets(p => p.map(a => a.id === asset.id ? { ...a, barcode: b.barcode, name: b.assetName, size: b.size || "" } : a)); setShowBarcodeDropdown(p => ({ ...p, [asset.id]: false })); }}><span className="font-mono text-primary">{b.barcode}</span> - {b.assetName}</div>)}</div>}
+                  {asset.noBarcode ? (
+                    <Input value={asset.barcode} readOnly className="glass-input bg-black/5 font-mono text-sm" />
+                  ) : (
+                    <>
+                      <Input value={asset.barcode} onChange={(e) => { setAssets(p => p.map(a => a.id === asset.id ? { ...a, barcode: e.target.value } : a)); debouncedBarcode(e.target.value, asset.id); }} onFocus={() => { fetchBarcodes(asset.barcode, asset.id); }} onBlur={() => setTimeout(() => setShowBarcodeDropdown(p => ({ ...p, [asset.id]: false })), 200)} placeholder="สแกน Barcode..." className="glass-input" />
+                      {showBarcodeDropdown[asset.id] && barcodeSearchResults.length > 0 && <div className="absolute top-full left-0 z-20 mt-1 w-full bg-white border rounded-xl shadow-lg max-h-48 overflow-auto">{barcodeSearchResults.map(b => <div key={b.barcode} className="px-3 py-2 hover:bg-black/5 cursor-pointer text-sm" onClick={() => { setAssets(p => p.map(a => a.id === asset.id ? { ...a, barcode: b.barcode, name: b.assetName, size: b.size || "" } : a)); setShowBarcodeDropdown(p => ({ ...p, [asset.id]: false })); }}><span className="font-mono text-primary">{b.barcode}</span> - {b.assetName}</div>)}</div>}
+                    </>
+                  )}
                 </div>
-                <div className="sm:col-span-3"><label className="block text-xs text-muted-foreground mb-1">Asset Name</label><Input value={asset.name} readOnly className="glass-input bg-black/5" /></div>
-                <div className="sm:col-span-2"><label className="block text-xs text-muted-foreground mb-1">Size</label><Input value={asset.size} readOnly className="glass-input bg-black/5" /></div>
+                <div className="sm:col-span-3 relative">
+                  <label className="block text-xs text-muted-foreground mb-1">Asset Name</label>
+                  {asset.noBarcode ? (
+                    <>
+                      <Input value={assetNameSearch[asset.id] || asset.name} onChange={(e) => { setAssetNameSearch(p => ({ ...p, [asset.id]: e.target.value })); setShowAssetNameDropdown(p => ({ ...p, [asset.id]: true })); }} onFocus={() => setShowAssetNameDropdown(p => ({ ...p, [asset.id]: true }))} onBlur={() => setTimeout(() => setShowAssetNameDropdown(p => ({ ...p, [asset.id]: false })), 200)} placeholder="เลือก Asset Name..." className="glass-input" />
+                      {showAssetNameDropdown[asset.id] && <div className="absolute top-full left-0 z-20 mt-1 w-full bg-white border rounded-xl shadow-lg max-h-48 overflow-auto">{getFilteredAssetNames(asset.id).map(name => <div key={name} className="px-3 py-2 hover:bg-black/5 cursor-pointer text-sm" onClick={() => { setAssets(p => p.map(a => a.id === asset.id ? { ...a, name } : a)); setAssetNameSearch(p => ({ ...p, [asset.id]: name })); setShowAssetNameDropdown(p => ({ ...p, [asset.id]: false })); }}>{name}</div>)}</div>}
+                    </>
+                  ) : (
+                    <Input value={asset.name} readOnly className="glass-input bg-black/5" />
+                  )}
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-xs text-muted-foreground mb-1">Size</label>
+                  {asset.noBarcode ? (
+                    <Input value={asset.size} onChange={(e) => setAssets(p => p.map(a => a.id === asset.id ? { ...a, size: e.target.value } : a))} placeholder="กรอก Size" className="glass-input" />
+                  ) : (
+                    <Input value={asset.size} readOnly className="glass-input bg-black/5" />
+                  )}
+                </div>
                 <div className="sm:col-span-2"><label className="block text-xs text-muted-foreground mb-1">Grade</label><Select value={asset.grade} onValueChange={(v) => setAssets(p => p.map(a => a.id === asset.id ? { ...a, grade: v } : a))}><SelectTrigger className="glass-input"><SelectValue placeholder="เลือก" /></SelectTrigger><SelectContent><SelectItem value="A">A</SelectItem><SelectItem value="AB">AB</SelectItem><SelectItem value="B">B</SelectItem><SelectItem value="BC">BC</SelectItem><SelectItem value="C">C</SelectItem><SelectItem value="CD">CD</SelectItem><SelectItem value="D">D</SelectItem></SelectContent></Select></div>
                 <div className="sm:col-span-1"><label className="block text-xs text-muted-foreground mb-1">จำนวน</label><Input value="1" readOnly className="glass-input bg-black/5 text-center" /></div>
                 {assets.length > 1 && <div className="flex items-end"><button onClick={() => setAssets(p => p.filter(a => a.id !== asset.id))} className="p-2 rounded-lg bg-red-50 text-red-500 hover:bg-red-100"><Trash2 className="w-4 h-4" /></button></div>}

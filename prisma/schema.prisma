@@ -80,6 +80,7 @@ model Asset {
   startWarranty String? // 👈 เปลี่ยนจาก DateTime → String
   endWarranty   String? // 👈 เปลี่ยนจาก DateTime → String
   cheilPO       String?
+  statusAsset   String   @default("Ready") // Ready หรือ NO Barcode
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -193,12 +194,13 @@ model AssetTransactionHistory {
   documentId Int
   document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
-  // 🟨 ========== 1. เกี่ยวกับ Asset (7 คอลัมน์) ==========
+  // 🟨 ========== 1. เกี่ยวกับ Asset (8 คอลัมน์) ==========
   barcode       String  @db.VarChar(50)
   assetName     String
   startWarranty String? // วันที่เริ่มประกัน (เก็บเป็น String ตาม schema เดิม)
   endWarranty   String? // วันที่สิ้นสุดประกัน
   cheilPO       String? // เลขที่ PO
+  budget        String? // Budget
   size          String? // ขนาด
   grade         String? // เกรด (A, AB, B, BC, C, CD, D)
 

@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, Search, ChevronLeft, ChevronRight, RefreshCw, Database, Filter, Pencil, Save, X, Download } from "lucide-react";
+import { Loader2, Search, ChevronLeft, ChevronRight, RefreshCw, Database, Filter, Pencil, Save, X, Download, Upload } from "lucide-react";
+import { toast } from "sonner";
 
 interface TransactionData {
   id: number;
@@ -116,6 +117,40 @@ export default function AdminDatabase() {
 
   // ✅ Export State
   const [exporting, setExporting] = useState(false);
+
+  // ✅ Import State
+  const [uploading, setUploading] = useState(false);
+
+  // ✅ Import Function
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("excel", file);
+      const res = await fetch("/api/database/import", { method: "POST", body: formData });
+      const json = await res.json();
+      if (json.success) {
+        toast.success(json.message || "นำเข้าสำเร็จ!");
+        fetchData(1);
+      } else {
+        // แสดง errors รายละเอียด
+        if (json.errors && json.errors.length > 0) {
+          console.error("Import errors:", json.errors);
+          const errorList = json.errors.slice(0, 5).join("\n");
+          toast.error(`${json.message}\n\n${errorList}${json.errors.length > 5 ? `\n...และอีก ${json.errors.length - 5} รายการ` : ""}`, { duration: 10000 });
+        } else {
+          toast.error(json.message || "เกิดข้อผิดพลาด");
+        }
+      }
+    } catch (err) {
+      toast.error("เกิดข้อผิดพลาด");
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  };
 
   // ✅ Export Function
   const handleExport = async () => {
@@ -332,14 +367,19 @@ export default function AdminDatabase() {
           {!isEditMode ? (
             <>
               <button onClick={() => fetchData(pagination.currentPage)} className="glass-button px-4 py-2.5 text-sm font-medium flex items-center gap-2">
-                <RefreshCw className="w-4 h-4" />รีเฟรช
+                <RefreshCw className="w-4 h-4" /><span className="hidden sm:inline">Refresh</span>
               </button>
+              <label className="glass-button px-4 py-2.5 text-sm font-medium flex items-center gap-2 cursor-pointer text-blue-600 border-blue-300 hover:bg-blue-50">
+                {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                <span className="hidden sm:inline">Import</span>
+                <input type="file" accept=".xlsx,.xls" onChange={handleImport} className="hidden" disabled={uploading} />
+              </label>
               <button onClick={handleExport} disabled={exporting} className="glass-button px-4 py-2.5 text-sm font-medium flex items-center gap-2 text-green-600 border-green-300 hover:bg-green-50">
                 {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                Export
+                <span className="hidden sm:inline">Export</span>
               </button>
               <button onClick={handleEnterEditMode} className="glass-button px-4 py-2.5 text-sm font-medium flex items-center gap-2 text-amber-600 border-amber-300 hover:bg-amber-50">
-                <Pencil className="w-4 h-4" />แก้ไขข้อมูล
+                <Pencil className="w-4 h-4" /><span className="hidden sm:inline">Edit</span>
               </button>
             </>
           ) : (

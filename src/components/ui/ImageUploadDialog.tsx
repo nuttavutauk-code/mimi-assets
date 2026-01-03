@@ -1,23 +1,19 @@
+// components/ui/ImageUploadDialog.tsx
+// อัปเดต: เพิ่ม Auto Image Compression ก่อน Upload
 "use client";
 
-import { useState, useRef } from "react";
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-} from "@/components/ui/dialog";
+import { useState, useRef, ChangeEvent } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Camera, ImageIcon, Loader2, X, Check } from "lucide-react";
-import Image from "next/image";
-import { toast } from "sonner";
+import { Camera, Upload, X, Loader2 } from "lucide-react";
+import { compressImage } from "@/lib/image-compress"; // ✅ เพิ่ม import
 
 interface ImageUploadDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     taskId: number;
     imageType: "barcode" | "asset";
-    currentImageUrl?: string | null;
+    currentImageUrl: string | null;
     onUploadComplete: (imageUrl: string) => void;
 }
 
@@ -29,221 +25,161 @@ export default function ImageUploadDialog({
     currentImageUrl,
     onUploadComplete,
 }: ImageUploadDialogProps) {
+    const [preview, setPreview] = useState<string | null>(currentImageUrl);
     const [uploading, setUploading] = useState(false);
-    const [preview, setPreview] = useState<string | null>(currentImageUrl || null);
-    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [compressing, setCompressing] = useState(false); // ✅ เพิ่ม state สำหรับ compression
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const cameraInputRef = useRef<HTMLInputElement>(null);
-    const galleryInputRef = useRef<HTMLInputElement>(null);
-
-    // Reset state when dialog opens/closes
-    const handleOpenChange = (newOpen: boolean) => {
-        if (!newOpen) {
-            setPreview(currentImageUrl || null);
-            setSelectedFile(null);
-        }
-        onOpenChange(newOpen);
-    };
-
-    // Handle file selection (from camera or gallery)
-    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
-        // Validate file type
-        const validTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
-        if (!validTypes.includes(file.type)) {
-            toast.error("รองรับเฉพาะไฟล์ .jpg, .png, .gif, .webp");
-            return;
-        }
-
-        // Validate file size (10MB)
-        if (file.size > 10 * 1024 * 1024) {
-            toast.error("ไฟล์ใหญ่เกิน 10MB");
-            return;
-        }
-
-        setSelectedFile(file);
-
-        // Create preview
+        // ✅ แสดง preview ก่อน compress
         const reader = new FileReader();
-        reader.onload = (event) => {
-            setPreview(event.target?.result as string);
+        reader.onload = () => {
+            setPreview(reader.result as string);
         };
         reader.readAsDataURL(file);
 
-        // Reset input value to allow selecting the same file again
-        e.target.value = "";
+        // ✅ Compress และ Upload
+        setCompressing(true);
+        try {
+            const compressedFile = await compressImage(file);
+            setCompressing(false);
+            
+            // Upload
+            await uploadFile(compressedFile);
+        } catch (error) {
+            console.error("Compression error:", error);
+            setCompressing(false);
+            // ถ้า compress ไม่ได้ ก็ upload ไฟล์เดิม
+            await uploadFile(file);
+        }
     };
 
-    // Upload file
-    const handleUpload = async () => {
-        if (!selectedFile) {
-            toast.error("กรุณาเลือกรูปภาพก่อน");
-            return;
-        }
-
+    const uploadFile = async (file: File) => {
         setUploading(true);
-
         try {
-            // 1. Upload file to server
             const formData = new FormData();
-            formData.append("file", selectedFile);
-            formData.append("imageType", imageType);
+            formData.append("file", file);
             formData.append("taskId", taskId.toString());
+            formData.append("imageType", imageType);
 
-            const uploadRes = await fetch("/api/upload/image", {
+            const res = await fetch("/api/upload/image", {
                 method: "POST",
                 body: formData,
             });
 
-            const uploadData = await uploadRes.json();
+            const data = await res.json();
 
-            if (!uploadRes.ok || !uploadData.success) {
-                throw new Error(uploadData.error || "อัปโหลดไม่สำเร็จ");
+            if (data.success) {
+                onUploadComplete(data.imageUrl);
+                onOpenChange(false);
+            } else {
+                alert("อัปโหลดไม่สำเร็จ: " + data.error);
             }
-
-            // 2. Update database with image URL
-            const updateRes = await fetch(`/api/pick-asset/${taskId}/update-image`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    imageType,
-                    imageUrl: uploadData.imageUrl,
-                }),
-            });
-
-            const updateData = await updateRes.json();
-
-            if (!updateRes.ok || !updateData.success) {
-                throw new Error(updateData.error || "บันทึกไม่สำเร็จ");
-            }
-
-            toast.success("อัปโหลดรูปสำเร็จ");
-            onUploadComplete(uploadData.imageUrl);
-            handleOpenChange(false);
         } catch (error) {
             console.error("Upload error:", error);
-            toast.error(error instanceof Error ? error.message : "เกิดข้อผิดพลาด");
+            alert("เกิดข้อผิดพลาดในการอัปโหลด");
         } finally {
             setUploading(false);
         }
     };
 
-    // Clear selected image
-    const handleClear = () => {
-        setPreview(currentImageUrl || null);
-        setSelectedFile(null);
+    const handleCameraClick = () => {
+        fileInputRef.current?.click();
     };
 
-    const title = imageType === "barcode" ? "รูปถ่าย Barcode" : "รูปถ่าย Asset";
-
     return (
-        <Dialog open={open} onOpenChange={handleOpenChange}>
+        <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-md">
                 <DialogHeader>
-                    <DialogTitle>{title}</DialogTitle>
+                    <DialogTitle>
+                        {imageType === "barcode" ? "รูปถ่าย Barcode" : "รูปถ่าย Asset"}
+                    </DialogTitle>
                 </DialogHeader>
 
                 <div className="space-y-4">
-                    {/* Hidden file inputs */}
-                    <input
-                        ref={cameraInputRef}
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        className="hidden"
-                        onChange={handleFileSelect}
-                    />
-                    <input
-                        ref={galleryInputRef}
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={handleFileSelect}
-                    />
-
-                    {/* Preview area */}
-                    <div className="relative w-full h-48 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center">
+                    {/* Preview */}
+                    <div className="relative aspect-video bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center">
                         {preview ? (
                             <>
-                                <Image
+                                <img
                                     src={preview}
                                     alt="Preview"
-                                    fill
-                                    className="object-contain"
-                                    unoptimized
+                                    className="w-full h-full object-contain"
                                 />
-                                {selectedFile && (
-                                    <button
-                                        type="button"
-                                        onClick={handleClear}
-                                        className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
-                                    >
-                                        <X className="w-4 h-4" />
-                                    </button>
-                                )}
+                                <button
+                                    type="button"
+                                    className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
+                                    onClick={() => setPreview(null)}
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
                             </>
                         ) : (
                             <div className="text-center text-gray-400">
                                 <Camera className="w-12 h-12 mx-auto mb-2" />
-                                <p className="text-sm">ยังไม่มีรูปภาพ</p>
+                                <p>ยังไม่มีรูปภาพ</p>
+                            </div>
+                        )}
+
+                        {/* Loading overlay */}
+                        {(compressing || uploading) && (
+                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                                <div className="text-center text-white">
+                                    <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
+                                    <p className="text-sm">
+                                        {compressing ? "กำลังบีบอัดรูป..." : "กำลังอัปโหลด..."}
+                                    </p>
+                                </div>
                             </div>
                         )}
                     </div>
 
-                    {/* Action buttons */}
-                    <div className="grid grid-cols-2 gap-3">
+                    {/* Hidden file input */}
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        onChange={handleFileChange}
+                    />
+
+                    {/* Buttons */}
+                    <div className="flex gap-3">
                         <Button
                             type="button"
                             variant="outline"
-                            className="flex items-center justify-center gap-2"
-                            onClick={() => cameraInputRef.current?.click()}
-                            disabled={uploading}
+                            className="flex-1"
+                            onClick={handleCameraClick}
+                            disabled={uploading || compressing}
                         >
-                            <Camera className="w-4 h-4" />
+                            <Camera className="w-4 h-4 mr-2" />
                             ถ่ายรูป
                         </Button>
                         <Button
                             type="button"
                             variant="outline"
-                            className="flex items-center justify-center gap-2"
-                            onClick={() => galleryInputRef.current?.click()}
-                            disabled={uploading}
+                            className="flex-1"
+                            onClick={() => {
+                                if (fileInputRef.current) {
+                                    fileInputRef.current.removeAttribute("capture");
+                                    fileInputRef.current.click();
+                                }
+                            }}
+                            disabled={uploading || compressing}
                         >
-                            <ImageIcon className="w-4 h-4" />
-                            เลือกจากคลัง
+                            <Upload className="w-4 h-4 mr-2" />
+                            เลือกไฟล์
                         </Button>
                     </div>
 
-                    {/* Upload button */}
-                    {selectedFile && (
-                        <Button
-                            type="button"
-                            className="w-full bg-blue-900 hover:bg-blue-800"
-                            onClick={handleUpload}
-                            disabled={uploading}
-                        >
-                            {uploading ? (
-                                <>
-                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                    กำลังอัปโหลด...
-                                </>
-                            ) : (
-                                <>
-                                    <Check className="w-4 h-4 mr-2" />
-                                    ยืนยันอัปโหลด
-                                </>
-                            )}
-                        </Button>
-                    )}
-
-                    {/* Current image indicator */}
-                    {currentImageUrl && !selectedFile && (
-                        <p className="text-center text-sm text-green-600">
-                            ✓ มีรูปภาพแล้ว (กดเลือกรูปใหม่เพื่อเปลี่ยน)
-                        </p>
-                    )}
+                    {/* Info text */}
+                    <p className="text-xs text-gray-500 text-center">
+                        รูปจะถูกบีบอัดอัตโนมัติเหลือ ~300-500 KB ก่อนอัปโหลด
+                    </p>
                 </div>
             </DialogContent>
         </Dialog>

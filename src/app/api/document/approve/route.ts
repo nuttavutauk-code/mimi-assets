@@ -457,6 +457,30 @@ async function createDirectTransactions(documentId: number): Promise<{ created: 
 
             transactionsCreated++;
 
+            // ✅ สร้าง Asset ใหม่สำหรับ NO BARCODE (barcode ขึ้นต้นด้วย NOBC-)
+            if (asset.barcode && asset.barcode.startsWith("NOBC-")) {
+                // เช็คว่ามี Asset นี้อยู่แล้วหรือยัง
+                const existingAsset = await prisma.asset.findUnique({
+                    where: { barcode: asset.barcode },
+                });
+
+                if (!existingAsset) {
+                    await prisma.asset.create({
+                        data: {
+                            barcode: asset.barcode,
+                            assetName: asset.name || null,
+                            size: asset.size || null,
+                            warehouse: documentCreator?.vendor || null,
+                            startWarranty: "-",
+                            endWarranty: "-",
+                            cheilPO: "-",
+                            statusAsset: "NO Barcode", // ✅ สถานะ NO Barcode
+                        },
+                    });
+                    console.log(`✅ Created NO BARCODE Asset: ${asset.barcode}`);
+                }
+            }
+
         } else if (document.documentType === "repair") {
             // ===== ลำดับ 11: ใบแจ้งซ่อม (Repair) =====
             // Logic ใหม่:
