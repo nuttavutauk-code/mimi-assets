@@ -19,6 +19,11 @@ export const authOptions: NextAuthOptions = {
         });
         if (!user) return null;
 
+        // ตรวจสอบว่า user ถูกปิดใช้งานหรือไม่
+        if (user.isActive === false) {
+          throw new Error("บัญชีของคุณถูกปิดใช้งาน กรุณาติดต่อผู้ดูแลระบบ");
+        }
+
         const isValid = await bcrypt.compare(credentials.password, user.password);
         if (!isValid) return null;
 

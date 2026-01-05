@@ -26,7 +26,7 @@ export async function POST(req: Request) {
       borrowType, // ✅ ประเภทการยืม
     } = data;
 
-    const user = await prisma.user.findUnique({
+    const user = await prisma.user.findFirst({
       where: { email: session.user.email },
     });
 

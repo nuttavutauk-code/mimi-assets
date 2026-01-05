@@ -2,7 +2,7 @@
 // อัปเดต: เพิ่ม Auto Image Compression ก่อน Upload
 "use client";
 
-import { useState, useRef, ChangeEvent } from "react";
+import { useState, useRef, useEffect, ChangeEvent } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Camera, Upload, X, Loader2 } from "lucide-react";
@@ -29,6 +29,20 @@ export default function ImageUploadDialog({
     const [uploading, setUploading] = useState(false);
     const [compressing, setCompressing] = useState(false); // ✅ เพิ่ม state สำหรับ compression
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // ✅ Sync preview กับ currentImageUrl เมื่อ Dialog เปิดหรือ taskId/imageType เปลี่ยน
+    useEffect(() => {
+        if (open) {
+            setPreview(currentImageUrl);
+        }
+    }, [open, currentImageUrl, taskId, imageType]);
+
+    // ✅ Reset file input เมื่อ Dialog เปิด
+    useEffect(() => {
+        if (open && fileInputRef.current) {
+            fileInputRef.current.value = "";
+        }
+    }, [open]);
 
     const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];

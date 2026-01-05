@@ -49,6 +49,7 @@ export async function GET(req: Request) {
           company: true,
           phone: true,
           role: true,
+          isActive: true,
           createdAt: true,
         },
       }),
@@ -81,20 +82,20 @@ export async function POST(req: Request) {
 
     const body = await req.json();
 
-    if (!body.username || !body.email || !body.password) {
+    if (!body.username || !body.password) {
       return NextResponse.json(
-        { error: "Missing required fields (username, email, password)" },
+        { error: "Missing required fields (username, password)" },
         { status: 400 }
       );
     }
 
-    // ตรวจสอบว่า email ซ้ำไหม
+    // ตรวจสอบว่า username ซ้ำไหม
     const existingUser = await prisma.user.findUnique({
-      where: { email: body.email },
+      where: { username: body.username },
     });
     if (existingUser) {
       return NextResponse.json(
-        { error: "Email already exists" },
+        { error: "Username already exists" },
         { status: 409 }
       );
     }
@@ -199,5 +200,54 @@ export async function DELETE(req: Request) {
   } catch (error) {
     console.error("[DELETE USER ERROR]", error);
     return NextResponse.json({ error: "Failed to delete user" }, { status: 500 });
+  }
+}
+
+/* ===========================================================
+   [ TOGGLE USER STATUS - เปิด/ปิดการใช้งานผู้ใช้ ]
+   Endpoint: PATCH /api/user?id=3
+   =========================================================== */
+export async function PATCH(req: Request) {
+  try {
+    // เช็ค Admin
+    const authError = await checkAdminAuth();
+    if (authError) {
+      return NextResponse.json({ error: authError.error }, { status: authError.status });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get("id");
+    if (!id) {
+      return NextResponse.json({ error: "User ID is required" }, { status: 400 });
+    }
+
+    // ดึงสถานะปัจจุบัน
+    const user = await prisma.user.findUnique({
+      where: { id: Number(id) },
+      select: { isActive: true },
+    });
+
+    if (!user) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    // Toggle สถานะ
+    const updatedUser = await prisma.user.update({
+      where: { id: Number(id) },
+      data: { isActive: !user.isActive },
+      select: {
+        id: true,
+        username: true,
+        isActive: true,
+      },
+    });
+
+    return NextResponse.json({
+      message: updatedUser.isActive ? "เปิดใช้งานผู้ใช้แล้ว" : "ปิดใช้งานผู้ใช้แล้ว",
+      user: updatedUser,
+    });
+  } catch (error) {
+    console.error("[TOGGLE USER STATUS ERROR]", error);
+    return NextResponse.json({ error: "Failed to toggle user status" }, { status: 500 });
   }
 }

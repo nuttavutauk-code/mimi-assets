@@ -8,7 +8,7 @@ export const getMe = async (email: string) => {
       return { status: 500, error: "Unauthorized" }
     }
 
-    const user = await prisma.user.findUnique({
+    const user = await prisma.user.findFirst({
       where: { email },
       select: {
         id: true,

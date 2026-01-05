@@ -12,7 +12,7 @@ export async function GET() {
       return NextResponse.json({ error: "User not authenticated" }, { status: 401 });
     }
 
-    const user = await prisma.user.findUnique({ where: { email: userEmail } });
+    const user = await prisma.user.findFirst({ where: { email: userEmail } });
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }

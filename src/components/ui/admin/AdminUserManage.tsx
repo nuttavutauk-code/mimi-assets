@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
-import { Search, Plus, Edit2, Trash2, X, Users, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Plus, Edit2, Trash2, X, Users, Loader2, ChevronLeft, ChevronRight, ToggleLeft, ToggleRight } from "lucide-react";
 import { toast } from "sonner";
 
 interface User {
@@ -16,6 +16,7 @@ interface User {
   phone?: string;
   role?: string;
   email?: string;
+  isActive?: boolean;
   createdAt?: string;
 }
 
@@ -112,6 +113,21 @@ export default function AdminUserManage() {
     }
   };
 
+  const handleToggleStatus = async (user: User) => {
+    try {
+      const res = await fetch(`/api/user?id=${user.id}`, { method: "PATCH" });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(data.message);
+        fetchUsers(page);
+      } else {
+        toast.error(data.error || "เกิดข้อผิดพลาด");
+      }
+    } catch (err) {
+      toast.error("ไม่สามารถเชื่อมต่อ API ได้");
+    }
+  };
+
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Header */}
@@ -146,10 +162,10 @@ export default function AdminUserManage() {
           <>
             <div className="overflow-x-auto">
               <table className="glass-table w-full">
-                <thead><tr className="bg-black/2"><th>Username</th><th>ชื่อ</th><th>Vendor</th><th>Company</th><th>Role</th><th className="text-center">จัดการ</th></tr></thead>
+                <thead><tr className="bg-black/2"><th>Username</th><th>ชื่อ</th><th>Vendor</th><th>Company</th><th>Role</th><th>สถานะ</th><th className="text-center">จัดการ</th></tr></thead>
                 <tbody>
                   {filtered.map((user) => (
-                    <tr key={user.id}>
+                    <tr key={user.id} className={user.isActive === false ? "opacity-50" : ""}>
                       <td>
                         <div className="flex items-center gap-2">
                           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-xs font-medium">
@@ -167,7 +183,15 @@ export default function AdminUserManage() {
                         </span>
                       </td>
                       <td>
+                        <span className={`px-2 py-1 rounded-md text-xs font-medium ${user.isActive !== false ? "bg-green-100 text-green-600" : "bg-gray-100 text-gray-500"}`}>
+                          {user.isActive !== false ? "เปิดใช้งาน" : "ปิดใช้งาน"}
+                        </span>
+                      </td>
+                      <td>
                         <div className="flex justify-center gap-1">
+                          <button onClick={() => handleToggleStatus(user)} className={`p-2 rounded-lg ${user.isActive !== false ? "hover:bg-orange-50 text-orange-500" : "hover:bg-green-50 text-green-500"}`} title={user.isActive !== false ? "ปิดใช้งาน" : "เปิดใช้งาน"}>
+                            {user.isActive !== false ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
+                          </button>
                           <button onClick={() => openEditModal(user)} className="p-2 rounded-lg hover:bg-blue-50 text-blue-500"><Edit2 className="w-4 h-4" /></button>
                           <button onClick={() => setConfirmDelete(user)} className="p-2 rounded-lg hover:bg-red-50 text-red-500"><Trash2 className="w-4 h-4" /></button>
                         </div>
@@ -198,7 +222,7 @@ export default function AdminUserManage() {
         ) : (
           <>
             {filtered.map((user) => (
-              <div key={user.id} className="glass-card p-4">
+              <div key={user.id} className={`glass-card p-4 ${user.isActive === false ? "opacity-50" : ""}`}>
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-medium">
                     {user.username?.substring(0, 2).toUpperCase()}
@@ -207,11 +231,20 @@ export default function AdminUserManage() {
                     <p className="font-semibold text-foreground">{user.username}</p>
                     <p className="text-xs text-muted-foreground">{user.firstName} {user.lastName}</p>
                   </div>
-                  <span className={`px-2 py-1 rounded-md text-xs font-medium ${user.role === "ADMIN" ? "bg-purple-100 text-purple-600" : "bg-blue-100 text-blue-600"}`}>
-                    {user.role}
-                  </span>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className={`px-2 py-1 rounded-md text-xs font-medium ${user.role === "ADMIN" ? "bg-purple-100 text-purple-600" : "bg-blue-100 text-blue-600"}`}>
+                      {user.role}
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-md text-xs ${user.isActive !== false ? "bg-green-100 text-green-600" : "bg-gray-100 text-gray-500"}`}>
+                      {user.isActive !== false ? "เปิดใช้งาน" : "ปิดใช้งาน"}
+                    </span>
+                  </div>
                 </div>
                 <div className="flex gap-2">
+                  <button onClick={() => handleToggleStatus(user)} className={`py-2.5 px-3 rounded-lg font-medium text-sm flex items-center justify-center gap-1 ${user.isActive !== false ? "bg-orange-50 text-orange-600" : "bg-green-50 text-green-600"}`}>
+                    {user.isActive !== false ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
+                    {user.isActive !== false ? "ปิด" : "เปิด"}
+                  </button>
                   <button onClick={() => openEditModal(user)} className="flex-1 py-2.5 rounded-lg bg-blue-50 text-blue-600 font-medium text-sm flex items-center justify-center gap-1">
                     <Edit2 className="w-4 h-4" />แก้ไข
                   </button>

@@ -13,7 +13,7 @@ export async function GET() {
     }
 
     // ✅ ดึงข้อมูล user จาก database
-    const user = await prisma.user.findUnique({
+    const user = await prisma.user.findFirst({
       where: { email: session.user.email },
     });
 

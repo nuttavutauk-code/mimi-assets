@@ -21,15 +21,25 @@ export async function GET(
             );
         }
 
-        // 2. ดึง vendor ของ User
+        // 2. ดึงข้อมูล User พร้อม role
         const userId = parseInt((session.user as any).id || (session.user as any).sub || "0");
 
         const user = await prisma.user.findUnique({
             where: { id: userId },
-            select: { vendor: true },
+            select: { vendor: true, role: true },
         });
 
-        if (!user || !user.vendor) {
+        if (!user) {
+            return NextResponse.json(
+                { success: false, message: "User not found" },
+                { status: 400 }
+            );
+        }
+
+        const isAdmin = user.role === "ADMIN";
+
+        // ✅ User ต้องมี vendor, Admin ไม่จำเป็น
+        if (!isAdmin && !user.vendor) {
             return NextResponse.json(
                 { success: false, message: "User vendor not found" },
                 { status: 400 }
@@ -48,11 +58,15 @@ export async function GET(
             );
         }
 
-        // 4. ดึงข้อมูล Tasks ทั้งหมดของเอกสารนี้ (filter ตาม shopCode ด้วย)
+        // 4. ดึงข้อมูล Tasks ทั้งหมดของเอกสารนี้
         const whereClause: any = {
             documentId,
-            warehouse: user.vendor, // ← เช็คว่าเป็น Tasks ของ vendor นี้
         };
+
+        // ✅ Admin ดูได้ทุก task, User ดูได้เฉพาะ vendor ตัวเอง
+        if (!isAdmin) {
+            whereClause.warehouse = user.vendor;
+        }
 
         // ✅ ถ้ามี shopCode ให้ filter ตาม shop ด้วย
         if (shopCode) {

@@ -35,7 +35,12 @@ export default function LoginPage() {
       });
 
       if (res?.error) {
-        setError("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง");
+        // แสดง error message จาก server (ถ้ามี)
+        if (res.error === "บัญชีของคุณถูกปิดใช้งาน กรุณาติดต่อผู้ดูแลระบบ") {
+          setError(res.error);
+        } else {
+          setError("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง");
+        }
         setLoading(false);
         return;
       }

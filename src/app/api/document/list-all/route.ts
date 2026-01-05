@@ -24,7 +24,7 @@ export async function GET(req: Request) {
         }
 
         // ✅ ตรวจสอบว่าเป็น Admin หรือไม่
-        const user = await prisma.user.findUnique({
+        const user = await prisma.user.findFirst({
             where: { email: session.user.email },
         });
 

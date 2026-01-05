@@ -10,7 +10,7 @@ datasource db {
 model User {
   id        Int      @id @default(autoincrement())
   username  String   @unique
-  email     String   @unique
+  email     String
   password  String
   firstName String?
   lastName  String?
@@ -19,6 +19,7 @@ model User {
   phone     String?
   initials  String?
   role      Role     @default(USER)
+  isActive  Boolean  @default(true) // เปิด-ปิดการใช้งาน
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
