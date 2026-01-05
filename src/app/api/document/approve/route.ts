@@ -685,6 +685,7 @@ export async function POST(req: NextRequest) {
             data: {
                 status: "approved",
                 otherActivity: otherActivity || null, // ✅ บันทึก Other Activity
+                approvedAt: new Date(), // ✅ บันทึกวันที่อนุมัติ
             },
         });
 

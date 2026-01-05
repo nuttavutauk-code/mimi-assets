@@ -102,8 +102,9 @@ model Document {
   phone    String?
 
   // 🔹 หมายเหตุ + สถานะ
-  note   String?
-  status String? // draft | submitted | approved | rejected
+  note       String?
+  status     String? // draft | submitted | approved | rejected
+  approvedAt DateTime? // วันที่อนุมัติ
 
   // 🔹 ข้อมูลเพิ่มเติมสำหรับใบย้ายของ (transfer)
   operation   String? // Event, ส่งคืนผู้ผลิต, ส่งคืนโกดังเช่า, อื่นๆ
