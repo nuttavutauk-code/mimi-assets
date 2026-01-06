@@ -50,8 +50,9 @@ type FormMode = "user" | "admin";
 
 const defaultSecuritySets = (): SecuritySet[] => [
   { id: 1, name: "CONTROLBOX 6 PORT (M-60000R) with power cable", qty: 0, withdrawFor: "" },
-  { id: 2, name: "Security Type C Ver.7.1", qty: 0, withdrawFor: "" },
-  { id: 3, name: "Security Type C Ver.7.0", qty: 0, withdrawFor: "" },
+  { id: 2, name: "CONTROLBOX 5 PORT (M-60000R) with power cable", qty: 0, withdrawFor: "" },
+  { id: 3, name: "Security Type C Ver.7.1", qty: 0, withdrawFor: "" },
+  { id: 4, name: "Security Type C Ver.7.0", qty: 0, withdrawFor: "" },
 ];
 
 const FormRouting3Shops = ({ mode = "user" }: { mode?: FormMode }) => {
@@ -227,6 +228,26 @@ const FormRouting3Shops = ({ mode = "user" }: { mode?: FormMode }) => {
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
+      // ✅ Validation: Security Set กรอกได้สูงสุด 3 รายการ (ต่อ Shop)
+      const filledSecuritySets1 = securitySets1.filter(s => s.qty > 0);
+      const filledSecuritySets2 = securitySets2.filter(s => s.qty > 0);
+      const filledSecuritySets3 = securitySets3.filter(s => s.qty > 0);
+      if (filledSecuritySets1.length > 3) {
+        toast.error("Security Set Shop 1 กรอกได้สูงสุด 3 รายการเท่านั้น");
+        setIsSubmitting(false);
+        return;
+      }
+      if (filledSecuritySets2.length > 3) {
+        toast.error("Security Set Shop 2 กรอกได้สูงสุด 3 รายการเท่านั้น");
+        setIsSubmitting(false);
+        return;
+      }
+      if (filledSecuritySets3.length > 3) {
+        toast.error("Security Set Shop 3 กรอกได้สูงสุด 3 รายการเท่านั้น");
+        setIsSubmitting(false);
+        return;
+      }
+
       const shopsPayload = [
         { shopCode: shop1.shopCode, shopName: shop1.shopName, startInstallDate: shop1.startDate, endInstallDate: shop1.endDate, q7b7: shop1.q7b7, shopFocus: shop1.focus, assets: assets1.map(a => ({ name: a.name, size: a.size, kv: a.kv, qty: a.qty, withdrawFor: a.withdrawFor })), securitySets: securitySets1.filter(s => s.qty > 0).map(s => ({ name: s.name, qty: s.qty, withdrawFor: s.withdrawFor })) },
         { shopCode: shop2.shopCode, shopName: shop2.shopName, startInstallDate: shop2.startDate, endInstallDate: shop2.endDate, q7b7: shop2.q7b7, shopFocus: shop2.focus, assets: assets2.map(a => ({ name: a.name, size: a.size, kv: a.kv, qty: a.qty, withdrawFor: a.withdrawFor })), securitySets: securitySets2.filter(s => s.qty > 0).map(s => ({ name: s.name, qty: s.qty, withdrawFor: s.withdrawFor })) },
@@ -239,6 +260,7 @@ const FormRouting3Shops = ({ mode = "user" }: { mode?: FormMode }) => {
         const missingWarehouse = allAssets.some(a => !a.withdrawFor || a.withdrawFor.trim() === "");
         if (missingWarehouse) {
           toast.error("กรุณาเลือกโกดังให้ครบทุกรายการก่อนอนุมัติ");
+          setIsSubmitting(false);
           return;
         }
       }

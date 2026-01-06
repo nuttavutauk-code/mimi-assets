@@ -192,9 +192,9 @@ model DocumentSecuritySet {
 model AssetTransactionHistory {
   id Int @id @default(autoincrement())
 
-  // 🔗 อ้างอิงเอกสารต้นทาง
-  documentId Int
-  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  // 🔗 อ้างอิงเอกสารต้นทาง (optional - เพื่อให้ reset ได้เมื่อลบเอกสาร)
+  documentId Int?
+  document   Document? @relation(fields: [documentId], references: [id], onDelete: SetNull)
 
   // 🟨 ========== 1. เกี่ยวกับ Asset (8 คอลัมน์) ==========
   barcode       String  @db.VarChar(50)
@@ -369,9 +369,9 @@ model SecuritySetTransaction {
   // 🔗 เลขที่เอกสารอ้างอิง (คอลัมน์แรก)
   docCode String @db.VarChar(50)
 
-  // 🔗 อ้างอิงเอกสารต้นทาง
-  documentId Int
-  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  // 🔗 อ้างอิงเอกสารต้นทาง (optional - เพื่อให้ reset ได้เมื่อลบเอกสาร)
+  documentId Int?
+  document   Document? @relation(fields: [documentId], references: [id], onDelete: SetNull)
 
   // 🟨 ========== 1. เกี่ยวกับ Security Set (7 คอลัมน์) ==========
   // ⚠️ รองรับเฉพาะ 3 Asset Names:

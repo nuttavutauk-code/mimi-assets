@@ -26,7 +26,7 @@ const FormShopToShop = ({ mode = "user" }: { mode?: FormMode }) => {
   const [docStatus, setDocStatus] = useState(""); const assetIdCounter = useRef(1);
 
   const [assets, setAssets] = useState<AssetRow[]>([{ id: assetIdCounter.current++, barcode: "", name: "", size: "", grade: "", qty: 1 }]);
-  const [securitySets, setSecuritySets] = useState<SecuritySet[]>([{ id: 1, name: "CONTROLBOX 6 PORT", qty: 0, withdrawFor: "" }, { id: 2, name: "Security Type C Ver.7.1", qty: 0, withdrawFor: "" }, { id: 3, name: "Security Type C Ver.7.0", qty: 0, withdrawFor: "" }]);
+  const [securitySets, setSecuritySets] = useState<SecuritySet[]>([{ id: 1, name: "CONTROLBOX 6 PORT", qty: 0, withdrawFor: "" }, { id: 2, name: "CONTROLBOX 5 PORT", qty: 0, withdrawFor: "" }, { id: 3, name: "Security Type C Ver.7.1", qty: 0, withdrawFor: "" }, { id: 4, name: "Security Type C Ver.7.0", qty: 0, withdrawFor: "" }]);
   const [vendors, setVendors] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -83,6 +83,14 @@ const FormShopToShop = ({ mode = "user" }: { mode?: FormMode }) => {
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
+      // ✅ Validation: Security Set กรอกได้สูงสุด 3 รายการ
+      const filledSecuritySets = securitySets.filter(s => s.qty > 0);
+      if (filledSecuritySets.length > 3) {
+        toast.error("Security Set กรอกได้สูงสุด 3 รายการเท่านั้น");
+        setIsSubmitting(false);
+        return;
+      }
+
       if (action === "approve" && editId) {
         // ✅ บันทึกข้อมูลก่อน
         const updatePayload = { documentType: "shop-to-shop", docCode: formData.docNumber, fullName: formData.fullName, company: formData.company, phone: formData.phone, note, status: "submitted", shops: [{ shopCode: shopCodeFrom, shopName: shopNameFrom, startInstallDate: transferDate, assets: assets.map(a => ({ barcode: a.barcode, name: a.name, size: a.size, grade: a.grade, qty: a.qty })), securitySets: securitySets.filter(s => s.qty > 0).map(s => ({ name: s.name, qty: s.qty })) }, { shopCode: shopCodeTo, shopName: shopNameTo }] };

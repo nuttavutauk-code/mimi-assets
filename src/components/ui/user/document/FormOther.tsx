@@ -50,8 +50,9 @@ const FormOther = ({ mode = "user" }: { mode?: FormMode }) => {
   const [assets, setAssets] = useState<AssetRow[]>([{ id: assetIdCounter.current++, name: "", size: "", grade: "", qty: 1, withdrawFor: "" }]);
   const defaultSecuritySets: SecuritySet[] = [
     { id: 1, name: "CONTROLBOX 6 PORT (M-60000R) with power cable", qty: 0, withdrawFor: "" },
-    { id: 2, name: "Security Type C Ver.7.1", qty: 0, withdrawFor: "" },
-    { id: 3, name: "Security Type C Ver.7.0", qty: 0, withdrawFor: "" },
+    { id: 2, name: "CONTROLBOX 5 PORT (M-60000R) with power cable", qty: 0, withdrawFor: "" },
+    { id: 3, name: "Security Type C Ver.7.1", qty: 0, withdrawFor: "" },
+    { id: 4, name: "Security Type C Ver.7.0", qty: 0, withdrawFor: "" },
   ];
   const [securitySets, setSecuritySets] = useState<SecuritySet[]>(defaultSecuritySets);
   const [loading, setLoading] = useState(false);
@@ -148,6 +149,7 @@ const FormOther = ({ mode = "user" }: { mode?: FormMode }) => {
       // ✅ Validation: ต้องเลือกวันที่โอนย้าย
       if (!startDate) {
         toast.error("กรุณาเลือกวันที่โอนย้าย");
+        setIsSubmitting(false);
         return;
       }
 
@@ -156,6 +158,15 @@ const FormOther = ({ mode = "user" }: { mode?: FormMode }) => {
       const hasSecuritySet = securitySets.some(s => s.qty > 0);
       if (!hasAsset && !hasSecuritySet) {
         toast.error("กรุณาเพิ่ม Asset หรือ Security Set อย่างน้อย 1 รายการ");
+        setIsSubmitting(false);
+        return;
+      }
+
+      // ✅ Validation: Security Set กรอกได้สูงสุด 3 รายการ
+      const filledSecuritySets = securitySets.filter(s => s.qty > 0);
+      if (filledSecuritySets.length > 3) {
+        toast.error("Security Set กรอกได้สูงสุด 3 รายการเท่านั้น");
+        setIsSubmitting(false);
         return;
       }
 
@@ -165,6 +176,7 @@ const FormOther = ({ mode = "user" }: { mode?: FormMode }) => {
         const missingSecurityWarehouse = securitySets.filter(s => s.qty > 0).some(s => !s.withdrawFor || s.withdrawFor.trim() === "");
         if (missingAssetWarehouse || missingSecurityWarehouse) {
           toast.error("กรุณาเลือกโกดังให้ครบทุกรายการก่อนอนุมัติ");
+          setIsSubmitting(false);
           return;
         }
       }

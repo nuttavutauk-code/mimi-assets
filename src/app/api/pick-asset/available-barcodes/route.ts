@@ -99,7 +99,7 @@ export async function GET(req: NextRequest) {
 
         console.log("🔍 Found assets from DB:", assets.length);
 
-        // Filter เฉพาะที่มี barcode และ Balance = 1 (หรือไม่มี transaction)
+        // Filter เฉพาะที่มี barcode และ Balance = 1 (ต้องมี Transaction ที่พร้อมเบิก)
         const availableAssets: typeof assets = [];
 
         for (const asset of assets) {
@@ -116,8 +116,8 @@ export async function GET(req: NextRequest) {
 
             console.log(`🔍 Checking barcode: ${asset.barcode}, size: "${asset.size || ''}", balance: ${latestTransaction?.balance ?? 'NO_TX'}`);
 
-            // ถ้าไม่มี Transaction หรือ Balance = 1 → แสดง Barcode นี้
-            if (!latestTransaction || latestTransaction.balance === 1) {
+            // ✅ ต้องมี Transaction และ Balance = 1 เท่านั้น (มีขาเข้า พร้อมเบิกออก)
+            if (latestTransaction && latestTransaction.balance === 1) {
                 availableAssets.push(asset);
             }
         }

@@ -52,8 +52,9 @@ type FormMode = "user" | "admin";
 
 const defaultSecuritySets = (): SecuritySet[] => [
   { id: 1, name: "CONTROLBOX 6 PORT (M-60000R) with power cable", qty: 0, withdrawFor: "" },
-  { id: 2, name: "Security Type C Ver.7.1", qty: 0, withdrawFor: "" },
-  { id: 3, name: "Security Type C Ver.7.0", qty: 0, withdrawFor: "" },
+  { id: 2, name: "CONTROLBOX 5 PORT (M-60000R) with power cable", qty: 0, withdrawFor: "" },
+  { id: 3, name: "Security Type C Ver.7.1", qty: 0, withdrawFor: "" },
+  { id: 4, name: "Security Type C Ver.7.0", qty: 0, withdrawFor: "" },
 ];
 
 const FormRouting2Shops = ({ mode = "user" }: { mode?: FormMode }) => {
@@ -284,12 +285,27 @@ const FormRouting2Shops = ({ mode = "user" }: { mode?: FormMode }) => {
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
+      // ✅ Validation: Security Set กรอกได้สูงสุด 3 รายการ (ต่อ Shop)
+      const filledSecuritySets1 = securitySets1.filter(s => s.qty > 0);
+      const filledSecuritySets2 = securitySets2.filter(s => s.qty > 0);
+      if (filledSecuritySets1.length > 3) {
+        toast.error("Security Set Shop 1 กรอกได้สูงสุด 3 รายการเท่านั้น");
+        setIsSubmitting(false);
+        return;
+      }
+      if (filledSecuritySets2.length > 3) {
+        toast.error("Security Set Shop 2 กรอกได้สูงสุด 3 รายการเท่านั้น");
+        setIsSubmitting(false);
+        return;
+      }
+
       // ✅ Admin ต้องเลือกโกดังครบทุก Asset ก่อนอนุมัติ
       if (action === "approve" && mode === "admin") {
         const allAssets = [...assets1, ...assets2];
         const missingWarehouse = allAssets.some(a => !a.withdrawFor || a.withdrawFor.trim() === "");
         if (missingWarehouse) {
           toast.error("กรุณาเลือกโกดังให้ครบทุกรายการก่อนอนุมัติ");
+          setIsSubmitting(false);
           return;
         }
       }

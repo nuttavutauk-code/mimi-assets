@@ -46,33 +46,88 @@ export async function DELETE(
             );
         }
 
-        // ===== ลบข้อมูลที่เกี่ยวข้องก่อนลบเอกสาร =====
+        // ===== จัดการข้อมูลที่เกี่ยวข้องก่อนลบเอกสาร =====
 
-        // 1. ลบ AssetTransactionHistory ที่เกี่ยวข้องกับเอกสารนี้
-        const deletedTransactions = await prisma.assetTransactionHistory.deleteMany({
+        // 1. Reset AssetTransactionHistory ที่เกี่ยวข้องกับเอกสารนี้
+        // แทนที่จะลบ → Reset ขา OUT กลับ และ balance = 1
+        const resetTransactions = await prisma.assetTransactionHistory.updateMany({
+            where: { documentId: id },
+            data: {
+                documentId: null,
+                outDate: null,
+                unitOut: null,
+                toVendor: null,
+                status: null,
+                shopType: null,
+                mcsCodeOut: null,
+                toShop: null,
+                remarkOut: null,
+                balance: 1,
+                // Reset WK columns
+                wkOut: null,
+                wkOutForRepair: null,
+                borrow: null,
+                outToRentalWarehouse: null,
+                inToRentalWarehouse: null,
+                discarded: null,
+                adjustError: null,
+            },
+        });
+
+        // 2. Reset SecuritySetTransaction ที่เกี่ยวข้องกับเอกสารนี้
+        const resetSecurityTransactions = await prisma.securitySetTransaction.updateMany({
+            where: { documentId: id },
+            data: {
+                documentId: null,
+                outDate: null,
+                unitOut: null,
+                toVendor: null,
+                status: null,
+                mcsCodeOut: null,
+                toShop: null,
+                remarkOut: null,
+                balance: 1,
+            },
+        });
+
+        // 3. ลบ TransferReceiveTask ที่เกี่ยวข้องกับเอกสารนี้
+        const deletedTransferTasks = await prisma.transferReceiveTask.deleteMany({
             where: { documentId: id },
         });
 
-        // 2. ลบ PickAssetTask ที่เกี่ยวข้องกับเอกสารนี้
-        const deletedTasks = await prisma.pickAssetTask.deleteMany({
+        // 4. ลบ RepairTask ที่เกี่ยวข้องกับเอกสารนี้
+        const deletedRepairTasks = await prisma.repairTask.deleteMany({
             where: { documentId: id },
         });
 
-        // 3. ลบเอกสาร (DocumentShop, DocumentAsset, DocumentSecuritySet จะถูกลบอัตโนมัติผ่าน onDelete: Cascade)
+        // 5. ลบ PickAssetTask ที่เกี่ยวข้องกับเอกสารนี้
+        const deletedPickTasks = await prisma.pickAssetTask.deleteMany({
+            where: { documentId: id },
+        });
+
+        // 6. ลบเอกสาร (DocumentShop, DocumentAsset, DocumentSecuritySet จะถูกลบอัตโนมัติผ่าน onDelete: Cascade)
         await prisma.document.delete({
             where: { id },
         });
 
         console.log(`✅ Deleted document ${id}:`);
-        console.log(`   - Transactions deleted: ${deletedTransactions.count}`);
-        console.log(`   - Pick tasks deleted: ${deletedTasks.count}`);
+        console.log(`   - Transactions reset: ${resetTransactions.count}`);
+        console.log(`   - Security transactions reset: ${resetSecurityTransactions.count}`);
+        console.log(`   - Pick tasks deleted: ${deletedPickTasks.count}`);
+        console.log(`   - Transfer tasks deleted: ${deletedTransferTasks.count}`);
+        console.log(`   - Repair tasks deleted: ${deletedRepairTasks.count}`);
 
         return NextResponse.json({
             success: true,
             message: "ลบเอกสารสำเร็จ",
+            reset: {
+                transactions: resetTransactions.count,
+                securityTransactions: resetSecurityTransactions.count,
+            },
             deleted: {
-                transactions: deletedTransactions.count,
-                pickTasks: deletedTasks.count,
+                pickTasks: deletedPickTasks.count,
+                transferTasks: deletedTransferTasks.count,
+                repairTasks: deletedRepairTasks.count,
             },
         });
     } catch (err) {

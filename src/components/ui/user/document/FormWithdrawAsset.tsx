@@ -55,8 +55,9 @@ const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {
   const [assets, setAssets] = useState<AssetRow[]>([{ id: assetIdCounter.current++, name: "", size: "", grade: "", kv: "", qty: 1, withdrawFor: "" }]);
   const defaultSecuritySets: SecuritySet[] = [
     { id: 1, name: "CONTROLBOX 6 PORT (M-60000R) with power cable", qty: 0, withdrawFor: "" },
-    { id: 2, name: "Security Type C Ver.7.1", qty: 0, withdrawFor: "" },
-    { id: 3, name: "Security Type C Ver.7.0", qty: 0, withdrawFor: "" },
+    { id: 2, name: "CONTROLBOX 5 PORT (M-60000R) with power cable", qty: 0, withdrawFor: "" },
+    { id: 3, name: "Security Type C Ver.7.1", qty: 0, withdrawFor: "" },
+    { id: 4, name: "Security Type C Ver.7.0", qty: 0, withdrawFor: "" },
   ];
   const [securitySets, setSecuritySets] = useState<SecuritySet[]>(defaultSecuritySets);
   const [loading, setLoading] = useState(false);
@@ -229,9 +230,18 @@ const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
+      // ✅ Validation: Security Set กรอกได้สูงสุด 3 รายการ
+      const filledSecuritySets = securitySets.filter(s => s.qty > 0);
+      if (filledSecuritySets.length > 3) {
+        toast.error("Security Set กรอกได้สูงสุด 3 รายการเท่านั้น");
+        setIsSubmitting(false);
+        return;
+      }
+
       // ✅ Admin ต้องเลือก Status ก่อนอนุมัติ
       if (action === "approve" && mode === "admin" && !transactionStatus) {
         toast.error("กรุณาเลือก Status ก่อนอนุมัติ");
+        setIsSubmitting(false);
         return;
       }
 
@@ -240,6 +250,7 @@ const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {
         const missingWarehouse = assets.some(a => !a.withdrawFor || a.withdrawFor.trim() === "");
         if (missingWarehouse) {
           toast.error("กรุณาเลือกโกดังให้ครบทุกรายการก่อนอนุมัติ");
+          setIsSubmitting(false);
           return;
         }
       }
