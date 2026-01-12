@@ -11,6 +11,9 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
             return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
         }
 
+        console.log('ไอดีไง',params,Number(params.id));
+        
+
         const doc = await prisma.document.findUnique({
             where: { id: Number(params.id) },
             include: {
