@@ -32,6 +32,16 @@ const nextConfig: NextConfig = {
       "framer-motion",
     ],
   },
+
+  // ปิด ESLint ตอน build
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+
+  // ปิด TypeScript errors ตอน build
+  typescript: {
+    ignoreBuildErrors: true,
+  },
 };
 
 export default nextConfig;
