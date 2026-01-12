@@ -43,3 +43,4 @@ next-env.d.ts
 # เพิ่มบรรทัดนี้ท้ายไฟล์ .gitignore
 uploads/
 public/uploads/
+.next
