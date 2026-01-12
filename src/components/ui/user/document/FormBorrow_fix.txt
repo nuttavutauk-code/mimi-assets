@@ -1,0 +1,21 @@
+  // ✅ Fixed: Load user data using session email
+  useEffect(() => {
+    if (isEdit || dataLoaded || !data?.user) return;
+    const initForm = async () => {
+      setLoading(true);
+      try {
+        const me = await getMe(data?.user?.email ?? "");
+        const { user } = me;
+        const docRes = await fetch("/api/document/generate");
+        const { docCode } = await docRes.json();
+        setFormData({
+          docNumber: docCode || "",
+          fullName: `${user?.firstName || ""} ${user?.lastName || ""}`.trim(),
+          company: user?.company || "",
+          phone: user?.phone || "",
+        });
+      } catch (err) { console.error(err); }
+      finally { setLoading(false); }
+    };
+    initForm();
+  }, [data, isEdit, dataLoaded]);
