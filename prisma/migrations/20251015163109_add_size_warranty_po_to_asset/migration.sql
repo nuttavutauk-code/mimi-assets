@@ -1,3 +1,0 @@
--- AlterTable
-ALTER TABLE "Asset" ALTER COLUMN "endWarranty" SET DATA TYPE TEXT,
-ALTER COLUMN "startWarranty" SET DATA TYPE TEXT;
