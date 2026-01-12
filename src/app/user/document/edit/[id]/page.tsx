@@ -38,7 +38,7 @@ export default function EditDocumentPage() {
     // ✅ โหลดข้อมูลเอกสาร
     const fetchDocument = async () => {
         try {
-            const res = await fetch(`/api/document/${id}`);
+            const res = await fetch(`/api/document/detail/${id}`);
             const json = await res.json();
             if (json.success) {
                 setDocument(json.document);
