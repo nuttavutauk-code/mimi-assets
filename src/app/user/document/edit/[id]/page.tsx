@@ -60,7 +60,7 @@ export default function EditDocumentPage() {
     const handleSave = async () => {
         setSaving(true);
         try {
-            const res = await fetch(`/api/document/${id}`, {
+            const res = await fetch(`/api/document/detail/${id}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(document),

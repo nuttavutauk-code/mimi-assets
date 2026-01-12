@@ -97,7 +97,7 @@ const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {
     const loadExisting = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`/api/document/${editIdFromUrl}`);
+        const res = await fetch(`/api/document/detail/${editIdFromUrl}`);
         const json = await res.json();
         if (json.success) {
           const doc = json.document;

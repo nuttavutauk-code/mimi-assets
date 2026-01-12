@@ -124,7 +124,7 @@ export default function AdminList() {
   const handleDownload = async (item: any) => {
     setDownloadingId(item.id);
     try {
-      const res = await fetch(`/api/document/${item.id}`);
+      const res = await fetch(`/api/document/detail/${item.id}`);
       const json = await res.json();
       if (!json.success) {
         toast.error("ไม่สามารถโหลดข้อมูลเอกสารได้");

@@ -42,7 +42,7 @@ const FormShopToShop = ({ mode = "user" }: { mode?: FormMode }) => {
   useEffect(() => {
     if (!editIdFromUrl || dataLoaded) return;
     setLoading(true);
-    fetch(`/api/document/${editIdFromUrl}`).then(r => r.json()).then(json => {
+    fetch(`/api/document/detail/${editIdFromUrl}`).then(r => r.json()).then(json => {
       if (json.success) {
         const doc = json.document;
         setDocStatus(doc.status || "");
