@@ -1,5 +1,9 @@
-// app/api/receive-transfer/[id]/route.ts
+// ============================================================
+// 📁 ไฟล์ที่ 6: src/app/api/receive-transfer/[id]/route.ts
+// ============================================================
+
 // API สำหรับดึงรายละเอียดและอัปเดต Transfer Receive Tasks
+// ✅ Next.js 15: params เป็น Promise
 
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
@@ -9,7 +13,7 @@ import { prisma } from "@/lib/prisma";
 // GET - ดึงรายละเอียดเอกสารและ Tasks
 export async function GET(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const session = await getServerSession(authOptions);
@@ -34,7 +38,9 @@ export async function GET(
             );
         }
 
-        const documentId = parseInt(params.id);
+        // ✅ Next.js 15: ต้อง await params
+        const { id } = await params;
+        const documentId = parseInt(id);
 
         // ดึงเอกสารพร้อม tasks
         const document = await prisma.document.findUnique({
@@ -117,7 +123,7 @@ export async function GET(
 // PATCH - อัปเดตสถานะ Task และรูปภาพ
 export async function PATCH(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const session = await getServerSession(authOptions);
@@ -134,9 +140,12 @@ export async function PATCH(
         const body = await req.json();
         const { taskId, status, rejectReason, assetImageUrl, transferDocImageUrl } = body;
 
+        // ✅ Next.js 15: ต้อง await params
+        const { id } = await params;
+        const documentId = parseInt(id);
+
         // อัปเดตรูปเอกสาร (ถ้ามี)
         if (transferDocImageUrl !== undefined) {
-            const documentId = parseInt(params.id);
             await prisma.document.update({
                 where: { id: documentId },
                 data: { transferDocImageUrl },

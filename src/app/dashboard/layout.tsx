@@ -355,9 +355,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </aside>
 
                 {/* ===== Main Content ===== */}
-                <main className="flex-1 lg:ml-[260px] min-h-screen">
+                <main className="flex-1 lg:ml-[260px] min-h-screen overflow-x-hidden">
                     {/* Page Content */}
-                    <div className="p-4 lg:p-6">
+                    <div className="p-4 lg:p-6 max-w-full overflow-x-hidden">
                         {children}
                     </div>
                 </main>

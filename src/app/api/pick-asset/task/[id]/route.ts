@@ -1,5 +1,9 @@
-// app/api/pick-asset/task/[id]/route.ts
+// ============================================================
+// 📁 ไฟล์ที่ 5: src/app/api/pick-asset/task/[id]/route.ts
+// ============================================================
+
 // API สำหรับ Picker ดูรายละเอียด Tasks ของเอกสารหนึ่งๆ
+// ✅ Next.js 15: params เป็น Promise
 
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
@@ -8,7 +12,7 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         // 1. เช็ค Authentication
@@ -46,8 +50,11 @@ export async function GET(
             );
         }
 
-        // 3. แปลง id เป็น documentId และรับ shopCode จาก query
-        const documentId = parseInt(params.id);
+        // ✅ Next.js 15: ต้อง await params
+        const { id } = await params;
+        const documentId = parseInt(id);
+        
+        // 3. รับ shopCode จาก query
         const { searchParams } = new URL(req.url);
         const shopCode = searchParams.get("shopCode") || "";
 

@@ -1,3 +1,7 @@
+// ============================================================
+// 📁 ไฟล์ที่ 4: src/app/api/user/[id]/route.ts
+// ============================================================
+
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -19,10 +23,11 @@ async function checkAdminAuth() {
 /* ===========================================================
    [ GET USER BY ID - ดึงข้อมูลผู้ใช้ตาม ID ]
    Endpoint: GET /api/user/[id]
+   ✅ Next.js 15: params เป็น Promise
    =========================================================== */
 export async function GET(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const authError = await checkAdminAuth();
@@ -30,7 +35,10 @@ export async function GET(
       return NextResponse.json({ error: authError.error }, { status: authError.status });
     }
 
-    const id = Number(params.id);
+    // ✅ Next.js 15: ต้อง await params
+    const { id: idStr } = await params;
+    const id = Number(idStr);
+    
     if (isNaN(id)) {
       return NextResponse.json({ error: "Invalid user ID" }, { status: 400 });
     }
@@ -66,10 +74,11 @@ export async function GET(
 /* ===========================================================
    [ UPDATE USER - แก้ไขข้อมูลผู้ใช้ ]
    Endpoint: PUT /api/user/[id]
+   ✅ Next.js 15: params เป็น Promise
    =========================================================== */
 export async function PUT(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const authError = await checkAdminAuth();
@@ -77,7 +86,10 @@ export async function PUT(
       return NextResponse.json({ error: authError.error }, { status: authError.status });
     }
 
-    const id = Number(params.id);
+    // ✅ Next.js 15: ต้อง await params
+    const { id: idStr } = await params;
+    const id = Number(idStr);
+    
     if (isNaN(id)) {
       return NextResponse.json({ error: "Invalid user ID" }, { status: 400 });
     }
@@ -113,10 +125,11 @@ export async function PUT(
 /* ===========================================================
    [ DELETE USER - ลบผู้ใช้ ]
    Endpoint: DELETE /api/user/[id]
+   ✅ Next.js 15: params เป็น Promise
    =========================================================== */
 export async function DELETE(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const authError = await checkAdminAuth();
@@ -124,7 +137,10 @@ export async function DELETE(
       return NextResponse.json({ error: authError.error }, { status: authError.status });
     }
 
-    const id = Number(params.id);
+    // ✅ Next.js 15: ต้อง await params
+    const { id: idStr } = await params;
+    const id = Number(idStr);
+    
     if (isNaN(id)) {
       return NextResponse.json({ error: "Invalid user ID" }, { status: 400 });
     }

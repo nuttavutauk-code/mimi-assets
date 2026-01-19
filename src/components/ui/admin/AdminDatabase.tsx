@@ -351,7 +351,7 @@ export default function AdminDatabase() {
   };
 
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="space-y-4 sm:space-y-6 overflow-hidden max-w-full">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
@@ -436,6 +436,13 @@ export default function AdminDatabase() {
         <span className="ml-auto text-muted-foreground">รวม {pagination.totalCount.toLocaleString()} รายการ</span>
       </div>
 
+      {/* Scroll Hint - Mobile Only */}
+      <div className="sm:hidden flex items-center justify-center gap-2 text-xs text-muted-foreground bg-blue-50 py-2 rounded-lg">
+        <span>←</span>
+        <span>เลื่อนตารางเพื่อดูข้อมูลเพิ่มเติม</span>
+        <span>→</span>
+      </div>
+
       {/* Table */}
       <div className="glass-card overflow-hidden">
         {loading ? (
@@ -444,8 +451,14 @@ export default function AdminDatabase() {
           <div className="p-12 text-center text-muted-foreground"><Database className="w-12 h-12 mx-auto mb-3 opacity-30" />ไม่พบข้อมูล</div>
         ) : (
           <>
-            <div className="overflow-x-auto overflow-y-auto max-h-[60vh]" style={{ maxWidth: 'calc(100vw - 260px - 48px)' }}>
-              <table className="w-full text-xs border-collapse whitespace-nowrap">
+            {/* ✅ Mobile-friendly: scroll แนวนอนได้ พร้อม scrollbar ที่มองเห็นได้ */}
+            <div 
+              className="overflow-auto max-h-[60vh]"
+              style={{
+                WebkitOverflowScrolling: 'touch',
+              }}
+            >
+              <table className="text-xs border-collapse whitespace-nowrap">
                 <thead className="sticky top-0 z-10">
                   <tr>
                     {orderedColumns.map((col, i) => {

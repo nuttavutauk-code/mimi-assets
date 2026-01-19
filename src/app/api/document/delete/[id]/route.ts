@@ -1,11 +1,16 @@
+// ============================================================
+// 📁 ไฟล์ที่ 2: src/app/api/document/delete/[id]/route.ts
+// ============================================================
+
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 
+// ✅ Next.js 15: params เป็น Promise
 export async function DELETE(
     req: Request,
-    context: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         // 1. เช็ค Authentication
@@ -25,8 +30,9 @@ export async function DELETE(
             );
         }
 
-        // แปลง id จาก string → number ก่อนใช้กับ Prisma
-        const id = Number(context.params.id);
+        // ✅ Next.js 15: ต้อง await params
+        const { id: idStr } = await params;
+        const id = Number(idStr);
 
         if (isNaN(id)) {
             return NextResponse.json(

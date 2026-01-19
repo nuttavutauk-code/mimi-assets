@@ -1,11 +1,16 @@
+// ============================================================
+// 📁 ไฟล์ที่ 3: src/app/api/document/update/[id]/route.ts
+// ============================================================
+
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
+// ✅ Next.js 15: params เป็น Promise
 export async function PUT(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const session = await getServerSession(authOptions);
@@ -16,7 +21,9 @@ export async function PUT(
             );
         }
 
-        const documentId = parseInt(params.id);
+        // ✅ Next.js 15: ต้อง await params
+        const { id } = await params;
+        const documentId = parseInt(id);
         const body = await req.json();
 
         const {

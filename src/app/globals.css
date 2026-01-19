@@ -537,3 +537,30 @@
     font-size: 10px;
   }
 }
+
+/* ✅ Mobile Table Scrollbar - แสดง scrollbar ชัดเจน */
+@media (max-width: 640px) {
+  .overflow-auto {
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Scrollbar styling for mobile */
+  .overflow-auto::-webkit-scrollbar {
+    height: 6px;
+    width: 6px;
+  }
+  
+  .overflow-auto::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 3px;
+  }
+  
+  .overflow-auto::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
+  }
+  
+  .overflow-auto::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.3);
+  }
+}
