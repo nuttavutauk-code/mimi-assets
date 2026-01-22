@@ -355,7 +355,6 @@ export default function ReceiveTransferDetailPage() {
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Asset Name</th>
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Size</th>
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Barcode</th>
-                                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">รูป Asset</th>
                                 <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">สถานะ</th>
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">เหตุผลที่ปฏิเสธ</th>
                                 <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider rounded-tr-xl">Action</th>
@@ -365,7 +364,6 @@ export default function ReceiveTransferDetailPage() {
                             {tasks.map((task, index) => {
                                 const status = localStatus[task.id] || task.status;
                                 const rejectReason = localRejectReason[task.id] || task.rejectReason || "";
-                                const assetImage = localAssetImages[task.id] || task.assetImageUrl || "";
                                 const taskReadOnly = task.status !== "pending";
                                 const isLast = index === tasks.length - 1;
 
@@ -376,37 +374,6 @@ export default function ReceiveTransferDetailPage() {
                                         <td className="px-4 py-4 text-gray-600">{task.size || "-"}</td>
                                         <td className="px-4 py-4">
                                             <span className="font-mono text-sm bg-primary/10 text-primary px-2 py-1 rounded-lg">{task.barcode}</span>
-                                        </td>
-                                        <td className="px-4 py-4">
-                                            <div className="flex justify-center">
-                                                {assetImage ? (
-                                                    <img 
-                                                        src={assetImage} 
-                                                        alt="Asset" 
-                                                        className="w-12 h-12 object-cover rounded-lg border-2 border-gray-200 shadow-sm cursor-pointer hover:scale-110 hover:shadow-lg transition-all" 
-                                                        onClick={() => setPreviewImage(assetImage)}
-                                                    />
-                                                ) : (
-                                                    <button
-                                                        onClick={() => assetImageInputRefs.current[task.id]?.click()}
-                                                        disabled={taskReadOnly}
-                                                        className="w-12 h-12 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center text-gray-400 hover:bg-gray-50 hover:border-primary hover:text-primary transition-all disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:border-gray-300 disabled:hover:text-gray-400"
-                                                    >
-                                                        <Camera className="w-5 h-5" />
-                                                    </button>
-                                                )}
-                                                <input
-                                                    ref={(el) => { assetImageInputRefs.current[task.id] = el; }}
-                                                    type="file"
-                                                    accept="image/*"
-                                                    capture="environment"
-                                                    className="hidden"
-                                                    onChange={(e) => {
-                                                        const file = e.target.files?.[0];
-                                                        if (file) handleImageUpload(file, "asset", task.id);
-                                                    }}
-                                                />
-                                            </div>
                                         </td>
                                         <td className="px-4 py-4 text-center">
                                             {status === "pending" && (
@@ -469,7 +436,6 @@ export default function ReceiveTransferDetailPage() {
                     {tasks.map((task, index) => {
                         const status = localStatus[task.id] || task.status;
                         const rejectReason = localRejectReason[task.id] || task.rejectReason || "";
-                        const assetImage = localAssetImages[task.id] || task.assetImageUrl || "";
                         const taskReadOnly = task.status !== "pending";
 
                         return (
@@ -502,29 +468,9 @@ export default function ReceiveTransferDetailPage() {
                                     </div>
                                 </div>
 
-                                <div className="flex items-center gap-3 mb-3">
-                                    <div className="flex-shrink-0">
-                                        {assetImage ? (
-                                            <img 
-                                                src={assetImage} 
-                                                alt="Asset" 
-                                                className="w-16 h-16 object-cover rounded-lg border-2 border-gray-200 shadow-sm cursor-pointer" 
-                                                onClick={() => setPreviewImage(assetImage)}
-                                            />
-                                        ) : (
-                                            <button
-                                                onClick={() => assetImageInputRefs.current[task.id]?.click()}
-                                                disabled={taskReadOnly}
-                                                className="w-16 h-16 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center text-gray-400 disabled:opacity-50"
-                                            >
-                                                <Camera className="w-5 h-5" />
-                                            </button>
-                                        )}
-                                    </div>
-                                    <div className="flex-1">
-                                        <p className="text-xs text-muted-foreground">Barcode</p>
-                                        <p className="font-mono text-sm bg-primary/10 text-primary px-2 py-1 rounded-lg inline-block">{task.barcode}</p>
-                                    </div>
+                                <div className="mb-3">
+                                    <p className="text-xs text-muted-foreground">Barcode</p>
+                                    <p className="font-mono text-sm bg-primary/10 text-primary px-2 py-1 rounded-lg inline-block">{task.barcode}</p>
                                 </div>
 
                                 {rejectReason && (

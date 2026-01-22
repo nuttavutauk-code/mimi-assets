@@ -395,44 +395,6 @@ export default function PickAssetDetailPage() {
             return;
         }
 
-        // ✅ Validation รูปภาพ - ตรวจสอบว่าทุกรายการที่ไม่ถูกยกเลิกมีรูปครบ
-        const missingImages: string[] = [];
-
-        // ตรวจสอบ Assets - ต้องมีทั้งรูป Barcode และรูป Asset
-        taskDetail.assets.forEach((asset) => {
-            if (cancelledTasks[asset.id]) return; // ข้ามรายการที่ยกเลิก
-            
-            if (!localImages[asset.id]?.barcode) {
-                missingImages.push(`${asset.assetName} - รูปถ่าย Barcode`);
-            }
-            if (!localImages[asset.id]?.asset) {
-                missingImages.push(`${asset.assetName} - รูปถ่าย Asset`);
-            }
-        });
-
-        // ตรวจสอบ Security Sets
-        taskDetail.securitySets.forEach((security) => {
-            if (cancelledTasks[security.id]) return; // ข้ามรายการที่ยกเลิก
-            
-            const isSecurityTypeC = security.assetName.includes("Security Type C");
-            
-            // CONTROLBOX ต้องมีทั้งรูป Barcode และรูป Asset
-            // Security Type C ต้องมีแค่รูป Asset
-            if (!isSecurityTypeC && !localImages[security.id]?.barcode) {
-                missingImages.push(`${security.assetName} - รูปถ่าย Barcode`);
-            }
-            if (!localImages[security.id]?.asset) {
-                missingImages.push(`${security.assetName} - รูปถ่าย Asset`);
-            }
-        });
-
-        if (missingImages.length > 0) {
-            alert(
-                `กรุณาแนบรูปภาพให้ครบทุกรายการ\nยังขาดอีก ${missingImages.length} รูป:\n${missingImages.slice(0, 10).join('\n')}${missingImages.length > 10 ? `\n...และอีก ${missingImages.length - 10} รายการ` : ''}`
-            );
-            return;
-        }
-
         if (!confirm("คุณต้องการบันทึกและยืนยันการเบิกของใช่หรือไม่?")) {
             return;
         }
@@ -752,101 +714,6 @@ export default function PickAssetDetailPage() {
 
                                     {!isCancelled && (
                                         <div className="flex flex-wrap items-start gap-4">
-                                            {/* รูปถ่าย Barcode */}
-                                            <div className="w-48">
-                                                <label className="text-sm font-medium mb-2 block">
-                                                    รูปถ่าย Barcode {!isCompleted && <span className="text-red-500">*</span>}
-                                                </label>
-                                                {isCompleted ? (
-                                                    // ✅ View-only mode: แสดงรูปภาพ คลิกเปิด Modal
-                                                    localImages[asset.id]?.barcode ? (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setPreviewImage(localImages[asset.id].barcode!)}
-                                                            className="w-24 h-24 border rounded-lg overflow-hidden hover:opacity-80 transition"
-                                                        >
-                                                            <img 
-                                                                src={localImages[asset.id].barcode} 
-                                                                alt="Barcode" 
-                                                                className="w-full h-full object-cover"
-                                                            />
-                                                        </button>
-                                                    ) : (
-                                                        <div className="w-24 h-24 flex items-center justify-center bg-gray-100 rounded-lg border text-gray-400 text-xs">
-                                                            <ImageIcon className="w-4 h-4 mr-1" />
-                                                            ไม่มีรูป
-                                                        </div>
-                                                    )
-                                                ) : (
-                                                    // ✅ Edit mode: แสดงปุ่มแนบรูป
-                                                    <button
-                                                        type="button"
-                                                        className={`w-full flex items-center justify-center gap-2 px-3 py-2 border rounded-lg transition-colors ${localImages[asset.id]?.barcode
-                                                            ? "border-green-500 bg-green-50 text-green-700"
-                                                            : "border-gray-300 hover:bg-gray-50"
-                                                            }`}
-                                                        onClick={() => handleImageUpload(asset.id, "barcode")}
-                                                    >
-                                                        {localImages[asset.id]?.barcode ? (
-                                                            <CheckCircle className="w-4 h-4" />
-                                                        ) : (
-                                                            <Camera className="w-4 h-4" />
-                                                        )}
-                                                        <span className="text-sm">
-                                                            {localImages[asset.id]?.barcode ? "มีรูปแล้ว" : "รูปถ่าย Barcode"}
-                                                        </span>
-                                                    </button>
-                                                )}
-                                            </div>
-
-                                            {/* รูปถ่าย Asset */}
-                                            <div className="w-48">
-                                                <label className="text-sm font-medium mb-2 block">
-                                                    รูปถ่าย Asset {!isCompleted && <span className="text-red-500">*</span>}
-                                                </label>
-                                                {isCompleted ? (
-                                                    // ✅ View-only mode: แสดงรูปภาพ คลิกเปิด Modal
-                                                    localImages[asset.id]?.asset ? (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setPreviewImage(localImages[asset.id].asset!)}
-                                                            className="w-24 h-24 border rounded-lg overflow-hidden hover:opacity-80 transition"
-                                                        >
-                                                            <img 
-                                                                src={localImages[asset.id].asset} 
-                                                                alt="Asset" 
-                                                                className="w-full h-full object-cover"
-                                                            />
-                                                        </button>
-                                                    ) : (
-                                                        <div className="w-24 h-24 flex items-center justify-center bg-gray-100 rounded-lg border text-gray-400 text-xs">
-                                                            <ImageIcon className="w-4 h-4 mr-1" />
-                                                            ไม่มีรูป
-                                                        </div>
-                                                    )
-                                                ) : (
-                                                    // ✅ Edit mode: แสดงปุ่มแนบรูป
-                                                    <button
-                                                        type="button"
-                                                        className={`w-full flex items-center justify-center gap-2 px-3 py-2 border rounded-lg transition-colors ${localImages[asset.id]?.asset
-                                                            ? "border-green-500 bg-green-50 text-green-700"
-                                                            : "border-gray-300 hover:bg-gray-50"
-                                                            }`}
-                                                        onClick={() => handleImageUpload(asset.id, "asset")}
-                                                    >
-                                                        {localImages[asset.id]?.asset ? (
-                                                            <CheckCircle className="w-4 h-4" />
-                                                        ) : (
-                                                            <Camera className="w-4 h-4" />
-
-                                                        )}
-                                                        <span className="text-sm">
-                                                            {localImages[asset.id]?.asset ? "มีรูปแล้ว" : "รูปถ่าย Asset"}
-                                                        </span>
-                                                    </button>
-                                                )}
-                                            </div>
-
                                             {/* Status indicator */}
                                             <div className="flex-1 flex items-end justify-end gap-3">
                                                 {isCompleted ? (
@@ -956,102 +823,6 @@ export default function PickAssetDetailPage() {
                                                 />
                                             </div>
 
-                                            {/* ✅ แสดงรูปถ่าย Barcode เฉพาะ CONTROLBOX */}
-                                            {!isSecurityTypeC && (
-                                                <div className="w-48">
-                                                    <label className="text-sm font-medium mb-2 block">
-                                                        รูปถ่าย Barcode {!isCompleted && <span className="text-red-500">*</span>}
-                                                    </label>
-                                                    {isCompleted ? (
-                                                        // ✅ View-only mode: แสดงรูปภาพ คลิกเปิด Modal
-                                                        localImages[security.id]?.barcode ? (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setPreviewImage(localImages[security.id].barcode!)}
-                                                                className="w-24 h-24 border rounded-lg overflow-hidden hover:opacity-80 transition"
-                                                            >
-                                                                <img 
-                                                                    src={localImages[security.id].barcode} 
-                                                                    alt="Barcode" 
-                                                                    className="w-full h-full object-cover"
-                                                                />
-                                                            </button>
-                                                        ) : (
-                                                            <div className="w-24 h-24 flex items-center justify-center bg-gray-100 rounded-lg border text-gray-400 text-xs">
-                                                                <ImageIcon className="w-4 h-4 mr-1" />
-                                                                ไม่มีรูป
-                                                            </div>
-                                                        )
-                                                    ) : (
-                                                        // ✅ Edit mode: แสดงปุ่มแนบรูป
-                                                        <button
-                                                            type="button"
-                                                            className={`w-full flex items-center justify-center gap-2 px-3 py-2 border rounded-lg transition-colors ${localImages[security.id]?.barcode
-                                                                ? "border-green-500 bg-green-50 text-green-700"
-                                                                : "border-gray-300 hover:bg-gray-50"
-                                                                }`}
-                                                            onClick={() => handleImageUpload(security.id, "barcode")}
-                                                        >
-                                                            {localImages[security.id]?.barcode ? (
-                                                                <CheckCircle className="w-4 h-4" />
-                                                            ) : (
-                                                                <Camera className="w-4 h-4" />
-                                                            )}
-                                                            <span className="text-sm">
-                                                                {localImages[security.id]?.barcode ? "มีรูปแล้ว" : "รูปถ่าย Barcode"}
-                                                            </span>
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            )}
-
-                                            {/* รูปถ่าย Asset */}
-                                            <div className="w-48">
-                                                <label className="text-sm font-medium mb-2 block">
-                                                    รูปถ่าย Asset {!isCompleted && <span className="text-red-500">*</span>}
-                                                </label>
-                                                {isCompleted ? (
-                                                    // ✅ View-only mode: แสดงรูปภาพ คลิกเปิด Modal
-                                                    localImages[security.id]?.asset ? (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setPreviewImage(localImages[security.id].asset!)}
-                                                            className="w-24 h-24 border rounded-lg overflow-hidden hover:opacity-80 transition"
-                                                        >
-                                                            <img 
-                                                                src={localImages[security.id].asset} 
-                                                                alt="Asset" 
-                                                                className="w-full h-full object-cover"
-                                                            />
-                                                        </button>
-                                                    ) : (
-                                                        <div className="w-24 h-24 flex items-center justify-center bg-gray-100 rounded-lg border text-gray-400 text-xs">
-                                                            <ImageIcon className="w-4 h-4 mr-1" />
-                                                            ไม่มีรูป
-                                                        </div>
-                                                    )
-                                                ) : (
-                                                    // ✅ Edit mode: แสดงปุ่มแนบรูป
-                                                    <button
-                                                        type="button"
-                                                        className={`w-full flex items-center justify-center gap-2 px-3 py-2 border rounded-lg transition-colors ${localImages[security.id]?.asset
-                                                            ? "border-green-500 bg-green-50 text-green-700"
-                                                            : "border-gray-300 hover:bg-gray-50"
-                                                            }`}
-                                                        onClick={() => handleImageUpload(security.id, "asset")}
-                                                    >
-                                                        {localImages[security.id]?.asset ? (
-                                                            <CheckCircle className="w-4 h-4" />
-                                                        ) : (
-                                                            <Camera className="w-4 h-4" />
-                                                        )}
-                                                        <span className="text-sm">
-                                                            {localImages[security.id]?.asset ? "มีรูปแล้ว" : "รูปถ่าย Asset"}
-                                                        </span>
-                                                    </button>
-                                                )}
-                                            </div>
-
                                             {/* Status indicator */}
                                             <div className="flex-1 flex items-end justify-end gap-3">
                                                 {isCompleted ? (
@@ -1109,7 +880,7 @@ export default function PickAssetDetailPage() {
                 </div>
             )}
 
-            {/* Image Preview Modal */}
+            {/* Image Preview Modal - เก็บไว้เผื่อใช้ในอนาคต */}
             {previewImage && (
                 <div
                     className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"

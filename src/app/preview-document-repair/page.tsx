@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { downloadAsImage } from "@/lib/downloadDocument";
 
@@ -98,45 +98,8 @@ const Cell = ({
     </td>
 );
 
-// Cell สำหรับรูปภาพ
-const ImageCell = ({
-    imageUrl,
-    isAlt = false,
-}: {
-    imageUrl: string | null;
-    isAlt?: boolean;
-}) => (
-    <td
-        style={{
-            width: "80px",
-            border: `1px solid ${colors.border}`,
-            height: "80px",
-            padding: "4px",
-            backgroundColor: isAlt ? colors.rowAlt : colors.white,
-            textAlign: "center",
-            verticalAlign: "middle",
-        }}
-    >
-        {imageUrl ? (
-            <img
-                src={imageUrl}
-                alt="Asset"
-                style={{
-                    maxHeight: "70px",
-                    maxWidth: "70px",
-                    objectFit: "contain"
-                }}
-            />
-        ) : (
-            <span style={{ fontSize: "9px", color: "#999" }}>-</span>
-        )}
-    </td>
-);
-
 export default function PreviewDocumentRepairPage() {
     const [downloading, setDownloading] = useState(false);
-    const [assetImages, setAssetImages] = useState<Record<string, string | null>>({});
-    const [loadingImages, setLoadingImages] = useState(true);
 
     const doc = mockDocument;
     const shop = doc.shops?.[0];
@@ -144,36 +107,6 @@ export default function PreviewDocumentRepairPage() {
 
     const totalAssetRows = 6;
     const emptyAssetRows = Math.max(0, totalAssetRows - assets.length);
-
-    // Fetch รูปภาพจาก API
-    useEffect(() => {
-        const fetchImages = async () => {
-            try {
-                const assetNames = assets.map((a) => a.name);
-                const res = await fetch("/api/library/get-image", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ assetNames }),
-                });
-                const data = await res.json();
-                setAssetImages(data.images || {});
-            } catch (err) {
-                console.error("Failed to fetch images:", err);
-            } finally {
-                setLoadingImages(false);
-            }
-        };
-
-        if (assets.length > 0) {
-            fetchImages();
-        } else {
-            setLoadingImages(false);
-        }
-    }, []);
-
-    const getAssetImage = (assetName: string): string | null => {
-        return assetImages[assetName] || null;
-    };
 
     const vendorName = doc.createdBy?.vendor || "N/A";
 
@@ -364,41 +297,38 @@ export default function PreviewDocumentRepairPage() {
                         <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "15px", borderRadius: "8px", overflow: "hidden" }}>
                             <thead>
                                 <tr>
-                                    <th colSpan={7} style={headerStyle}>
+                                    <th colSpan={6} style={headerStyle}>
                                         <span style={{ position: "relative", top: textOffset }}>🔧 รายการ Asset ที่แจ้งซ่อม</span>
                                     </th>
                                 </tr>
                                 <tr>
                                     <th style={{ ...thStyle, width: "35px" }}><span style={{ position: "relative", top: textOffset }}>No.</span></th>
-                                    <th style={{ ...thStyle, width: "90px" }}><span style={{ position: "relative", top: textOffset }}>Barcode</span></th>
+                                    <th style={{ ...thStyle, width: "100px" }}><span style={{ position: "relative", top: textOffset }}>Barcode</span></th>
                                     <th style={thStyle}><span style={{ position: "relative", top: textOffset }}>Asset Name</span></th>
-                                    <th style={{ ...thStyle, width: "80px" }}><span style={{ position: "relative", top: textOffset }}>รูปภาพ</span></th>
-                                    <th style={{ ...thStyle, width: "70px" }}><span style={{ position: "relative", top: textOffset }}>Size</span></th>
-                                    <th style={{ ...thStyle, width: "50px" }}><span style={{ position: "relative", top: textOffset }}>เกรด</span></th>
-                                    <th style={{ ...thStyle, width: "50px" }}><span style={{ position: "relative", top: textOffset }}>จำนวน</span></th>
+                                    <th style={{ ...thStyle, width: "80px" }}><span style={{ position: "relative", top: textOffset }}>Size</span></th>
+                                    <th style={{ ...thStyle, width: "60px" }}><span style={{ position: "relative", top: textOffset }}>เกรด</span></th>
+                                    <th style={{ ...thStyle, width: "60px" }}><span style={{ position: "relative", top: textOffset }}>จำนวน</span></th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {assets.map((asset, idx) => (
                                     <tr key={idx}>
-                                        <Cell width="35px" center isAlt={idx % 2 === 1} hasImage>{idx + 1}</Cell>
-                                        <Cell width="90px" center isAlt={idx % 2 === 1} hasImage>{asset.barcode || "-"}</Cell>
-                                        <Cell isAlt={idx % 2 === 1} hasImage>{asset.name}</Cell>
-                                        <ImageCell imageUrl={getAssetImage(asset.name)} isAlt={idx % 2 === 1} />
-                                        <Cell width="70px" center isAlt={idx % 2 === 1} hasImage>{asset.size || "-"}</Cell>
-                                        <Cell width="50px" center isAlt={idx % 2 === 1} hasImage>{asset.grade || "-"}</Cell>
-                                        <Cell width="50px" center bold isAlt={idx % 2 === 1} hasImage>{asset.qty}</Cell>
+                                        <Cell width="35px" center isAlt={idx % 2 === 1}>{idx + 1}</Cell>
+                                        <Cell width="100px" center isAlt={idx % 2 === 1}>{asset.barcode || "-"}</Cell>
+                                        <Cell isAlt={idx % 2 === 1}>{asset.name}</Cell>
+                                        <Cell width="80px" center isAlt={idx % 2 === 1}>{asset.size || "-"}</Cell>
+                                        <Cell width="60px" center isAlt={idx % 2 === 1}>{asset.grade || "-"}</Cell>
+                                        <Cell width="60px" center bold isAlt={idx % 2 === 1}>{asset.qty}</Cell>
                                     </tr>
                                 ))}
                                 {Array.from({ length: emptyAssetRows }).map((_, idx) => (
                                     <tr key={`empty-${idx}`}>
-                                        <Cell width="35px" center isAlt={(assets.length + idx) % 2 === 1} hasImage>{assets.length + idx + 1}</Cell>
-                                        <Cell width="90px" center isAlt={(assets.length + idx) % 2 === 1} hasImage />
-                                        <Cell isAlt={(assets.length + idx) % 2 === 1} hasImage />
-                                        <ImageCell imageUrl={null} isAlt={(assets.length + idx) % 2 === 1} />
-                                        <Cell width="70px" center isAlt={(assets.length + idx) % 2 === 1} hasImage />
-                                        <Cell width="50px" center isAlt={(assets.length + idx) % 2 === 1} hasImage />
-                                        <Cell width="50px" center isAlt={(assets.length + idx) % 2 === 1} hasImage />
+                                        <Cell width="35px" center isAlt={(assets.length + idx) % 2 === 1}>{assets.length + idx + 1}</Cell>
+                                        <Cell width="100px" center isAlt={(assets.length + idx) % 2 === 1} />
+                                        <Cell isAlt={(assets.length + idx) % 2 === 1} />
+                                        <Cell width="80px" center isAlt={(assets.length + idx) % 2 === 1} />
+                                        <Cell width="60px" center isAlt={(assets.length + idx) % 2 === 1} />
+                                        <Cell width="60px" center isAlt={(assets.length + idx) % 2 === 1} />
                                     </tr>
                                 ))}
                             </tbody>

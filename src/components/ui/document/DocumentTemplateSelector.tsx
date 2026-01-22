@@ -1407,38 +1407,35 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
                 {/* Asset Table */}
                 <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "15px", borderRadius: "8px", overflow: "hidden" }}>
                     <thead>
-                        <tr><th colSpan={7} style={headerStyle}><span style={{ position: "relative", top: textOffset }}>🔧 รายการ Asset ที่แจ้งซ่อม</span></th></tr>
+                        <tr><th colSpan={6} style={headerStyle}><span style={{ position: "relative", top: textOffset }}>🔧 รายการ Asset ที่แจ้งซ่อม</span></th></tr>
                         <tr>
                             <th style={{ ...thStyle, width: "35px" }}><span style={{ position: "relative", top: textOffset }}>No.</span></th>
-                            <th style={{ ...thStyle, width: "90px" }}><span style={{ position: "relative", top: textOffset }}>Barcode</span></th>
+                            <th style={{ ...thStyle, width: "100px" }}><span style={{ position: "relative", top: textOffset }}>Barcode</span></th>
                             <th style={thStyle}><span style={{ position: "relative", top: textOffset }}>Asset Name</span></th>
-                            <th style={{ ...thStyle, width: "80px" }}><span style={{ position: "relative", top: textOffset }}>รูปภาพ</span></th>
-                            <th style={{ ...thStyle, width: "70px" }}><span style={{ position: "relative", top: textOffset }}>Size</span></th>
-                            <th style={{ ...thStyle, width: "50px" }}><span style={{ position: "relative", top: textOffset }}>เกรด</span></th>
-                            <th style={{ ...thStyle, width: "50px" }}><span style={{ position: "relative", top: textOffset }}>จำนวน</span></th>
+                            <th style={{ ...thStyle, width: "80px" }}><span style={{ position: "relative", top: textOffset }}>Size</span></th>
+                            <th style={{ ...thStyle, width: "60px" }}><span style={{ position: "relative", top: textOffset }}>เกรด</span></th>
+                            <th style={{ ...thStyle, width: "60px" }}><span style={{ position: "relative", top: textOffset }}>จำนวน</span></th>
                         </tr>
                     </thead>
                     <tbody>
                         {assets.map((asset: any, idx: number) => (
                             <tr key={idx}>
-                                <Cell width="35px" center isAlt={idx % 2 === 1} hasImage>{idx + 1}</Cell>
-                                <Cell width="90px" center isAlt={idx % 2 === 1} hasImage>{asset.barcode || "-"}</Cell>
-                                <Cell isAlt={idx % 2 === 1} hasImage>{asset.name}</Cell>
-                                <ImageCell imageUrl={assetImages[asset.name] || null} isAlt={idx % 2 === 1} />
-                                <Cell width="70px" center isAlt={idx % 2 === 1} hasImage>{asset.size || "-"}</Cell>
-                                <Cell width="50px" center isAlt={idx % 2 === 1} hasImage>{asset.grade || "-"}</Cell>
-                                <Cell width="50px" center bold isAlt={idx % 2 === 1} hasImage>{asset.qty}</Cell>
+                                <Cell width="35px" center isAlt={idx % 2 === 1}>{idx + 1}</Cell>
+                                <Cell width="100px" center isAlt={idx % 2 === 1}>{asset.barcode || "-"}</Cell>
+                                <Cell isAlt={idx % 2 === 1}>{asset.name}</Cell>
+                                <Cell width="80px" center isAlt={idx % 2 === 1}>{asset.size || "-"}</Cell>
+                                <Cell width="60px" center isAlt={idx % 2 === 1}>{asset.grade || "-"}</Cell>
+                                <Cell width="60px" center bold isAlt={idx % 2 === 1}>{asset.qty}</Cell>
                             </tr>
                         ))}
                         {Array.from({ length: emptyRows }).map((_, idx) => (
                             <tr key={`empty-${idx}`}>
-                                <Cell width="35px" center isAlt={(assets.length + idx) % 2 === 1} hasImage>{assets.length + idx + 1}</Cell>
-                                <Cell width="90px" center isAlt={(assets.length + idx) % 2 === 1} hasImage />
-                                <Cell isAlt={(assets.length + idx) % 2 === 1} hasImage />
-                                <ImageCell imageUrl={null} isAlt={(assets.length + idx) % 2 === 1} />
-                                <Cell width="70px" center isAlt={(assets.length + idx) % 2 === 1} hasImage />
-                                <Cell width="50px" center isAlt={(assets.length + idx) % 2 === 1} hasImage />
-                                <Cell width="50px" center isAlt={(assets.length + idx) % 2 === 1} hasImage />
+                                <Cell width="35px" center isAlt={(assets.length + idx) % 2 === 1}>{assets.length + idx + 1}</Cell>
+                                <Cell width="100px" center isAlt={(assets.length + idx) % 2 === 1} />
+                                <Cell isAlt={(assets.length + idx) % 2 === 1} />
+                                <Cell width="80px" center isAlt={(assets.length + idx) % 2 === 1} />
+                                <Cell width="60px" center isAlt={(assets.length + idx) % 2 === 1} />
+                                <Cell width="60px" center isAlt={(assets.length + idx) % 2 === 1} />
                             </tr>
                         ))}
                     </tbody>
