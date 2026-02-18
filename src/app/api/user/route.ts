@@ -18,7 +18,7 @@ async function checkAdminAuth() {
 
 /* ===========================================================
    [ GET USERS - ดึงข้อมูลผู้ใช้ทั้งหมดแบบแบ่งหน้า ]
-   Endpoint: GET /api/user?page=1&limit=10
+   Endpoint: GET /api/user?page=1&limit=10&search=xxx
    =========================================================== */
 export async function GET(req: Request) {
   try {
@@ -31,10 +31,26 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const page = Number(searchParams.get("page")) || 1;
     const limit = Number(searchParams.get("limit")) || 10;
+    const search = searchParams.get("search") || "";
     const skip = (page - 1) * limit;
+
+    // สร้าง where clause สำหรับ search
+    const whereClause = search.trim()
+      ? {
+          OR: [
+            { username: { contains: search, mode: "insensitive" as const } },
+            { firstName: { contains: search, mode: "insensitive" as const } },
+            { lastName: { contains: search, mode: "insensitive" as const } },
+            { company: { contains: search, mode: "insensitive" as const } },
+            { vendor: { contains: search, mode: "insensitive" as const } },
+            { email: { contains: search, mode: "insensitive" as const } },
+          ],
+        }
+      : {};
 
     const [users, total] = await Promise.all([
       prisma.user.findMany({
+        where: whereClause,
         orderBy: { createdAt: "desc" },
         skip,
         take: limit,
@@ -53,7 +69,7 @@ export async function GET(req: Request) {
           createdAt: true,
         },
       }),
-      prisma.user.count(),
+      prisma.user.count({ where: whereClause }),
     ]);
 
     return NextResponse.json({

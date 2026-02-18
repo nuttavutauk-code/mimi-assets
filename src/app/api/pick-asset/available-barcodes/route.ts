@@ -94,7 +94,7 @@ export async function GET(req: NextRequest) {
                 size: true,
             },
             orderBy: { barcode: "asc" },
-            take: 200,
+            take: 1000,
         });
 
         console.log("🔍 Found assets from DB:", assets.length);

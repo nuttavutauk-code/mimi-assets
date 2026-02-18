@@ -22,6 +22,7 @@ interface User {
 
 export default function AdminUserManage() {
   const [search, setSearch] = useState("");
+  const [searchQuery, setSearchQuery] = useState(""); // ← เก็บค่าที่จะส่งไป API
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -35,10 +36,17 @@ export default function AdminUserManage() {
     vendor: "", initials: "", company: "", phone: "", role: "USER",
   });
 
-  const fetchUsers = async (pageNum = 1) => {
+  const fetchUsers = async (pageNum = 1, searchTerm = "") => {
     try {
       setLoading(true);
-      const res = await fetch(`/api/user?page=${pageNum}&limit=10`);
+      const params = new URLSearchParams({
+        page: String(pageNum),
+        limit: "10",
+      });
+      if (searchTerm.trim()) {
+        params.append("search", searchTerm.trim());
+      }
+      const res = await fetch(`/api/user?${params.toString()}`);
       const data = await res.json();
       setUsers(data.data || []);
       setTotalPages(data.totalPages || 1);
@@ -49,14 +57,20 @@ export default function AdminUserManage() {
     }
   };
 
-  useEffect(() => { fetchUsers(page); }, [page]);
+  useEffect(() => { fetchUsers(page, searchQuery); }, [page, searchQuery]);
 
-  const filtered = users.filter((u) =>
-    u.username?.toLowerCase().includes(search.toLowerCase()) ||
-    `${u.firstName ?? ""} ${u.lastName ?? ""}`.toLowerCase().includes(search.toLowerCase()) ||
-    u.company?.toLowerCase().includes(search.toLowerCase()) ||
-    u.vendor?.toLowerCase().includes(search.toLowerCase())
-  );
+  // ฟังก์ชันค้นหา
+  const handleSearch = () => {
+    setPage(1); // รีเซ็ตไปหน้าแรก
+    setSearchQuery(search); // อัปเดต searchQuery เพื่อ trigger useEffect
+  };
+
+  // กด Enter เพื่อค้นหา
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      handleSearch();
+    }
+  };
 
   const openAddModal = () => {
     setEditingUser(null);
@@ -88,7 +102,7 @@ export default function AdminUserManage() {
       if (res.ok) {
         toast.success(editingUser ? "อัปเดตผู้ใช้สำเร็จ" : "เพิ่มผู้ใช้สำเร็จ");
         setModalOpen(false);
-        fetchUsers(page);
+        fetchUsers(page, searchQuery);
       } else {
         toast.error(data.error || "เกิดข้อผิดพลาด");
       }
@@ -104,7 +118,7 @@ export default function AdminUserManage() {
       if (res.ok) {
         toast.success("ลบผู้ใช้สำเร็จ");
         setConfirmDelete(null);
-        fetchUsers(page);
+        fetchUsers(page, searchQuery);
       } else {
         toast.error("เกิดข้อผิดพลาดในการลบ");
       }
@@ -119,7 +133,7 @@ export default function AdminUserManage() {
       const data = await res.json();
       if (res.ok) {
         toast.success(data.message);
-        fetchUsers(page);
+        fetchUsers(page, searchQuery);
       } else {
         toast.error(data.error || "เกิดข้อผิดพลาด");
       }
@@ -146,9 +160,20 @@ export default function AdminUserManage() {
 
       {/* Search */}
       <div className="glass-card p-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
-          <Input placeholder="ค้นหา username, ชื่อ, company..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10 glass-input" />
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
+            <Input 
+              placeholder="ค้นหา username, ชื่อ, company, vendor..." 
+              value={search} 
+              onChange={(e) => setSearch(e.target.value)} 
+              onKeyDown={handleKeyDown}
+              className="pl-10 glass-input" 
+            />
+          </div>
+          <button onClick={handleSearch} className="gradient-button px-6 py-2.5 text-sm font-medium flex items-center justify-center gap-2">
+            <Search className="w-4 h-4" />ค้นหา
+          </button>
         </div>
       </div>
 
@@ -156,7 +181,7 @@ export default function AdminUserManage() {
       <div className="glass-card overflow-hidden hidden sm:block">
         {loading ? (
           <div className="p-12 text-center text-muted-foreground"><Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />กำลังโหลด...</div>
-        ) : filtered.length === 0 ? (
+        ) : users.length === 0 ? (
           <div className="p-12 text-center text-muted-foreground"><Users className="w-12 h-12 mx-auto mb-3 opacity-30" />ไม่พบผู้ใช้</div>
         ) : (
           <>
@@ -164,7 +189,7 @@ export default function AdminUserManage() {
               <table className="glass-table w-full">
                 <thead><tr className="bg-black/2"><th>Username</th><th>ชื่อ</th><th>Vendor</th><th>Company</th><th>Role</th><th>สถานะ</th><th className="text-center">จัดการ</th></tr></thead>
                 <tbody>
-                  {filtered.map((user) => (
+                  {users.map((user) => (
                     <tr key={user.id} className={user.isActive === false ? "opacity-50" : ""}>
                       <td>
                         <div className="flex items-center gap-2">
@@ -217,11 +242,11 @@ export default function AdminUserManage() {
       <div className="sm:hidden space-y-3">
         {loading ? (
           <div className="glass-card p-8 text-center text-muted-foreground"><Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />กำลังโหลด...</div>
-        ) : filtered.length === 0 ? (
+        ) : users.length === 0 ? (
           <div className="glass-card p-8 text-center text-muted-foreground">ไม่พบผู้ใช้</div>
         ) : (
           <>
-            {filtered.map((user) => (
+            {users.map((user) => (
               <div key={user.id} className={`glass-card p-4 ${user.isActive === false ? "opacity-50" : ""}`}>
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-medium">
