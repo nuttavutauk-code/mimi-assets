@@ -11,13 +11,13 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { getMe } from "./loader";
-import { Plus, Trash2, User, Store, Package, FileText, Save, CheckCircle, XCircle, Loader2, RotateCcw, ClipboardList } from "lucide-react";
+import { Plus, Trash2, User, Store, Package, FileText, Save, CheckCircle, XCircle, Loader2, RotateCcw, ClipboardList, X } from "lucide-react";
 import { toast } from "sonner";
 import OtherActivitiesSelect, { OtherActivity } from "@/components/ui/admin/OtherActivitiesSelect";
 import StatusSelect, { StatusOption } from "@/components/ui/admin/StatusSelect";
 
 type ShopItem = { mcsCode: string; shopName: string };
-type AssetRow = { id: number; barcode: string; name: string; size: string; grade: string; qty: number; noBarcode?: boolean };
+type AssetRow = { id: number; barcode: string; name: string; size: string; grade: string; qty: number; noBarcode?: boolean; isSelected?: boolean };
 type FormMode = "user" | "admin";
 
 const FormReturnAsset = ({ mode = "user" }: { mode?: FormMode }) => {
@@ -63,7 +63,7 @@ const FormReturnAsset = ({ mode = "user" }: { mode?: FormMode }) => {
         if (shop) {
           setShopCode(shop.shopCode || ""); setShopName(shop.shopName || "");
           if (shop.startInstallDate) setReturnDate(new Date(shop.startInstallDate).toISOString().split('T')[0]);
-          if (shop.assets?.length > 0) setAssets(shop.assets.map((a: any, idx: number) => ({ id: idx + 1, barcode: a.barcode || "", name: a.name || "", size: a.size || "", grade: a.grade || "", qty: a.qty || 1, noBarcode: a.barcode?.startsWith("NOBC-") || false })));
+          if (shop.assets?.length > 0) setAssets(shop.assets.map((a: any, idx: number) => ({ id: idx + 1, barcode: a.barcode || "", name: a.name || "", size: a.size || "", grade: a.grade || "", qty: a.qty || 1, noBarcode: a.barcode?.startsWith("NOBC-") || false, isSelected: !!(a.name) })));
         }
         setNote(doc.note || "");
         // ✅ Load returnCondition
@@ -250,8 +250,13 @@ const FormReturnAsset = ({ mode = "user" }: { mode?: FormMode }) => {
                   <label className="block text-xs text-muted-foreground mb-1">Asset Name</label>
                   {asset.noBarcode ? (
                     <>
-                      <Input value={assetNameSearch[asset.id] || asset.name} onChange={(e) => { setAssetNameSearch(p => ({ ...p, [asset.id]: e.target.value })); setShowAssetNameDropdown(p => ({ ...p, [asset.id]: true })); }} onFocus={() => setShowAssetNameDropdown(p => ({ ...p, [asset.id]: true }))} onBlur={() => setTimeout(() => setShowAssetNameDropdown(p => ({ ...p, [asset.id]: false })), 200)} placeholder="เลือก Asset Name..." className="glass-input" />
-                      {showAssetNameDropdown[asset.id] && <div className="absolute top-full left-0 z-20 mt-1 w-full bg-white border rounded-xl shadow-lg max-h-48 overflow-auto">{getFilteredAssetNames(asset.id).map(name => <div key={name} className="px-3 py-2 hover:bg-black/5 cursor-pointer text-sm" onClick={() => { setAssets(p => p.map(a => a.id === asset.id ? { ...a, name } : a)); setAssetNameSearch(p => ({ ...p, [asset.id]: name })); setShowAssetNameDropdown(p => ({ ...p, [asset.id]: false })); }}>{name}</div>)}</div>}
+                      <div className="relative">
+                        <Input value={assetNameSearch[asset.id] || asset.name} onChange={(e) => { if (!asset.isSelected) { setAssetNameSearch(p => ({ ...p, [asset.id]: e.target.value })); setShowAssetNameDropdown(p => ({ ...p, [asset.id]: true })); } }} onFocus={() => !asset.isSelected && setShowAssetNameDropdown(p => ({ ...p, [asset.id]: true }))} onBlur={() => setTimeout(() => setShowAssetNameDropdown(p => ({ ...p, [asset.id]: false })), 200)} placeholder="เลือก Asset Name..." readOnly={asset.isSelected} className={`glass-input ${asset.isSelected ? "pr-10 bg-gray-50" : ""}`} />
+                        {asset.isSelected && (
+                          <button type="button" onClick={() => { setAssets(p => p.map(a => a.id === asset.id ? { ...a, name: "", isSelected: false } : a)); setAssetNameSearch(p => ({ ...p, [asset.id]: "" })); }} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-gray-200 text-gray-400 hover:text-gray-600" title="ล้างเพื่อเลือกใหม่"><X className="w-4 h-4" /></button>
+                        )}
+                      </div>
+                      {showAssetNameDropdown[asset.id] && !asset.isSelected && <div className="absolute top-full left-0 z-20 mt-1 w-full bg-white border rounded-xl shadow-lg max-h-48 overflow-auto">{getFilteredAssetNames(asset.id).map(name => <div key={name} className="px-3 py-2 hover:bg-black/5 cursor-pointer text-sm" onMouseDown={(e) => { e.preventDefault(); setAssets(p => p.map(a => a.id === asset.id ? { ...a, name, isSelected: true } : a)); setAssetNameSearch(p => ({ ...p, [asset.id]: name })); setShowAssetNameDropdown(p => ({ ...p, [asset.id]: false })); }}>{name}</div>)}</div>}
                     </>
                   ) : (
                     <Input value={asset.name} readOnly className="glass-input bg-black/5" />

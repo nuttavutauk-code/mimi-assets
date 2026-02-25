@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { getMe } from "./loader";
-import { Plus, Trash2, User, Store, Package, Shield, FileText, Save, CheckCircle, XCircle, Loader2, Route } from "lucide-react";
+import { Plus, Trash2, User, Store, Package, Shield, FileText, Save, CheckCircle, XCircle, Loader2, Route, X } from "lucide-react";
 import { toast } from "sonner";
 import OtherActivitiesSelect, { OtherActivity } from "@/components/ui/admin/OtherActivitiesSelect";
 import StatusSelect, { StatusOption } from "@/components/ui/admin/StatusSelect";
@@ -28,6 +28,7 @@ type AssetRow = {
   customD?: string;
   customH?: string;
   customXX?: string;
+  isSelected?: boolean; // ✅ เพิ่ม: true = เลือกจาก Dropdown แล้ว (Read-Only)
 };
 type SecuritySet = { id: number; name: string; qty: number; withdrawFor: string };
 
@@ -52,7 +53,7 @@ type FormMode = "user" | "admin";
 
 const defaultSecuritySets = (): SecuritySet[] => [
   { id: 1, name: "CONTROLBOX 6 PORT (M-60000R) with power cable", qty: 0, withdrawFor: "" },
-  { id: 2, name: "CONTROLBOX 5 PORT (M-5000LD) with power cable", qty: 0, withdrawFor: "" },
+  { id: 2, name: "CONTROLBOX 5 PORT (M-60000R) with power cable", qty: 0, withdrawFor: "" },
   { id: 3, name: "Security Type C Ver.7.1", qty: 0, withdrawFor: "" },
   { id: 4, name: "Security Type C Ver.7.0", qty: 0, withdrawFor: "" },
 ];
@@ -147,6 +148,7 @@ const FormRouting2Shops = ({ mode = "user" }: { mode?: FormMode }) => {
                 customD: isCustom ? customMatch[2] : undefined,
                 customH: isCustom ? customMatch[3] : undefined,
                 customXX: isCustom ? customMatch[4] : undefined,
+                isSelected: !!(a.name), // ✅ เพิ่ม: ถ้ามี name = ถือว่าเลือกแล้ว
               };
             });
             setAssets1(loadedAssets1);
@@ -189,6 +191,7 @@ const FormRouting2Shops = ({ mode = "user" }: { mode?: FormMode }) => {
                 customD: isCustom ? customMatch[2] : undefined,
                 customH: isCustom ? customMatch[3] : undefined,
                 customXX: isCustom ? customMatch[4] : undefined,
+                isSelected: !!(a.name), // ✅ เพิ่ม: ถ้ามี name = ถือว่าเลือกแล้ว
               };
             });
             setAssets2(loadedAssets2);
@@ -489,15 +492,37 @@ const FormRouting2Shops = ({ mode = "user" }: { mode?: FormMode }) => {
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
                 <div className="sm:col-span-4 relative">
                   <label className="block text-xs text-muted-foreground mb-1">Asset Name <span className="text-red-500">*</span></label>
-                  <Input value={asset.name} onChange={(e) => { setAssets(p => p.map(a => a.id === asset.id ? { ...a, name: e.target.value } : a)); debouncedAssetSearch(e.target.value, asset.id); }}
-                    onFocus={() => assetSearchResults.length > 0 && setShowAssetDropdown(p => ({ ...p, [asset.id]: true }))}
-                    onBlur={() => setTimeout(() => setShowAssetDropdown(p => ({ ...p, [asset.id]: false })), 200)}
-                    placeholder="พิมพ์ชื่อ Asset..." className="glass-input" />
-                  {showAssetDropdown[asset.id] && assetSearchResults.length > 0 && (
+                  <div className="relative">
+                    <Input 
+                      value={asset.name} 
+                      onChange={(e) => { 
+                        if (!asset.isSelected) {
+                          setAssets(p => p.map(a => a.id === asset.id ? { ...a, name: e.target.value } : a)); 
+                          debouncedAssetSearch(e.target.value, asset.id); 
+                        }
+                      }}
+                      onFocus={() => !asset.isSelected && assetSearchResults.length > 0 && setShowAssetDropdown(p => ({ ...p, [asset.id]: true }))}
+                      onBlur={() => setTimeout(() => setShowAssetDropdown(p => ({ ...p, [asset.id]: false })), 200)}
+                      placeholder="พิมพ์ชื่อ Asset..." 
+                      readOnly={asset.isSelected}
+                      className={`glass-input ${asset.isSelected ? "pr-10 bg-gray-50" : ""}`} 
+                    />
+                    {asset.isSelected && (
+                      <button 
+                        type="button"
+                        onClick={() => setAssets(p => p.map(a => a.id === asset.id ? { ...a, name: "", size: "", isSelected: false } : a))}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-gray-200 text-gray-400 hover:text-gray-600"
+                        title="ล้างเพื่อเลือกใหม่"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                  {showAssetDropdown[asset.id] && assetSearchResults.length > 0 && !asset.isSelected && (
                     <div className="absolute top-full left-0 z-20 mt-1 w-full bg-white border rounded-xl shadow-lg max-h-48 overflow-auto">
                       {assetSearchResults.map(name => (
                         <div key={name} className="px-3 py-2 hover:bg-black/5 cursor-pointer text-sm"
-                          onClick={() => { setAssets(p => p.map(a => a.id === asset.id ? { ...a, name } : a)); fetchSizes(name, shopNum, asset.id); setShowAssetDropdown(p => ({ ...p, [asset.id]: false })); }}>
+                          onMouseDown={(e) => { e.preventDefault(); setAssets(p => p.map(a => a.id === asset.id ? { ...a, name, isSelected: true } : a)); fetchSizes(name, shopNum, asset.id); setShowAssetDropdown(p => ({ ...p, [asset.id]: false })); }}>
                           {name}
                         </div>
                       ))}
