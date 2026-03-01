@@ -134,11 +134,11 @@ export default function AdminPickAsset() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredData.map((item) => {
+                  {filteredData.map((item, index) => {
                     const statusInfo = statusConfig[item.status] || { text: item.status, className: "status-badge" };
                     const progress = item.totalItems > 0 ? Math.round((item.pickedItems / item.totalItems) * 100) : 0;
                     return (
-                      <tr key={item.id}>
+                      <tr key={`${item.id}-${index}`}>
                         <td className="font-medium text-primary">{item.docCode}</td>
                         <td>{item.warehouse}</td>
                         <td>{item.shopName}</td>
@@ -220,11 +220,11 @@ export default function AdminPickAsset() {
           </div>
         ) : (
           <>
-            {filteredData.map((item) => {
+            {filteredData.map((item, index) => {
               const statusInfo = statusConfig[item.status] || { text: item.status, className: "status-badge" };
               const progress = item.totalItems > 0 ? Math.round((item.pickedItems / item.totalItems) * 100) : 0;
               return (
-                <div key={item.id} className="glass-card p-4">
+                <div key={`${item.id}-${index}`} className="glass-card p-4">
                   <div className="flex justify-between items-start mb-3">
                     <div>
                       <p className="font-semibold text-foreground">{item.docCode}</p>

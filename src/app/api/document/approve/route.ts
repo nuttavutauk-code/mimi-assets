@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { sendApprovalEmail, sendPickTaskEmail } from "@/lib/email";
 
 // ประเภทเอกสารที่ต้องผ่าน Pick Asset (1-8) - ขาออกอย่างเดียว
 const NEEDS_PICK_ASSET_TYPES = [
@@ -168,8 +167,13 @@ async function createPickAssetTasks(documentId: number): Promise<number> {
             }
         }
 
-        // สร้าง Tasks สำหรับ Security Sets
+        // สร้าง Tasks สำหรับ Security Sets (เฉพาะที่ qty > 0)
         for (const security of shop.securitySets) {
+            // ✅ เช็คว่า qty > 0 ก่อนสร้าง Task
+            if (security.qty <= 0) {
+                continue; // ข้าม Security Set ที่ qty = 0
+            }
+
             // ✅ เช็คว่าเป็น Security Type C หรือไม่ (ไม่มี Barcode)
             const isSecurityTypeC = security.name.includes("Security Type C");
 
@@ -660,12 +664,9 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // 4. เช็คว่าเอกสารมีอยู่จริง + ดึงข้อมูลผู้สร้างเอกสาร
+        // 4. เช็คว่าเอกสารมีอยู่จริง
         const document = await prisma.document.findUnique({
             where: { id: documentId },
-            include: {
-                createdBy: true, // ✅ ดึงข้อมูลผู้สร้างเพื่อส่ง email
-            },
         });
 
         if (!document) {
@@ -700,17 +701,6 @@ export async function POST(req: NextRequest) {
             // กรณี returnasset หรือ shoptoshop: บันทึกลง AssetTransactionHistory ทันที
             const result = await createDirectTransactions(documentId);
 
-            // ✅ ส่ง Email แจ้งผู้สร้างเอกสาร
-            if (document.createdBy?.email) {
-                sendApprovalEmail({
-                    toEmail: document.createdBy.email,
-                    userName: document.createdBy.username || document.createdBy.firstName || "User",
-                    docCode: document.docCode,
-                    documentType: document.documentType,
-                    approvedBy: session.user.username || session.user.name || "Admin",
-                }).catch((err) => console.error("Failed to send approval email:", err));
-            }
-
             let message = `Document approved successfully. Created ${result.created} transactions.`;
             if (result.securityCreated > 0) {
                 message += ` Created ${result.securityCreated} security set transactions.`;
@@ -737,49 +727,6 @@ export async function POST(req: NextRequest) {
             // กรณีที่ 1: ต้องผ่าน Picker (ลำดับ 1-8)
             const tasksCreated = await createPickAssetTasks(documentId);
 
-            // ✅ ส่ง Email แจ้งผู้สร้างเอกสาร
-            if (document.createdBy?.email) {
-                sendApprovalEmail({
-                    toEmail: document.createdBy.email,
-                    userName: document.createdBy.username || document.createdBy.firstName || "User",
-                    docCode: document.docCode,
-                    documentType: document.documentType,
-                    approvedBy: session.user.username || session.user.name || "Admin",
-                }).catch((err) => console.error("Failed to send approval email:", err));
-            }
-
-            // ✅ ส่ง Email แจ้ง Picker (Users ที่มี vendor ตรงกับ warehouse)
-            // ดึง warehouses ที่มีใน tasks
-            const pickTasks = await prisma.pickAssetTask.findMany({
-                where: { documentId: documentId },
-                select: { warehouse: true },
-            });
-            const warehouses = [...new Set(pickTasks.map(t => t.warehouse))];
-
-            // หา Users ที่มี vendor ตรงกับ warehouse
-            for (const warehouse of warehouses) {
-                const usersInWarehouse = await prisma.user.findMany({
-                    where: {
-                        vendor: warehouse,
-                        isActive: true,
-                        role: "USER",
-                    },
-                });
-
-                for (const user of usersInWarehouse) {
-                    if (user.email) {
-                        sendPickTaskEmail({
-                            toEmail: user.email,
-                            userName: user.username || user.firstName || "User",
-                            docCode: document.docCode,
-                            documentType: document.documentType,
-                            tasksCount: pickTasks.filter(t => t.warehouse === warehouse).length,
-                            warehouse: warehouse,
-                        }).catch((err) => console.error("Failed to send pick task email:", err));
-                    }
-                }
-            }
-
             return NextResponse.json({
                 success: true,
                 message: `Document approved successfully. Created ${tasksCreated} pick tasks.`,
@@ -788,17 +735,6 @@ export async function POST(req: NextRequest) {
             });
         } else {
             // กรณีที่ 2: ไม่ต้องผ่าน Picker และไม่ใช่ Direct Transaction
-            // ✅ ส่ง Email แจ้งผู้สร้างเอกสาร
-            if (document.createdBy?.email) {
-                sendApprovalEmail({
-                    toEmail: document.createdBy.email,
-                    userName: document.createdBy.username || document.createdBy.firstName || "User",
-                    docCode: document.docCode,
-                    documentType: document.documentType,
-                    approvedBy: session.user.username || session.user.name || "Admin",
-                }).catch((err) => console.error("Failed to send approval email:", err));
-            }
-
             return NextResponse.json({
                 success: true,
                 message: "Document approved successfully.",

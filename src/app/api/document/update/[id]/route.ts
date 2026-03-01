@@ -157,29 +157,32 @@ export async function PUT(
                     });
                 }
 
-                // สร้าง Task สำหรับ Security Sets
+                // สร้าง Task สำหรับ Security Sets (เฉพาะที่ qty > 0)
                 for (const security of shop.securitySets) {
-                    await prisma.pickAssetTask.create({
-                        data: {
-                            documentId: updatedDocument.id,
-                            assetName: security.name,
-                            size: null,
-                            grade: null,
-                            qty: security.qty,
-                            isSecuritySet: true,
-                            warehouse: security.withdrawFor || "Unknown",
-                            shopCode: shop.shopCode,
-                            shopName: shop.shopName,
-                            startInstallDate: shop.startInstallDate,
-                            endInstallDate: shop.endInstallDate,
-                            q7b7: shop.q7b7,
-                            shopFocus: shop.shopFocus,
-                            requesterName: fullName,
-                            requesterCompany: company,
-                            requesterPhone: phone,
-                            status: "pending",
-                        },
-                    });
+                    // ✅ เช็คว่า qty > 0 ก่อนสร้าง Task
+                    if (security.qty > 0) {
+                        await prisma.pickAssetTask.create({
+                            data: {
+                                documentId: updatedDocument.id,
+                                assetName: security.name,
+                                size: null,
+                                grade: null,
+                                qty: security.qty,
+                                isSecuritySet: true,
+                                warehouse: security.withdrawFor || "Unknown",
+                                shopCode: shop.shopCode,
+                                shopName: shop.shopName,
+                                startInstallDate: shop.startInstallDate,
+                                endInstallDate: shop.endInstallDate,
+                                q7b7: shop.q7b7,
+                                shopFocus: shop.shopFocus,
+                                requesterName: fullName,
+                                requesterCompany: company,
+                                requesterPhone: phone,
+                                status: "pending",
+                            },
+                        });
+                    }
                 }
             }
 

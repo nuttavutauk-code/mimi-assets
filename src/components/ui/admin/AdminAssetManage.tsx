@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
-import { Package, Upload, Search, Loader2, ChevronLeft, ChevronRight, Download, Warehouse, Calendar, Pencil, Check, X } from "lucide-react";
+import { Package, Upload, Search, Loader2, ChevronLeft, ChevronRight, Download, Warehouse, Calendar, Pencil, Check, X, PackagePlus } from "lucide-react";
 import { toast } from "sonner";
 
 type EditData = {
@@ -22,6 +22,8 @@ export default function AdminAssetManage() {
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [uploadingUsed, setUploadingUsed] = useState(false); // ✅ state สำหรับ Import Used
+  const [uploadingRefurbished, setUploadingRefurbished] = useState(false); // ✅ state สำหรับ Import Refurbished
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editData, setEditData] = useState<EditData>({ barcode: "", assetName: "", size: "", warehouse: "", startWarranty: "", endWarranty: "", cheilPO: "" });
   const [saving, setSaving] = useState(false);
@@ -65,6 +67,54 @@ export default function AdminAssetManage() {
       toast.error("เกิดข้อผิดพลาด");
     } finally {
       setUploading(false);
+      e.target.value = "";
+    }
+  };
+
+  // ✅ Import Asset USED (ของเก่า)
+  const handleImportUsed = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingUsed(true);
+    try {
+      const formData = new FormData();
+      formData.append("excel", file);
+      const res = await fetch("/api/asset/import-used", { method: "POST", body: formData });
+      const json = await res.json();
+      if (res.ok) {
+        toast.success(json.message || `นำเข้า Asset USED สำเร็จ ${json.imported || 0} รายการ!`);
+        fetchAssets();
+      } else {
+        toast.error(json.error || "เกิดข้อผิดพลาด");
+      }
+    } catch (err) {
+      toast.error("เกิดข้อผิดพลาด");
+    } finally {
+      setUploadingUsed(false);
+      e.target.value = "";
+    }
+  };
+
+  // ✅ Import Asset REFURBISHED (ของซ่อมแล้ว)
+  const handleImportRefurbished = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingRefurbished(true);
+    try {
+      const formData = new FormData();
+      formData.append("excel", file);
+      const res = await fetch("/api/asset/import-refurbished", { method: "POST", body: formData });
+      const json = await res.json();
+      if (res.ok) {
+        toast.success(json.message || `นำเข้า Asset REFURBISHED สำเร็จ ${json.imported || 0} รายการ!`);
+        fetchAssets();
+      } else {
+        toast.error(json.error || "เกิดข้อผิดพลาด");
+      }
+    } catch (err) {
+      toast.error("เกิดข้อผิดพลาด");
+    } finally {
+      setUploadingRefurbished(false);
       e.target.value = "";
     }
   };
@@ -153,11 +203,21 @@ export default function AdminAssetManage() {
           </div>
           <p className="text-sm text-muted-foreground">จัดการข้อมูล Asset ในระบบ</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <label className="gradient-button px-4 py-2.5 text-sm font-medium flex items-center gap-2 cursor-pointer">
             {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
             <span className="hidden sm:inline">Import</span>
             <input type="file" accept=".xlsx,.xls" onChange={handleImportExcel} className="hidden" disabled={uploading} />
+          </label>
+          <label className="px-4 py-2.5 text-sm font-medium flex items-center gap-2 cursor-pointer rounded-xl bg-amber-500 text-white hover:bg-amber-600 transition-colors">
+            {uploadingUsed ? <Loader2 className="w-4 h-4 animate-spin" /> : <PackagePlus className="w-4 h-4" />}
+            <span className="hidden sm:inline">Import USED</span>
+            <input type="file" accept=".xlsx,.xls" onChange={handleImportUsed} className="hidden" disabled={uploadingUsed} />
+          </label>
+          <label className="px-4 py-2.5 text-sm font-medium flex items-center gap-2 cursor-pointer rounded-xl bg-emerald-500 text-white hover:bg-emerald-600 transition-colors">
+            {uploadingRefurbished ? <Loader2 className="w-4 h-4 animate-spin" /> : <PackagePlus className="w-4 h-4" />}
+            <span className="hidden sm:inline">Import REFURBISHED</span>
+            <input type="file" accept=".xlsx,.xls" onChange={handleImportRefurbished} className="hidden" disabled={uploadingRefurbished} />
           </label>
           <button onClick={handleExport} className="glass-button px-4 py-2.5 text-sm font-medium flex items-center gap-2">
             <Download className="w-4 h-4" />
