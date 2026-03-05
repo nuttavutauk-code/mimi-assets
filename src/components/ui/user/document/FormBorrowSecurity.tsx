@@ -61,7 +61,7 @@ const FormBorrowSecurity = ({ mode = "user" }: { mode?: FormMode }) => {
   // Security Set state
   const defaultSecuritySets: SecuritySet[] = [
     { id: 1, name: "CONTROLBOX 6 PORT (M-60000R) with power cable", qty: 0, withdrawFor: "" },
-    { id: 2, name: "CONTROLBOX 5 PORT (M-5000LD) with power cable", qty: 0, withdrawFor: "" },
+    { id: 2, name: "CONTROLBOX 5 PORT (M-60000R) with power cable", qty: 0, withdrawFor: "" },
     { id: 3, name: "Security Type C Ver.7.1", qty: 0, withdrawFor: "" },
     { id: 4, name: "Security Type C Ver.7.0", qty: 0, withdrawFor: "" },
   ];
@@ -218,15 +218,23 @@ const FormBorrowSecurity = ({ mode = "user" }: { mode?: FormMode }) => {
         return;
       }
 
+      // ✅ Validation: ต้องมี Asset หรือ Security Set อย่างน้อย 1 รายการ
+      const filledAssets = assets.filter(a => a.name && a.name.trim() !== "");
+      if (filledAssets.length === 0 && filledSecuritySets.length === 0) {
+        toast.error("กรุณาเลือก Asset หรือ Security Set อย่างน้อย 1 รายการ");
+        setIsSubmitting(false);
+        return;
+      }
+
       if (action === "approve" && mode === "admin" && !transactionStatus) {
         toast.error("กรุณาเลือก Status ก่อนอนุมัติ");
         setIsSubmitting(false);
         return;
       }
 
-      // ✅ Admin ต้องเลือกโกดังครบทุก Asset ก่อนอนุมัติ
+      // ✅ Admin ต้องเลือกโกดังครบทุก Asset ก่อนอนุมัติ (เฉพาะ Asset ที่กรอกชื่อแล้ว)
       if (action === "approve" && mode === "admin") {
-        const missingWarehouse = assets.some(a => !a.withdrawFor || a.withdrawFor.trim() === "");
+        const missingWarehouse = filledAssets.some(a => !a.withdrawFor || a.withdrawFor.trim() === "");
         if (missingWarehouse) {
           toast.error("กรุณาเลือกโกดังให้ครบทุกรายการก่อนอนุมัติ");
           setIsSubmitting(false);
@@ -250,7 +258,7 @@ const FormBorrowSecurity = ({ mode = "user" }: { mode?: FormMode }) => {
             startInstallDate: startDate,
             endInstallDate: endDate,
             q7b7, shopFocus,
-            assets: assets.map(a => ({ name: a.name, size: a.size, kv: a.kv, qty: a.qty, withdrawFor: a.withdrawFor })),
+            assets: filledAssets.map(a => ({ name: a.name, size: a.size, kv: a.kv, qty: a.qty, withdrawFor: a.withdrawFor })),
             securitySets: securitySets.filter(s => s.qty > 0).map(s => ({ name: s.name, qty: s.qty, withdrawFor: s.withdrawFor })),
           }],
         };
@@ -289,7 +297,7 @@ const FormBorrowSecurity = ({ mode = "user" }: { mode?: FormMode }) => {
           startInstallDate: startDate,
           endInstallDate: endDate,
           q7b7, shopFocus,
-          assets: assets.map(a => ({ name: a.name, size: a.size, kv: a.kv, qty: a.qty, withdrawFor: a.withdrawFor })),
+          assets: filledAssets.map(a => ({ name: a.name, size: a.size, kv: a.kv, qty: a.qty, withdrawFor: a.withdrawFor })),
           securitySets: securitySets.filter(s => s.qty > 0).map(s => ({ name: s.name, qty: s.qty })),
         }],
       };
@@ -443,6 +451,7 @@ const FormBorrowSecurity = ({ mode = "user" }: { mode?: FormMode }) => {
             <div className="icon-container orange !w-8 !h-8"><Package className="w-4 h-4" /></div>
             <h2 className="font-semibold">Asset</h2>
             <span className="text-xs text-muted-foreground">({assets.length}/3)</span>
+            <span className="text-xs text-amber-600">(ไม่บังคับ ถ้ามี Security Set)</span>
           </div>
           {!isReadOnly && assets.length < 3 && (
             <button
@@ -453,6 +462,12 @@ const FormBorrowSecurity = ({ mode = "user" }: { mode?: FormMode }) => {
             </button>
           )}
         </div>
+        {assets.length === 0 ? (
+          <div className="p-6 text-center text-muted-foreground border border-dashed border-black/10 rounded-xl">
+            <Package className="w-8 h-8 mx-auto mb-2 opacity-30" />
+            <p className="text-sm">ไม่มี Asset (กดปุ่ม "เพิ่ม" เพื่อเพิ่ม Asset)</p>
+          </div>
+        ) : (
         <div className="space-y-3">
           {assets.map((asset) => (
             <div key={asset.id} className="p-4 rounded-xl bg-black/2 border border-black/5">
@@ -551,7 +566,7 @@ const FormBorrowSecurity = ({ mode = "user" }: { mode?: FormMode }) => {
                 )}
 
                 {/* Delete button */}
-                {assets.length > 1 && !isReadOnly && (
+                {!isReadOnly && (
                   <div className="flex items-end">
                     <button onClick={() => setAssets(p => p.filter(a => a.id !== asset.id))} className="p-2 rounded-lg bg-red-50 text-red-500 hover:bg-red-100">
                       <Trash2 className="w-4 h-4" />
@@ -650,6 +665,7 @@ const FormBorrowSecurity = ({ mode = "user" }: { mode?: FormMode }) => {
             </div>
           ))}
         </div>
+        )}
       </div>
 
       {/* Security Set */}
