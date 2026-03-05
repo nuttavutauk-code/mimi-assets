@@ -1,11 +1,61 @@
 // src/app/api/asset/import-refurbished/route.ts
-// API สำหรับ Import Asset REFURBISHED (ของซ่อมแล้ว) พร้อมสร้าง AssetTransactionHistory
+// API สำหรับ Import Asset REFURBISHED (ของเก่า) พร้อมสร้าง AssetTransactionHistory
 
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import prisma from "@/lib/prisma";
 import * as XLSX from "xlsx";
+
+// ✅ ฟังก์ชันแปลงวันที่ให้เป็น DD/MM/YYYY string
+function formatDateToDDMMYYYY(dateValue: any): string | null {
+    if (!dateValue) return null;
+
+    let date: Date | null = null;
+
+    // ถ้าเป็น Excel serial date (number)
+    if (typeof dateValue === "number") {
+        date = new Date((dateValue - 25569) * 86400 * 1000);
+    } else {
+        const dateStr = String(dateValue).trim();
+        if (!dateStr) return null;
+
+        // ลอง DD-MM-YYYY หรือ DD/MM/YYYY ก่อน
+        const ddmmyyyy = dateStr.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})$/);
+        if (ddmmyyyy) {
+            const day = parseInt(ddmmyyyy[1]);
+            const month = parseInt(ddmmyyyy[2]) - 1;
+            const year = parseInt(ddmmyyyy[3]);
+            date = new Date(year, month, day);
+        }
+
+        // ลอง YYYY-MM-DD
+        if (!date || isNaN(date.getTime())) {
+            const yyyymmdd = dateStr.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})$/);
+            if (yyyymmdd) {
+                const year = parseInt(yyyymmdd[1]);
+                const month = parseInt(yyyymmdd[2]) - 1;
+                const day = parseInt(yyyymmdd[3]);
+                date = new Date(year, month, day);
+            }
+        }
+
+        // ลอง parse ตรงๆ
+        if (!date || isNaN(date.getTime())) {
+            date = new Date(dateStr);
+        }
+    }
+
+    // ถ้า parse ได้ ให้ format เป็น DD/MM/YYYY
+    if (date && !isNaN(date.getTime())) {
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        return `${day}/${month}/${year}`;
+    }
+
+    return null;
+}
 
 // ✅ ฟังก์ชันแปลงวันที่ DD-MM-YYYY เป็น Date object
 function parseDate(dateValue: any): Date | null {
@@ -131,9 +181,13 @@ export async function POST(request: NextRequest) {
             const mcsCodeIn = String(row.mcsCodeIn || row.McsCodeIn || row["MCS Code In"] || row["MCS Code (In)"] || "").trim() || null;
             const fromShop = String(row.fromShop || row.FromShop || row["From Shop"] || row["จากร้าน"] || "").trim() || null;
             const remarkIn = String(row.remarkIn || row.RemarkIn || row["Remark In"] || row["Remark"] || row["หมายเหตุ"] || "").trim() || null;
-            const startWarranty = String(row.startWarranty || row.StartWarranty || row["Start Warranty"] || row["เริ่มประกัน"] || "").trim() || null;
-            const endWarranty = String(row.endWarranty || row.EndWarranty || row["End Warranty"] || row["สิ้นสุดประกัน"] || "").trim() || null;
             const cheilPO = String(row.cheilPO || row.CheilPO || row["Cheil PO"] || row["PO"] || "").trim() || null;
+
+            // ✅ แปลง Warranty เป็น DD/MM/YYYY
+            const startWarrantyRaw = row.startWarranty || row.StartWarranty || row["Start Warranty"] || row["เริ่มประกัน"] || "";
+            const endWarrantyRaw = row.endWarranty || row.EndWarranty || row["End Warranty"] || row["สิ้นสุดประกัน"] || "";
+            const startWarranty = formatDateToDDMMYYYY(startWarrantyRaw);
+            const endWarranty = formatDateToDDMMYYYY(endWarrantyRaw);
 
             // ดึงวันที่ (รองรับ DD-MM-YYYY)
             const inStockDateRaw = row.inStockDate || row.InStockDate || row["In Stock Date"] || row["วันที่รับเข้า"] || "";
@@ -210,7 +264,7 @@ export async function POST(request: NextRequest) {
                         remarkIn: remarkIn || "Import Asset REFURBISHED",
 
                         // Auto fields
-                        assetStatus: "REFURBISHED", // ✅ สถานะเป็น REFURBISHED
+                        assetStatus: "REFURBISHED", // ✅ สถานะเป็น USED
                         balance: 1, // ✅ มีของอยู่ในโกดัง
 
                         // Metadata
