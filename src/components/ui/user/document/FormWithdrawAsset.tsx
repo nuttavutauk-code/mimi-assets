@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { getMe } from "./loader";
-import { Plus, Trash2, User, Store, Package, Shield, FileText, Save, CheckCircle, XCircle, Loader2, X } from "lucide-react";
+import { Plus, Trash2, User, Store, Package, Shield, FileText, Save, CheckCircle, XCircle, Loader2 } from "lucide-react";
 import { useRouter, useParams } from "next/navigation";
 import { toast } from "sonner";
 import OtherActivitiesSelect, { OtherActivity } from "@/components/ui/admin/OtherActivitiesSelect";
@@ -29,7 +29,6 @@ type AssetRow = {
   customD?: string;
   customH?: string;
   customXX?: string;
-  isSelected?: boolean; // ✅ เพิ่ม: true = เลือกจาก Dropdown แล้ว (Read-Only)
 };
 type SecuritySet = { id: number; name: string; qty: number; withdrawFor: string };
 type FormMode = "user" | "admin";
@@ -132,7 +131,6 @@ const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {
                   customD: isCustom ? customMatch[2] : undefined,
                   customH: isCustom ? customMatch[3] : undefined,
                   customXX: isCustom ? customMatch[4] : undefined,
-                  isSelected: !!(a.name), // ✅ เพิ่ม: ถ้ามี name = ถือว่าเลือกแล้ว
                 };
               });
               setAssets(loadedAssets);
@@ -240,6 +238,14 @@ const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {
         return;
       }
 
+      // ✅ Validation: ต้องมี Asset หรือ Security Set อย่างน้อย 1 รายการ
+      const filledAssets = assets.filter(a => a.name && a.name.trim() !== "");
+      if (filledAssets.length === 0 && filledSecuritySets.length === 0) {
+        toast.error("กรุณาเลือก Asset หรือ Security Set อย่างน้อย 1 รายการ");
+        setIsSubmitting(false);
+        return;
+      }
+
       // ✅ Admin ต้องเลือก Status ก่อนอนุมัติ
       if (action === "approve" && mode === "admin" && !transactionStatus) {
         toast.error("กรุณาเลือก Status ก่อนอนุมัติ");
@@ -247,9 +253,9 @@ const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {
         return;
       }
 
-      // ✅ Admin ต้องเลือกโกดังครบทุก Asset ก่อนอนุมัติ
+      // ✅ Admin ต้องเลือกโกดังครบทุก Asset ก่อนอนุมัติ (เฉพาะ Asset ที่กรอกชื่อแล้ว)
       if (action === "approve" && mode === "admin") {
-        const missingWarehouse = assets.some(a => !a.withdrawFor || a.withdrawFor.trim() === "");
+        const missingWarehouse = filledAssets.some(a => !a.withdrawFor || a.withdrawFor.trim() === "");
         if (missingWarehouse) {
           toast.error("กรุณาเลือกโกดังให้ครบทุกรายการก่อนอนุมัติ");
           setIsSubmitting(false);
@@ -264,7 +270,7 @@ const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {
           transactionStatus: transactionStatus || null,
           shops: [{
             shopCode, shopName, startInstallDate, endInstallDate, q7b7, shopFocus,
-            assets: assets.map(a => ({ name: a.name, size: a.size || null, grade: a.grade || null, kv: a.kv || null, qty: a.qty, withdrawFor: a.withdrawFor })),
+            assets: filledAssets.map(a => ({ name: a.name, size: a.size || null, grade: a.grade || null, kv: a.kv || null, qty: a.qty, withdrawFor: a.withdrawFor })),
             securitySets: securitySets.filter(s => s.qty > 0).map(s => ({ name: s.name, qty: s.qty, withdrawFor: s.withdrawFor })),
           }],
         };
@@ -300,7 +306,7 @@ const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {
         documentType: "withdraw", docCode: formData.docNumber, fullName: formData.fullName, company: formData.company, phone: formData.phone, note, status: "submitted",
         shops: [{
           shopCode, shopName, startInstallDate, endInstallDate, q7b7, shopFocus,
-          assets: assets.map(a => ({ name: a.name, size: a.size || null, grade: a.grade || null, kv: a.kv || null, qty: a.qty, withdrawFor: a.withdrawFor })),
+          assets: filledAssets.map(a => ({ name: a.name, size: a.size || null, grade: a.grade || null, kv: a.kv || null, qty: a.qty, withdrawFor: a.withdrawFor })),
           securitySets: securitySets.filter(s => s.qty > 0).map(s => ({ name: s.name, qty: s.qty, withdrawFor: s.withdrawFor })),
         }],
       };
@@ -417,48 +423,32 @@ const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {
             <div className="icon-container orange !w-8 !h-8"><Package className="w-4 h-4" /></div>
             <h2 className="font-semibold text-foreground">Asset</h2>
             <span className="text-xs text-muted-foreground">({assets.length}/15)</span>
+            <span className="text-xs text-amber-600">(ไม่บังคับ ถ้ามี Security Set)</span>
           </div>
           {!isReadOnly && assets.length < 15 && <button onClick={() => setAssets([...assets, { id: assetIdCounter.current++, name: "", size: "", grade: "", kv: "", qty: 1, withdrawFor: "" }])}
             className="glass-button px-3 py-2 text-sm flex items-center gap-1"><Plus className="w-4 h-4" />เพิ่ม</button>}
         </div>
+        {assets.length === 0 ? (
+          <div className="p-6 text-center text-muted-foreground border border-dashed border-black/10 rounded-xl">
+            <Package className="w-8 h-8 mx-auto mb-2 opacity-30" />
+            <p className="text-sm">ไม่มี Asset (กดปุ่ม "เพิ่ม" เพื่อเพิ่ม Asset)</p>
+          </div>
+        ) : (
         <div className="space-y-3">
           {assets.map((asset, idx) => (
             <div key={asset.id} className="p-4 rounded-xl bg-black/2 border border-black/5">
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
                 <div className="sm:col-span-4 relative">
                   <label className="block text-xs text-muted-foreground mb-1">Asset Name <span className="text-red-500">*</span></label>
-                  <div className="relative">
-                    <Input 
-                      value={asset.name} 
-                      onChange={(e) => { 
-                        if (!asset.isSelected) {
-                          setAssets(p => p.map(a => a.id === asset.id ? { ...a, name: e.target.value } : a)); 
-                          debouncedAssetSearch(e.target.value, asset.id); 
-                        }
-                      }}
-                      onFocus={() => !asset.isSelected && assetSearchResults.length > 0 && setShowAssetDropdown(p => ({ ...p, [asset.id]: true }))}
-                      onBlur={() => setTimeout(() => setShowAssetDropdown(p => ({ ...p, [asset.id]: false })), 200)}
-                      placeholder="พิมพ์ชื่อ Asset..." 
-                      disabled={isReadOnly} 
-                      readOnly={asset.isSelected}
-                      className={`glass-input ${asset.isSelected ? "pr-10 bg-gray-50" : ""}`} 
-                    />
-                    {asset.isSelected && !isReadOnly && (
-                      <button 
-                        type="button"
-                        onClick={() => setAssets(p => p.map(a => a.id === asset.id ? { ...a, name: "", size: "", isSelected: false } : a))}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-gray-200 text-gray-400 hover:text-gray-600"
-                        title="ล้างเพื่อเลือกใหม่"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                  {showAssetDropdown[asset.id] && assetSearchResults.length > 0 && !asset.isSelected && (
+                  <Input value={asset.name} onChange={(e) => { setAssets(p => p.map(a => a.id === asset.id ? { ...a, name: e.target.value } : a)); debouncedAssetSearch(e.target.value, asset.id); }}
+                    onFocus={() => assetSearchResults.length > 0 && setShowAssetDropdown(p => ({ ...p, [asset.id]: true }))}
+                    onBlur={() => setTimeout(() => setShowAssetDropdown(p => ({ ...p, [asset.id]: false })), 200)}
+                    placeholder="พิมพ์ชื่อ Asset..." disabled={isReadOnly} className="glass-input" />
+                  {showAssetDropdown[asset.id] && assetSearchResults.length > 0 && (
                     <div className="absolute top-full left-0 z-20 mt-1 w-full bg-white border rounded-xl shadow-lg max-h-48 overflow-auto">
                       {assetSearchResults.map((name) => (
                         <div key={name} className="px-3 py-2 hover:bg-black/5 cursor-pointer text-sm"
-                          onMouseDown={(e) => { e.preventDefault(); setAssets(p => p.map(a => a.id === asset.id ? { ...a, name, isSelected: true } : a)); fetchSizesByAssetName(name, asset.id); setShowAssetDropdown(p => ({ ...p, [asset.id]: false })); }}>
+                          onClick={() => { setAssets(p => p.map(a => a.id === asset.id ? { ...a, name } : a)); fetchSizesByAssetName(name, asset.id); setShowAssetDropdown(p => ({ ...p, [asset.id]: false })); }}>
                           {name}
                         </div>
                       ))}
@@ -502,7 +492,7 @@ const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {
                   </div>
                 )}
                 <div className="sm:col-span-1 flex items-end">
-                  {assets.length > 1 && !isReadOnly && (
+                  {!isReadOnly && (
                     <button onClick={() => setAssets(p => p.filter(a => a.id !== asset.id))} className="p-2 rounded-lg bg-red-50 text-red-500 hover:bg-red-100">
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -594,6 +584,7 @@ const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {
             </div>
           ))}
         </div>
+        )}
       </div>
 
       {/* Security Set */}
