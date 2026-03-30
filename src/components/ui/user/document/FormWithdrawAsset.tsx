@@ -37,7 +37,7 @@ type SubmitAction = "save" | "approve" | "reject";
 // ✅ Helper: เช็คว่าเป็น Asset ที่ต้องกรอก custom size
 const isCustomSizeAsset = (name: string) => {
   const lowerName = name.toLowerCase().replace(/\s+/g, '');
-  return lowerName.includes("lightbox") || lowerName.includes("accwall");
+  return lowerName.includes("lightbox") || lowerName.includes("accwall") || lowerName.includes("wallkv-low") || lowerName.includes("wallkv - low");
 };
 
 const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {

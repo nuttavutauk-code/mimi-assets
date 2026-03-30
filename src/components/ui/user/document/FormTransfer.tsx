@@ -30,7 +30,7 @@ type AssetRow = {
 
 const isCustomSizeAsset = (name: string) => {
   const lowerName = name.toLowerCase().replace(/\s+/g, '');
-  return lowerName.includes("lightbox") || lowerName.includes("accwall");
+  return lowerName.includes("lightbox") || lowerName.includes("accwall") || lowerName.includes("wallkv-low") || lowerName.includes("wallkv - low");
 };
 type FormMode = "user" | "admin";
 
