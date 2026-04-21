@@ -1,6 +1,6 @@
 // app/api/pick-asset/my-tasks/route.ts
 // API สำหรับ Picker ดูรายการ Tasks ของตัวเอง (filter ตาม vendor)
-// ✅ แก้ไขให้รองรับทั้ง vendor code และชื่อเต็ม
+// ✅ แก้ไข Pagination ให้ถูกต้อง - Group ก่อนแล้วค่อย Paginate
 
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
@@ -38,53 +38,37 @@ export async function GET(req: NextRequest) {
         const { searchParams } = new URL(req.url);
         const page = parseInt(searchParams.get("page") || "1");
         const limit = parseInt(searchParams.get("limit") || "20");
-        const status = searchParams.get("status"); // pending, picking, completed
+        const statusFilter = searchParams.get("status"); // pending, picking, completed
+        const searchQuery = searchParams.get("search") || "";
 
         // 4. สร้าง where clause - รองรับทั้ง vendor code และชื่อเต็ม
         const where: any = {
             OR: [
-                { warehouse: user.vendor }, // ตรงทุกตัวอักษร เช่น "NEWLOOK"
-                { warehouse: { contains: user.vendor, mode: "insensitive" } }, // มีคำนี้อยู่ เช่น "บริษัท NEWLOOK จำกัด"
-                { warehouse: user.company }, // หรือใช้ชื่อบริษัท
-                { warehouse: { contains: user.company || "", mode: "insensitive" } }, // หรือมีชื่อบริษัทอยู่
+                { warehouse: user.vendor },
+                { warehouse: { contains: user.vendor, mode: "insensitive" } },
+                { warehouse: user.company },
+                { warehouse: { contains: user.company || "", mode: "insensitive" } },
             ],
         };
 
-        if (status) {
-            where.status = status;
-        }
-
-        console.log("🔍 Searching with:", {
-            vendor: user.vendor,
-            company: user.company,
-            whereClause: JSON.stringify(where, null, 2)
-        });
-
-        // 5. ดึงข้อมูล Tasks
-        const [tasks, totalCount] = await Promise.all([
-            prisma.pickAssetTask.findMany({
-                where,
-                include: {
-                    document: {
-                        select: {
-                            docCode: true,
-                            documentType: true,
-                            fullName: true,
-                        },
+        // 5. ✅ ดึง Tasks ทั้งหมดของ User (ไม่ paginate ตรงนี้)
+        const allTasks = await prisma.pickAssetTask.findMany({
+            where,
+            include: {
+                document: {
+                    select: {
+                        docCode: true,
+                        documentType: true,
+                        fullName: true,
                     },
                 },
-                orderBy: { createdAt: "desc" },
-                skip: (page - 1) * limit,
-                take: limit,
-            }),
-            prisma.pickAssetTask.count({ where }),
-        ]);
+            },
+            orderBy: { createdAt: "desc" },
+        });
 
-        console.log(`✅ Found ${tasks.length} tasks`);
-
-        // 6. Group tasks by documentId + shopCode (แยกแต่ละ shop)
-        const tasksByDocumentAndShop = tasks.reduce((acc: any, task) => {
-            const key = `${task.documentId}-${task.shopCode || 'no-shop'}`; // ✅ ใช้ documentId + shopCode เป็น key
+        // 6. ✅ Group tasks by documentId + shopCode ก่อน
+        const tasksByDocumentAndShop = allTasks.reduce((acc: any, task) => {
+            const key = `${task.documentId}-${task.shopCode || 'no-shop'}`;
             if (!acc[key]) {
                 acc[key] = {
                     documentId: task.documentId,
@@ -95,26 +79,25 @@ export async function GET(req: NextRequest) {
                     createdAt: task.createdAt.toISOString(),
                     status: "pending",
                     totalItems: 0,
-                    handledItems: 0, // ✅ เปลี่ยนจาก pickedItems เป็น handledItems (รวม completed + cancelled)
+                    handledItems: 0,
                     tasks: [],
                 };
             }
             acc[key].tasks.push(task);
             acc[key].totalItems++;
-            // ✅ นับทั้ง completed และ cancelled เป็น "จัดการแล้ว"
             if (task.status === "completed" || task.status === "cancelled") {
                 acc[key].handledItems++;
             }
             return acc;
         }, {});
 
-        // 7. คำนวณ status ของแต่ละเอกสาร + shop
-        const groupedTasks = Object.values(tasksByDocumentAndShop).map((doc: any) => {
-            const allHandled = doc.handledItems === doc.totalItems; // ✅ จัดการครบทุกรายการ
+        // 7. คำนวณ status ของแต่ละ group
+        let groupedTasks = Object.values(tasksByDocumentAndShop).map((doc: any) => {
+            const allHandled = doc.handledItems === doc.totalItems;
             const someHandled = doc.handledItems > 0;
 
             return {
-                id: `${doc.documentId}-${doc.shopCode}`, // ✅ ใช้ composite id
+                id: `${doc.documentId}-${doc.shopCode}`,
                 documentId: doc.documentId,
                 docCode: doc.docCode,
                 warehouse: doc.warehouse,
@@ -123,25 +106,44 @@ export async function GET(req: NextRequest) {
                 createdAt: doc.createdAt,
                 status: allHandled ? "completed" : someHandled ? "picking" : "pending",
                 totalItems: doc.totalItems,
-                pickedItems: doc.handledItems, // ✅ แสดงจำนวนที่จัดการแล้ว (completed + cancelled)
+                pickedItems: doc.handledItems,
             };
         });
 
-        // ✅ เรียงลำดับจากล่าสุดไว้บนสุด
+        // 8. ✅ Filter by status (ถ้ามี)
+        if (statusFilter && statusFilter !== "all") {
+            groupedTasks = groupedTasks.filter((task: any) => task.status === statusFilter);
+        }
+
+        // 9. ✅ Filter by search query (ถ้ามี)
+        if (searchQuery) {
+            const query = searchQuery.toLowerCase();
+            groupedTasks = groupedTasks.filter((task: any) =>
+                task.docCode?.toLowerCase().includes(query) ||
+                task.shopCode?.toLowerCase().includes(query) ||
+                task.shopName?.toLowerCase().includes(query) ||
+                task.warehouse?.toLowerCase().includes(query)
+            );
+        }
+
+        // 10. ✅ เรียงลำดับจากล่าสุดไว้บนสุด
         groupedTasks.sort((a: any, b: any) =>
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         );
 
-        // 8. คำนวณ pagination
-        const totalPages = Math.ceil(totalCount / limit);
+        // 11. ✅ Pagination จาก grouped data (ไม่ใช่จาก raw tasks)
+        const totalGroups = groupedTasks.length;
+        const totalPages = Math.ceil(totalGroups / limit);
+        const skip = (page - 1) * limit;
+        const paginatedTasks = groupedTasks.slice(skip, skip + limit);
 
         return NextResponse.json({
             success: true,
-            tasks: groupedTasks,
+            tasks: paginatedTasks,
             pagination: {
                 currentPage: page,
                 totalPages,
-                totalCount,
+                totalCount: totalGroups,  // ✅ นับจำนวน groups ไม่ใช่ tasks
                 limit,
             },
         });
