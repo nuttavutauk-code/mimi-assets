@@ -22,13 +22,11 @@
         "name": "next"
       }
     ],
-    "baseUrl": ".",
     "paths": {
       "@/*": [
-        "src/*"
+        "./src/*"
       ]
     },
-    // ✅ เพิ่มบรรทัดนี้เข้าไป
     "typeRoots": [
       "./node_modules/@types",
       "./src/types"

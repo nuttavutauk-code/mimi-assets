@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
-import { Search, Package, ChevronLeft, ChevronRight, Loader2, Eye } from "lucide-react";
+import { SimplePagination } from "@/components/ui/SimplePagination";
+import { Search, Package, Loader2, Eye } from "lucide-react";
 
 interface PickTask {
   id: string;
@@ -184,23 +185,7 @@ export default function AdminPickAsset() {
               <span className="text-sm text-muted-foreground">
                 แสดง {filteredData.length} จาก {tasks.length} รายการ
               </span>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setCurrentPage((prev) => prev - 1)}
-                  disabled={currentPage === 1}
-                  className="p-2 rounded-lg hover:bg-black/5 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <span className="px-3 text-sm font-medium">{currentPage}/{totalPages}</span>
-                <button
-                  onClick={() => setCurrentPage((prev) => prev + 1)}
-                  disabled={currentPage === totalPages}
-                  className="p-2 rounded-lg hover:bg-black/5 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
+              <SimplePagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
             </div>
           </>
         )}
@@ -268,22 +253,8 @@ export default function AdminPickAsset() {
             })}
 
             {/* Mobile Pagination */}
-            <div className="flex justify-center items-center gap-4 py-4">
-              <button
-                onClick={() => setCurrentPage((prev) => prev - 1)}
-                disabled={currentPage === 1}
-                className="px-4 py-2 rounded-lg bg-black/5 text-sm disabled:opacity-50"
-              >
-                ก่อนหน้า
-              </button>
-              <span className="text-sm font-medium">{currentPage}/{totalPages}</span>
-              <button
-                onClick={() => setCurrentPage((prev) => prev + 1)}
-                disabled={currentPage === totalPages}
-                className="px-4 py-2 rounded-lg bg-black/5 text-sm disabled:opacity-50"
-              >
-                ถัดไป
-              </button>
+            <div className="flex justify-center items-center py-4">
+              <SimplePagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
             </div>
           </>
         )}

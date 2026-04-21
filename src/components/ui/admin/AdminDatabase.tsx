@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Input } from "@/components/ui/input";
+import { SimplePagination } from "@/components/ui/SimplePagination";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, Search, ChevronLeft, ChevronRight, RefreshCw, Database, Filter, Pencil, Save, X, Download, Upload } from "lucide-react";
+import { Loader2, Search, RefreshCw, Database, Filter, Pencil, Save, X, Download, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 interface TransactionData {
@@ -494,12 +495,8 @@ export default function AdminDatabase() {
               </table>
             </div>
             <div className="flex justify-between items-center p-4 border-t border-black/5 bg-white/50">
-              <span className="text-sm text-muted-foreground">หน้า {pagination.currentPage}/{pagination.totalPages}</span>
-              <div className="flex items-center gap-2">
-                <button onClick={() => handlePageChange(pagination.currentPage - 1)} disabled={pagination.currentPage === 1 || isEditMode} className="p-2 rounded-lg hover:bg-black/5 disabled:opacity-50"><ChevronLeft className="w-4 h-4" /></button>
-                <span className="px-3 text-sm font-medium">{pagination.currentPage}</span>
-                <button onClick={() => handlePageChange(pagination.currentPage + 1)} disabled={pagination.currentPage === pagination.totalPages || isEditMode} className="p-2 rounded-lg hover:bg-black/5 disabled:opacity-50"><ChevronRight className="w-4 h-4" /></button>
-              </div>
+              <span className="text-sm text-muted-foreground">รวม {pagination.totalCount.toLocaleString()} รายการ</span>
+              <SimplePagination currentPage={pagination.currentPage} totalPages={pagination.totalPages} onPageChange={handlePageChange} disabled={isEditMode} />
             </div>
           </>
         )}

@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
-import { Store, Upload, Search, Loader2, ChevronLeft, ChevronRight, Download } from "lucide-react";
+import { SimplePagination } from "@/components/ui/SimplePagination";
+import { Store, Upload, Search, Loader2, Download } from "lucide-react";
 import { toast } from "sonner";
 
 export default function AdminShopManage() {
@@ -189,24 +190,8 @@ export default function AdminShopManage() {
             </div>
             {/* Pagination */}
             <div className="flex justify-between items-center p-4 border-t border-black/5">
-              <span className="text-sm text-muted-foreground">Showing page {page} of {totalPages}</span>
-              <div className="flex items-center gap-2">
-                <button onClick={() => setPage(page - 1)} disabled={page === 1} className="px-3 py-1.5 rounded-lg border border-black/10 text-sm hover:bg-black/5 disabled:opacity-50">
-                  ก่อนหน้า
-                </button>
-                <select
-                  className="border border-black/10 rounded-lg text-sm px-2 py-1.5 bg-white"
-                  value={page}
-                  onChange={(e) => setPage(Number(e.target.value))}
-                >
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((num) => (
-                    <option key={num} value={num}>{num}</option>
-                  ))}
-                </select>
-                <button onClick={() => setPage(page + 1)} disabled={page === totalPages} className="px-3 py-1.5 rounded-lg border border-black/10 text-sm hover:bg-black/5 disabled:opacity-50">
-                  ถัดไป
-                </button>
-              </div>
+              <span className="text-sm text-muted-foreground">หน้า {page}/{totalPages}</span>
+              <SimplePagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
             </div>
           </>
         )}
@@ -247,10 +232,8 @@ export default function AdminShopManage() {
                 </div>
               );
             })}
-            <div className="flex justify-center items-center gap-4 py-4">
-              <button onClick={() => setPage(page - 1)} disabled={page === 1} className="px-4 py-2 rounded-lg bg-black/5 text-sm disabled:opacity-50">ก่อนหน้า</button>
-              <span className="text-sm font-medium">{page}/{totalPages}</span>
-              <button onClick={() => setPage(page + 1)} disabled={page === totalPages} className="px-4 py-2 rounded-lg bg-black/5 text-sm disabled:opacity-50">ถัดไป</button>
+            <div className="flex justify-center items-center py-4">
+              <SimplePagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
             </div>
           </>
         )}

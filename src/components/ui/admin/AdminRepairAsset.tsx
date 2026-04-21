@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
-import { Wrench, CheckCircle, Clock, Eye, Search, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { Wrench, CheckCircle, Clock, Eye, Search, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { SimplePagination } from "@/components/ui/SimplePagination";
 
 interface RepairTask {
     id: number;
@@ -272,25 +273,7 @@ export default function AdminRepairAsset() {
                         <span className="text-sm text-gray-500">
                             แสดง {paginatedTasks.length} จาก {filteredTasks.length} รายการ
                         </span>
-                        <div className="flex items-center gap-2">
-                            <button
-                                onClick={() => setCurrentPage((prev) => prev - 1)}
-                                disabled={currentPage === 1}
-                                className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                <ChevronLeft className="w-4 h-4" />
-                            </button>
-                            <span className="px-3 text-sm font-medium">
-                                {currentPage}/{totalPages || 1}
-                            </span>
-                            <button
-                                onClick={() => setCurrentPage((prev) => prev + 1)}
-                                disabled={currentPage === totalPages || totalPages === 0}
-                                className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                <ChevronRight className="w-4 h-4" />
-                            </button>
-                        </div>
+                        <SimplePagination currentPage={currentPage} totalPages={totalPages || 1} onPageChange={setCurrentPage} />
                     </div>
                 </div>
             )}

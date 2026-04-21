@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
+import { SimplePagination } from "@/components/ui/SimplePagination";
 import {
   Select,
   SelectContent,
@@ -9,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Edit, Trash2, Download, Loader2, Search, ChevronLeft, ChevronRight, Filter, ShieldCheck } from "lucide-react";
+import { Edit, Trash2, Download, Loader2, Search, Filter, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { downloadAsImage } from "@/lib/downloadDocument";
@@ -268,11 +269,7 @@ export default function AdminList() {
             </div>
             <div className="flex justify-between items-center p-4 border-t border-black/5">
               <span className="text-sm text-muted-foreground">หน้า {page}/{totalPages}</span>
-              <div className="flex items-center gap-2">
-                <button onClick={() => setPage(page - 1)} disabled={page === 1} className="p-2 rounded-lg hover:bg-black/5 disabled:opacity-50"><ChevronLeft className="w-4 h-4" /></button>
-                <span className="px-3 text-sm font-medium">{page}</span>
-                <button onClick={() => setPage(page + 1)} disabled={page === totalPages} className="p-2 rounded-lg hover:bg-black/5 disabled:opacity-50"><ChevronRight className="w-4 h-4" /></button>
-              </div>
+              <SimplePagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
             </div>
           </>
         )}
@@ -315,10 +312,8 @@ export default function AdminList() {
                 </div>
               );
             })}
-            <div className="flex justify-center items-center gap-4 py-4">
-              <button onClick={() => setPage(page - 1)} disabled={page === 1} className="px-4 py-2 rounded-lg bg-black/5 text-sm disabled:opacity-50">ก่อนหน้า</button>
-              <span className="text-sm font-medium">{page}/{totalPages}</span>
-              <button onClick={() => setPage(page + 1)} disabled={page === totalPages} className="px-4 py-2 rounded-lg bg-black/5 text-sm disabled:opacity-50">ถัดไป</button>
+            <div className="flex justify-center items-center py-4">
+              <SimplePagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
             </div>
           </>
         )}

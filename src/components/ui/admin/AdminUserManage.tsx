@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
-import { Search, Plus, Edit2, Trash2, X, Users, Loader2, ChevronLeft, ChevronRight, ToggleLeft, ToggleRight } from "lucide-react";
+import { SimplePagination } from "@/components/ui/SimplePagination";
+import { Search, Plus, Edit2, Trash2, X, Users, Loader2, ToggleLeft, ToggleRight } from "lucide-react";
 import { toast } from "sonner";
 
 interface User {
@@ -228,11 +229,7 @@ export default function AdminUserManage() {
             </div>
             <div className="flex justify-between items-center p-4 border-t border-black/5">
               <span className="text-sm text-muted-foreground">หน้า {page}/{totalPages}</span>
-              <div className="flex items-center gap-2">
-                <button onClick={() => setPage(page - 1)} disabled={page === 1} className="p-2 rounded-lg hover:bg-black/5 disabled:opacity-50"><ChevronLeft className="w-4 h-4" /></button>
-                <span className="px-3 text-sm font-medium">{page}</span>
-                <button onClick={() => setPage(page + 1)} disabled={page === totalPages} className="p-2 rounded-lg hover:bg-black/5 disabled:opacity-50"><ChevronRight className="w-4 h-4" /></button>
-              </div>
+              <SimplePagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
             </div>
           </>
         )}
