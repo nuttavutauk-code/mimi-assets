@@ -12,6 +12,7 @@ import { Plus, Trash2, User, Store, Package, Shield, FileText, Save, CheckCircle
 import { toast } from "sonner";
 import OtherActivitiesSelect, { OtherActivity } from "@/components/ui/admin/OtherActivitiesSelect";
 import StatusSelect, { StatusOption } from "@/components/ui/admin/StatusSelect";
+import PreviewApproveModal from "@/components/ui/PreviewApproveModal";
 
 type ShopItem = { mcsCode: string; shopName: string };
 type AssetRow = {
@@ -22,17 +23,15 @@ type AssetRow = {
   qty: number;
   withdrawFor: string;
   autoWarehouse?: boolean;
-  // ✅ Custom size fields for Lightbox / ACC WALL
   useCustomSize?: boolean;
   customW?: string;
   customD?: string;
   customH?: string;
   customXX?: string;
-  isSelected?: boolean; // ✅ เพิ่ม: true = เลือกจาก Dropdown แล้ว (Read-Only)
+  isSelected?: boolean;
 };
 type SecuritySet = { id: number; name: string; qty: number; withdrawFor: string };
 
-// ✅ Helper: เช็คว่าเป็น Asset ที่ต้องกรอก custom size
 const isCustomSizeAsset = (name: string) => {
   const lowerName = name.toLowerCase().replace(/\s+/g, '');
   return lowerName.includes("lightbox") || lowerName.includes("accwall") || lowerName.includes("wallkv-low") || lowerName.includes("wallkv - low");
@@ -79,6 +78,9 @@ const FormRouting2Shops = ({ mode = "user" }: { mode?: FormMode }) => {
   const [note, setNote] = useState("");
   const [otherActivity, setOtherActivity] = useState<OtherActivity>("");
   const [transactionStatus, setTransactionStatus] = useState<StatusOption>("");
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [userVendor, setUserVendor] = useState("");
+  const [previewShopIndex, setPreviewShopIndex] = useState(0);
 
   // Shop 1
   const [shop1, setShop1] = useState<ShopState>({
@@ -120,6 +122,7 @@ const FormRouting2Shops = ({ mode = "user" }: { mode?: FormMode }) => {
         const doc = json.document;
         setDocStatus(doc.status || "");
         setFormData({ docNumber: doc.docCode, fullName: doc.fullName || "", company: doc.company || "", phone: doc.phone || "" });
+        setUserVendor(doc.createdBy?.vendor || "");
 
         const shops = doc.shops || [];
         if (shops[0]) {
@@ -148,11 +151,10 @@ const FormRouting2Shops = ({ mode = "user" }: { mode?: FormMode }) => {
                 customD: isCustom ? customMatch[2] : undefined,
                 customH: isCustom ? customMatch[3] : undefined,
                 customXX: isCustom ? customMatch[4] : undefined,
-                isSelected: !!(a.name), // ✅ เพิ่ม: ถ้ามี name = ถือว่าเลือกแล้ว
+                isSelected: !!(a.name),
               };
             });
             setAssets1(loadedAssets1);
-            // ✅ โหลด size options สำหรับแต่ละ asset ใน shop 1
             loadedAssets1.forEach(async (asset: any) => {
               if (asset.name) {
                 try {
@@ -191,11 +193,10 @@ const FormRouting2Shops = ({ mode = "user" }: { mode?: FormMode }) => {
                 customD: isCustom ? customMatch[2] : undefined,
                 customH: isCustom ? customMatch[3] : undefined,
                 customXX: isCustom ? customMatch[4] : undefined,
-                isSelected: !!(a.name), // ✅ เพิ่ม: ถ้ามี name = ถือว่าเลือกแล้ว
+                isSelected: !!(a.name),
               };
             });
             setAssets2(loadedAssets2);
-            // ✅ โหลด size options สำหรับแต่ละ asset ใน shop 2
             loadedAssets2.forEach(async (asset: any) => {
               if (asset.name) {
                 try {
@@ -227,6 +228,7 @@ const FormRouting2Shops = ({ mode = "user" }: { mode?: FormMode }) => {
           company: user?.company || "",
           phone: user?.phone || "",
         });
+        setUserVendor(user?.vendor || "");
       });
     }).finally(() => setLoading(false));
   }, [data, isEdit, dataLoaded]);
@@ -283,12 +285,39 @@ const FormRouting2Shops = ({ mode = "user" }: { mode?: FormMode }) => {
     } catch (err) { console.error(err); }
   };
 
+  const handleOpenPreview = () => {
+    const filledSecuritySets1 = securitySets1.filter(s => s.qty > 0);
+    const filledSecuritySets2 = securitySets2.filter(s => s.qty > 0);
+    if (filledSecuritySets1.length > 3) {
+      toast.error("Security Set Shop 1 กรอกได้สูงสุด 3 รายการเท่านั้น");
+      return;
+    }
+    if (filledSecuritySets2.length > 3) {
+      toast.error("Security Set Shop 2 กรอกได้สูงสุด 3 รายการเท่านั้น");
+      return;
+    }
+
+    const allAssets = [...assets1, ...assets2];
+    const missingWarehouse = allAssets.some(a => !a.withdrawFor || a.withdrawFor.trim() === "");
+    if (missingWarehouse) {
+      toast.error("กรุณาเลือกโกดังให้ครบทุกรายการก่อนอนุมัติ");
+      return;
+    }
+
+    setPreviewShopIndex(0);
+    setShowPreviewModal(true);
+  };
+
+  const handleConfirmApprove = async () => {
+    setShowPreviewModal(false);
+    await handleSubmit("approve");
+  };
+
   // Submit
   const handleSubmit = async (action: string) => {
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
-      // ✅ Validation: Security Set กรอกได้สูงสุด 3 รายการ (ต่อ Shop)
       const filledSecuritySets1 = securitySets1.filter(s => s.qty > 0);
       const filledSecuritySets2 = securitySets2.filter(s => s.qty > 0);
       if (filledSecuritySets1.length > 3) {
@@ -302,7 +331,6 @@ const FormRouting2Shops = ({ mode = "user" }: { mode?: FormMode }) => {
         return;
       }
 
-      // ✅ Admin ต้องเลือกโกดังครบทุก Asset ก่อนอนุมัติ
       if (action === "approve" && mode === "admin") {
         const allAssets = [...assets1, ...assets2];
         const missingWarehouse = allAssets.some(a => !a.withdrawFor || a.withdrawFor.trim() === "");
@@ -314,7 +342,6 @@ const FormRouting2Shops = ({ mode = "user" }: { mode?: FormMode }) => {
       }
 
       if (action === "approve" && editId) {
-        // ✅ บันทึกข้อมูลก่อน (รวมถึง withdrawFor ที่ Admin เลือก)
         const updatePayload = {
           documentType: "routing2shops",
           docCode: formData.docNumber, fullName: formData.fullName, company: formData.company, phone: formData.phone, note, status: "submitted",
@@ -334,7 +361,6 @@ const FormRouting2Shops = ({ mode = "user" }: { mode?: FormMode }) => {
         const updateRes = await fetch(`/api/document/update/${editId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(updatePayload) });
         const updateR = await updateRes.json();
         if (!updateR.success) throw new Error(updateR.message);
-        // ✅ จากนั้นค่อยอนุมัติ
         const res = await fetch("/api/document/approve", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ documentId: parseInt(editId), otherActivity }) });
         const r = await res.json();
         if (!r.success) throw new Error(r.message);
@@ -546,7 +572,6 @@ const FormRouting2Shops = ({ mode = "user" }: { mode?: FormMode }) => {
                   </Select>
                 </div>
 
-                {/* ✅ Custom Size Fields for Lightbox / ACC WALL */}
                 {asset.useCustomSize && isCustomSizeAsset(asset.name) && (
                   <div className="sm:col-span-12 mt-2">
                     <div className="p-3 rounded-lg bg-amber-50 border border-amber-200">
@@ -696,6 +721,14 @@ const FormRouting2Shops = ({ mode = "user" }: { mode?: FormMode }) => {
     );
   };
 
+  // Prepare shops array for Preview Modal
+  const shopsForPreview = [
+    { shopCode: shop1.shopCode, shopName: shop1.shopName, startDate: shop1.startDate, endDate: shop1.endDate, q7b7: shop1.q7b7, focus: shop1.focus, assets: assets1, securitySets: securitySets1 },
+    { shopCode: shop2.shopCode, shopName: shop2.shopName, startDate: shop2.startDate, endDate: shop2.endDate, q7b7: shop2.q7b7, focus: shop2.focus, assets: assets2, securitySets: securitySets2 },
+  ];
+
+  const currentPreviewShop = shopsForPreview[previewShopIndex];
+
   return (
     <div className="space-y-4 sm:space-y-6">
       {isReadOnly && (
@@ -759,7 +792,7 @@ const FormRouting2Shops = ({ mode = "user" }: { mode?: FormMode }) => {
         <div className="flex flex-col sm:flex-row justify-center gap-3 pt-4">
           {mode === "admin" ? (
             <>
-              <button disabled={isSubmitting} onClick={() => handleSubmit("approve")} className="gradient-button px-8 py-3 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50">
+              <button disabled={isSubmitting} onClick={handleOpenPreview} className="gradient-button px-8 py-3 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50">
                 <CheckCircle className="w-4 h-4" />{isSubmitting ? "กำลังดำเนินการ..." : "อนุมัติ"}
               </button>
               <button disabled={isSubmitting} onClick={() => handleSubmit("reject")} className="px-8 py-3 rounded-xl bg-red-500 text-white text-sm font-medium flex items-center justify-center gap-2 hover:bg-red-600 disabled:opacity-50">
@@ -773,6 +806,66 @@ const FormRouting2Shops = ({ mode = "user" }: { mode?: FormMode }) => {
           )}
         </div>
       )}
+
+      <PreviewApproveModal
+        isOpen={showPreviewModal}
+        onClose={() => setShowPreviewModal(false)}
+        onConfirm={handleConfirmApprove}
+        isSubmitting={isSubmitting}
+        documentType="routing2shops"
+        documentData={{
+          docCode: formData.docNumber,
+          fullName: formData.fullName,
+          company: formData.company,
+          phone: formData.phone,
+          note: note,
+          vendor: userVendor,
+        }}
+        shopInfo={{
+          shopCode: currentPreviewShop.shopCode,
+          shopName: currentPreviewShop.shopName,
+          startInstallDate: currentPreviewShop.startDate,
+          endInstallDate: currentPreviewShop.endDate,
+          q7b7: currentPreviewShop.q7b7,
+          shopFocus: currentPreviewShop.focus,
+        }}
+        assets={currentPreviewShop.assets.filter(a => a.name && a.name.trim() !== "").map(a => ({
+          name: a.name,
+          size: a.size,
+          grade: "",
+          kv: a.kv,
+          qty: a.qty,
+          withdrawFor: a.withdrawFor,
+          barcode: "",
+        }))}
+        securitySets={currentPreviewShop.securitySets.filter(s => s.qty > 0).map(s => ({
+          name: s.name,
+          qty: s.qty,
+          withdrawFor: s.withdrawFor,
+        }))}
+        shops={shopsForPreview.map(shop => ({
+          shopCode: shop.shopCode,
+          shopName: shop.shopName,
+          startInstallDate: shop.startDate,
+          endInstallDate: shop.endDate,
+          q7b7: shop.q7b7,
+          shopFocus: shop.focus,
+          assets: shop.assets.filter(a => a.name && a.name.trim() !== "").map(a => ({
+            name: a.name,
+            size: a.size,
+            grade: "",
+            kv: a.kv,
+            qty: a.qty,
+            withdrawFor: a.withdrawFor,
+            barcode: "",
+          })),
+          securitySets: shop.securitySets.filter(s => s.qty > 0).map(s => ({
+            name: s.name,
+            qty: s.qty,
+            withdrawFor: s.withdrawFor,
+          })),
+        }))}
+      />
     </div>
   );
 };

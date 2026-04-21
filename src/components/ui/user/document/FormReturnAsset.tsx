@@ -15,6 +15,7 @@ import { Plus, Trash2, User, Store, Package, FileText, Save, CheckCircle, XCircl
 import { toast } from "sonner";
 import OtherActivitiesSelect, { OtherActivity } from "@/components/ui/admin/OtherActivitiesSelect";
 import StatusSelect, { StatusOption } from "@/components/ui/admin/StatusSelect";
+import PreviewApproveModal from "@/components/ui/PreviewApproveModal";
 
 type ShopItem = { mcsCode: string; shopName: string };
 type AssetRow = { id: number; barcode: string; name: string; size: string; grade: string; qty: number; noBarcode?: boolean; isSelected?: boolean };
@@ -50,6 +51,8 @@ const FormReturnAsset = ({ mode = "user" }: { mode?: FormMode }) => {
   const [assetNames, setAssetNames] = useState<string[]>([]);
   const [showAssetNameDropdown, setShowAssetNameDropdown] = useState<Record<number, boolean>>({});
   const [assetNameSearch, setAssetNameSearch] = useState<Record<number, string>>({});
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [userVendor, setUserVendor] = useState("");
 
   useEffect(() => {
     if (!editIdFromUrl || dataLoaded) return;
@@ -66,14 +69,13 @@ const FormReturnAsset = ({ mode = "user" }: { mode?: FormMode }) => {
           if (shop.assets?.length > 0) setAssets(shop.assets.map((a: any, idx: number) => ({ id: idx + 1, barcode: a.barcode || "", name: a.name || "", size: a.size || "", grade: a.grade || "", qty: a.qty || 1, noBarcode: a.barcode?.startsWith("NOBC-") || false, isSelected: !!(a.name) })));
         }
         setNote(doc.note || "");
-        // ✅ Load returnCondition
         if (doc.returnCondition) setReturnCondition(doc.returnCondition);
+        setUserVendor(doc.createdBy?.vendor || "");
       }
       setDataLoaded(true);
     }).finally(() => setLoading(false));
   }, [editIdFromUrl, dataLoaded]);
 
-  // ✅ Fetch asset names สำหรับ NO BARCODE dropdown
   useEffect(() => {
     fetch("/api/asset/names").then(r => r.json()).then(json => {
       if (json.success) setAssetNames(json.names || []);
@@ -85,6 +87,7 @@ const FormReturnAsset = ({ mode = "user" }: { mode?: FormMode }) => {
     getMe(data?.user?.email ?? '').then(me => {
       fetch("/api/document/generate").then(r => r.json()).then(json => {
         setFormData({ docNumber: json.docCode || "", fullName: `${me?.user?.firstName || ""} ${me?.user?.lastName || ""}`.trim() || "", company: me?.user?.company || "", phone: me?.user?.phone || "" });
+        setUserVendor(me?.user?.vendor || "");
       });
     });
   }, [dataLoaded, isEdit]);
@@ -97,10 +100,8 @@ const FormReturnAsset = ({ mode = "user" }: { mode?: FormMode }) => {
   const debouncedSearch = useMemo(() => debounce(searchShop, 300), [searchShop]);
 
   const fetchBarcodes = async (q: string, rowId: number) => {
-    // ✅ ล้าง name และ size เมื่อกำลังค้นหาใหม่
     setAssets(p => p.map(a => a.id === rowId ? { ...a, name: "", size: "" } : a));
     
-    // ✅ ใช้ searchByBarcode API + balanceFilter=0 (ค้นหาเฉพาะ Barcode ที่ออกไปแล้ว ถึงจะคืนได้)
     const res = await fetch(`/api/asset/searchByBarcode?query=${encodeURIComponent(q)}&balanceFilter=0`); const json = await res.json();
     const barcodes = json.assets || []; 
     setBarcodeSearchResults(barcodes); 
@@ -108,10 +109,8 @@ const FormReturnAsset = ({ mode = "user" }: { mode?: FormMode }) => {
   };
   const debouncedBarcode = useMemo(() => debounce(fetchBarcodes, 300), []);
 
-  // ✅ Handle NO BARCODE toggle - generate barcode อัตโนมัติ
   const handleNoBarcodeToggle = async (rowId: number, checked: boolean) => {
     if (checked) {
-      // Generate NOBC barcode
       const res = await fetch("/api/asset/generate-nobc");
       const json = await res.json();
       if (json.success) {
@@ -120,34 +119,43 @@ const FormReturnAsset = ({ mode = "user" }: { mode?: FormMode }) => {
         toast.error("ไม่สามารถสร้าง Barcode ได้");
       }
     } else {
-      // Clear และกลับไปโหมดปกติ
       setAssets(p => p.map(a => a.id === rowId ? { ...a, noBarcode: false, barcode: "", name: "", size: "" } : a));
     }
   };
 
-  // ✅ Filter asset names ตาม search
   const getFilteredAssetNames = (rowId: number) => {
     const search = assetNameSearch[rowId] || "";
-    if (!search) return assetNames.slice(0, 50); // แสดงแค่ 50 รายการแรกถ้าไม่ได้ค้นหา
+    if (!search) return assetNames.slice(0, 50);
     return assetNames.filter(name => name.toLowerCase().includes(search.toLowerCase())).slice(0, 50);
+  };
+
+  const handleOpenPreview = () => {
+    if (!returnCondition) {
+      toast.error("กรุณาเลือกเงื่อนไขการเก็บกลับ");
+      return;
+    }
+
+    setShowPreviewModal(true);
+  };
+
+  const handleConfirmApprove = async () => {
+    setShowPreviewModal(false);
+    await handleSubmit("approve");
   };
 
   const handleSubmit = async (action: string) => {
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
-      // ✅ Validation เงื่อนไขการเก็บกลับ
       if (!returnCondition) {
         toast.error("กรุณาเลือกเงื่อนไขการเก็บกลับ");
         return;
       }
       if (action === "approve" && editId) {
-        // ✅ บันทึกข้อมูลก่อน
         const updatePayload = { documentType: "return", docCode: formData.docNumber, fullName: formData.fullName, company: formData.company, phone: formData.phone, note, returnCondition, status: "submitted", shops: [{ shopCode, shopName, startInstallDate: returnDate, assets: assets.map(a => ({ barcode: a.barcode, name: a.name, size: a.size, grade: a.grade, qty: a.qty })) }] };
         const updateRes = await fetch(`/api/document/update/${editId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(updatePayload) });
         const updateR = await updateRes.json();
         if (!updateR.success) throw new Error(updateR.message);
-        // ✅ จากนั้นค่อยอนุมัติ
         const res = await fetch("/api/document/approve", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ documentId: parseInt(editId), otherActivity }) }); const r = await res.json(); if (!r.success) throw new Error(r.message); toast.success("อนุมัติสำเร็จ!"); router.push("/dashboard/admin-list"); return;
       }
       if (action === "reject" && editId) { const res = await fetch(`/api/document/update/${editId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: "rejected", note }) }); const r = await res.json(); if (!r.success) throw new Error(r.message); toast.success("ปฏิเสธสำเร็จ!"); router.push("/dashboard/admin-list"); return; }
@@ -229,7 +237,6 @@ const FormReturnAsset = ({ mode = "user" }: { mode?: FormMode }) => {
         <div className="space-y-3">
           {assets.map((asset) => (
             <div key={asset.id} className="p-4 rounded-xl bg-black/2 border border-black/5">
-              {/* NO BARCODE Checkbox */}
               <div className="flex items-center gap-2 mb-3">
                 <Checkbox id={`no-barcode-${asset.id}`} checked={asset.noBarcode || false} onCheckedChange={(c) => handleNoBarcodeToggle(asset.id, !!c)} className="border-2 border-gray-400" />
                 <label htmlFor={`no-barcode-${asset.id}`} className="text-sm font-medium text-foreground cursor-pointer">NO BARCODE</label>
@@ -286,18 +293,52 @@ const FormReturnAsset = ({ mode = "user" }: { mode?: FormMode }) => {
 
       {mode === "admin" && <OtherActivitiesSelect value={otherActivity} onChange={setOtherActivity} />}
 
-      {/* Status - Admin only (บังคับเลือก) */}
       {mode === "admin" && <StatusSelect value={transactionStatus} onChange={setTransactionStatus} />}
 
       {!isReadOnly && (
         <div className="flex flex-col sm:flex-row justify-center gap-3 pt-4">
           {mode === "admin" ? (
-            <><button disabled={isSubmitting} onClick={() => handleSubmit("approve")} className="gradient-button px-8 py-3 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50"><CheckCircle className="w-4 h-4" />{isSubmitting ? "กำลังดำเนินการ..." : "อนุมัติ"}</button><button disabled={isSubmitting} onClick={() => handleSubmit("reject")} className="px-8 py-3 rounded-xl bg-red-500 text-white text-sm font-medium flex items-center justify-center gap-2 hover:bg-red-600 disabled:opacity-50"><XCircle className="w-4 h-4" />ปฏิเสธ</button></>
+            <><button disabled={isSubmitting} onClick={handleOpenPreview} className="gradient-button px-8 py-3 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50"><CheckCircle className="w-4 h-4" />{isSubmitting ? "กำลังดำเนินการ..." : "อนุมัติ"}</button><button disabled={isSubmitting} onClick={() => handleSubmit("reject")} className="px-8 py-3 rounded-xl bg-red-500 text-white text-sm font-medium flex items-center justify-center gap-2 hover:bg-red-600 disabled:opacity-50"><XCircle className="w-4 h-4" />ปฏิเสธ</button></>
           ) : (
             <button disabled={isSubmitting} onClick={() => handleSubmit("save")} className="gradient-button px-10 py-3 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50"><Save className="w-4 h-4" />{isSubmitting ? "กำลังบันทึก..." : (isEdit ? "บันทึกการแก้ไข" : "บันทึก")}</button>
           )}
         </div>
       )}
+
+      <PreviewApproveModal
+        isOpen={showPreviewModal}
+        onClose={() => setShowPreviewModal(false)}
+        onConfirm={handleConfirmApprove}
+        isSubmitting={isSubmitting}
+        documentType="return"
+        documentData={{
+          docCode: formData.docNumber,
+          fullName: formData.fullName,
+          company: formData.company,
+          phone: formData.phone,
+          note: note,
+          vendor: userVendor,
+        }}
+        shopInfo={{
+          shopCode: shopCode,
+          shopName: shopName,
+          startInstallDate: returnDate,
+          endInstallDate: "",
+          q7b7: "",
+          shopFocus: "",
+        }}
+        assets={assets.filter(a => a.barcode && a.barcode.trim() !== "").map(a => ({
+          name: a.name,
+          size: a.size,
+          grade: a.grade || "",
+          kv: "",
+          qty: a.qty,
+          withdrawFor: "",
+          barcode: a.barcode,
+        }))}
+        securitySets={[]}
+        returnCondition={returnCondition}
+      />
     </div>
   );
 };

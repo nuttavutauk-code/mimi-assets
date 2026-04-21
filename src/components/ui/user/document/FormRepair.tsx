@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import OtherActivitiesSelect, { OtherActivity } from "@/components/ui/admin/OtherActivitiesSelect";
 import debounce from "lodash.debounce";
 import { getMe } from "./loader";
+import PreviewApproveModal from "@/components/ui/PreviewApproveModal";
 
 type AssetRow = { id: number; barcode: string; name: string; size: string; grade: string; qty: number };
 type FormMode = "user" | "admin";
@@ -38,14 +39,13 @@ const FormRepair = ({ mode = "user" }: { mode?: FormMode }) => {
   const [repairDate, setRepairDate] = useState<string>("");
   const [note, setNote] = useState("");
   const [otherActivity, setOtherActivity] = useState<OtherActivity>("");
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
 
   const fetchBarcodes = async (query: string, rowId: number) => {
-    // ✅ ล้าง name และ size เมื่อกำลังค้นหาใหม่
     setAssets(p => p.map(a => a.id === rowId ? { ...a, name: "", size: "" } : a));
     
     if (!userVendor) { setBarcodeSearchResults([]); setShowBarcodeDropdown(p => ({ ...p, [rowId]: false })); return; }
     try {
-      // ✅ ใช้ searchByBarcode API + balanceFilter=1 + warehouse (ค้นหา Barcode ที่อยู่ในโกดังของตัวเอง)
       const res = await fetch(`/api/asset/searchByBarcode?query=${encodeURIComponent(query)}&balanceFilter=1&warehouse=${encodeURIComponent(userVendor)}`);
       const json = await res.json();
       const barcodes = json.assets || []; setBarcodeSearchResults(barcodes); setShowBarcodeDropdown(p => ({ ...p, [rowId]: true }));
@@ -79,6 +79,7 @@ const FormRepair = ({ mode = "user" }: { mode?: FormMode }) => {
             }
           }
           setNote(doc.note || "");
+          setUserVendor(doc.createdBy?.vendor || "");
         }
         setDataLoaded(true);
       } catch (err) { console.error(err); toast.error("โหลดข้อมูลไม่สำเร็จ"); }
@@ -101,24 +102,40 @@ const FormRepair = ({ mode = "user" }: { mode?: FormMode }) => {
     initForm();
   }, [dataLoaded, isEdit]);
 
+  const handleOpenPreview = () => {
+    if (!repairDate) {
+      toast.error("กรุณาเลือกวันที่ส่งซ่อม");
+      return;
+    }
+    
+    if (assets.length === 0 || !assets.some(a => a.barcode.trim())) {
+      toast.error("กรุณาเพิ่ม Barcode อย่างน้อย 1 รายการ");
+      return;
+    }
+
+    setShowPreviewModal(true);
+  };
+
+  const handleConfirmApprove = async () => {
+    setShowPreviewModal(false);
+    await handleSubmit("approve");
+  };
+
   const handleSubmit = async (action: SubmitAction) => {
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
-      // ✅ Validation: ต้องเลือกวันที่ส่งซ่อม
       if (!repairDate) {
         toast.error("กรุณาเลือกวันที่ส่งซ่อม");
         return;
       }
       
-      // ✅ Validation: ต้องมี Barcode อย่างน้อย 1 รายการ
       if (assets.length === 0 || !assets.some(a => a.barcode.trim())) {
         toast.error("กรุณาเพิ่ม Barcode อย่างน้อย 1 รายการ");
         return;
       }
 
       if (action === "approve" && isEdit && editId) {
-        // ✅ บันทึกข้อมูลก่อน
         const updatePayload = {
           documentType: "repair", docCode: formData.docNumber, fullName: formData.fullName, company: formData.company, phone: formData.phone, note, status: "submitted",
           shops: [{ shopCode: "", shopName: "", startInstallDate: repairDate, assets: assets.map(a => ({ barcode: a.barcode, name: a.name, size: a.size || null, grade: a.grade || null, qty: a.qty })) }],
@@ -126,7 +143,6 @@ const FormRepair = ({ mode = "user" }: { mode?: FormMode }) => {
         const updateRes = await fetch(`/api/document/update/${editId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(updatePayload) });
         const updateResult = await updateRes.json();
         if (!updateResult.success) throw new Error(updateResult.message);
-        // ✅ จากนั้นค่อยอนุมัติ
         const res = await fetch("/api/document/approve", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ documentId: parseInt(editId), otherActivity: otherActivity || null }) });
         const result = await res.json();
         if (!result.success) throw new Error(result.message);
@@ -158,7 +174,7 @@ const FormRepair = ({ mode = "user" }: { mode?: FormMode }) => {
   if (loading && isEdit) return <div className="flex items-center justify-center min-h-[400px]"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
 
   const isReadOnly = docStatus === "approved" || docStatus === "rejected";
-  const isViewMode = docStatus === "submitted" && mode === "admin"; // Admin กำลังดูเอกสารเพื่ออนุมัติ
+  const isViewMode = docStatus === "submitted" && mode === "admin";
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -178,7 +194,6 @@ const FormRepair = ({ mode = "user" }: { mode?: FormMode }) => {
         </div>
       </div>
 
-      {/* ข้อมูลผู้ส่งซ่อม */}
       <div className="glass-card p-4 sm:p-5">
         <div className="flex items-center gap-2 mb-4"><div className="icon-container blue !w-8 !h-8"><User className="w-4 h-4" /></div><h2 className="font-semibold text-foreground">ข้อมูลผู้ส่งซ่อม</h2></div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -189,13 +204,11 @@ const FormRepair = ({ mode = "user" }: { mode?: FormMode }) => {
         </div>
       </div>
 
-      {/* วันที่ส่งซ่อม */}
       <div className="glass-card p-4 sm:p-5">
         <div className="flex items-center gap-2 mb-4"><div className="icon-container orange !w-8 !h-8"><Calendar className="w-4 h-4" /></div><h2 className="font-semibold text-foreground">วันที่ส่งซ่อม</h2></div>
         <div className="max-w-xs"><Input type="date" value={repairDate} onChange={(e) => setRepairDate(e.target.value)} className="glass-input" /></div>
       </div>
 
-      {/* Asset */}
       <div className="glass-card p-4 sm:p-5">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2"><div className="icon-container purple !w-8 !h-8"><Package className="w-4 h-4" /></div><h2 className="font-semibold text-foreground">Asset ที่ส่งซ่อม</h2><span className="text-xs text-muted-foreground">({assets.length}/6)</span></div>
@@ -223,7 +236,6 @@ const FormRepair = ({ mode = "user" }: { mode?: FormMode }) => {
         </div>
       </div>
 
-      {/* หมายเหตุ */}
       <div className="glass-card p-4 sm:p-5">
         <div className="flex items-center gap-2 mb-4"><div className="icon-container gray !w-8 !h-8"><FileText className="w-4 h-4" /></div><h2 className="font-semibold text-foreground">หมายเหตุ</h2></div>
         <Input placeholder="หมายเหตุเพิ่มเติม (ถ้ามี)" value={note} onChange={(e) => setNote(e.target.value)} className="glass-input" />
@@ -231,12 +243,11 @@ const FormRepair = ({ mode = "user" }: { mode?: FormMode }) => {
 
       {mode === "admin" && <OtherActivitiesSelect value={otherActivity} onChange={setOtherActivity} />}
 
-      {/* Action Buttons */}
       {!isReadOnly && (
         <div className="flex flex-col sm:flex-row justify-center gap-3 pt-4">
           {mode === "admin" ? (
             <>
-              <button disabled={isSubmitting} onClick={() => handleSubmit("approve")} className="gradient-button px-8 py-3 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50"><CheckCircle className="w-4 h-4" />{isSubmitting ? "กำลังดำเนินการ..." : "อนุมัติ"}</button>
+              <button disabled={isSubmitting} onClick={handleOpenPreview} className="gradient-button px-8 py-3 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50"><CheckCircle className="w-4 h-4" />{isSubmitting ? "กำลังดำเนินการ..." : "อนุมัติ"}</button>
               <button disabled={isSubmitting} onClick={() => handleSubmit("reject")} className="px-8 py-3 rounded-xl bg-red-500 text-white text-sm font-medium flex items-center justify-center gap-2 hover:bg-red-600 transition-colors disabled:opacity-50"><XCircle className="w-4 h-4" />ปฏิเสธ</button>
             </>
           ) : (
@@ -244,6 +255,40 @@ const FormRepair = ({ mode = "user" }: { mode?: FormMode }) => {
           )}
         </div>
       )}
+
+      <PreviewApproveModal
+        isOpen={showPreviewModal}
+        onClose={() => setShowPreviewModal(false)}
+        onConfirm={handleConfirmApprove}
+        isSubmitting={isSubmitting}
+        documentType="repair"
+        documentData={{
+          docCode: formData.docNumber,
+          fullName: formData.fullName,
+          company: formData.company,
+          phone: formData.phone,
+          note: note,
+          vendor: userVendor,
+        }}
+        shopInfo={{
+          shopCode: "",
+          shopName: "",
+          startInstallDate: repairDate,
+          endInstallDate: "",
+          q7b7: "",
+          shopFocus: "",
+        }}
+        assets={assets.filter(a => a.barcode && a.barcode.trim() !== "").map(a => ({
+          name: a.name,
+          size: a.size,
+          grade: a.grade || "",
+          kv: "",
+          qty: a.qty,
+          withdrawFor: "",
+          barcode: a.barcode,
+        }))}
+        securitySets={[]}
+      />
     </div>
   );
 };

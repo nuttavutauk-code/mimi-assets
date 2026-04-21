@@ -12,6 +12,7 @@ import { Plus, Trash2, User, Store, Package, FileText, Save, CheckCircle, XCircl
 import { toast } from "sonner";
 import OtherActivitiesSelect, { OtherActivity } from "@/components/ui/admin/OtherActivitiesSelect";
 import StatusSelect, { StatusOption } from "@/components/ui/admin/StatusSelect";
+import PreviewApproveModal from "@/components/ui/PreviewApproveModal";
 
 type AssetRow = {
   id: number;
@@ -62,6 +63,7 @@ const FormTransfer = ({ mode = "user" }: { mode?: FormMode }) => {
   const [barcodeSearchResults, setBarcodeSearchResults] = useState<{ barcode: string; assetName: string; size?: string }[]>([]);
   const [showBarcodeDropdown, setShowBarcodeDropdown] = useState<Record<number, boolean>>({});
   const [userVendor, setUserVendor] = useState<string>("");
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
 
   useEffect(() => { fetch("/api/vendor/list").then(r => r.json()).then(j => j.success && setVendors(j.vendors?.filter((v: string) => v.trim()) || [])); }, []);
 
@@ -80,6 +82,7 @@ const FormTransfer = ({ mode = "user" }: { mode?: FormMode }) => {
           operation: doc.operation || "",
           otherDetail: doc.otherDetail || ""
         });
+        setUserVendor(doc.createdBy?.vendor || "");
         const shop = doc.shops?.[0];
         if (shop) {
           setShopCode(shop.shopCode || "");
@@ -119,6 +122,39 @@ const FormTransfer = ({ mode = "user" }: { mode?: FormMode }) => {
     const barcodes = json.assets || []; setBarcodeSearchResults(barcodes); setShowBarcodeDropdown(p => ({ ...p, [rowId]: true }));
   };
   const debouncedBarcode = useMemo(() => debounce(fetchBarcodes, 300), [userVendor]);
+
+  const handleOpenPreview = () => {
+    // Validate วันที่โอนย้าย
+    if (!transferDate) {
+      toast.error("กรุณาเลือกวันที่โอนย้าย");
+      return;
+    }
+    
+    // Validate operation
+    if (!formData.operation) {
+      toast.error("กรุณาเลือกประเภทการย้าย");
+      return;
+    }
+    if (formData.operation === "อื่นๆ" && !formData.otherDetail.trim()) {
+      toast.error("กรุณาระบุรายละเอียด (อื่นๆ)");
+      return;
+    }
+
+    // Admin ต้องเลือกโกดังปลายทางก่อนอนุมัติ
+    if (mode === "admin") {
+      if (!shopName || shopName.trim() === "") {
+        toast.error("กรุณาเลือกโกดังปลายทางก่อนอนุมัติ");
+        return;
+      }
+    }
+
+    setShowPreviewModal(true);
+  };
+
+  const handleConfirmApprove = async () => {
+    setShowPreviewModal(false);
+    await handleSubmit("approve");
+  };
 
   const handleSubmit = async (action: string) => {
     if (isSubmitting) return;
@@ -332,7 +368,7 @@ const FormTransfer = ({ mode = "user" }: { mode?: FormMode }) => {
         <div className="flex flex-col sm:flex-row justify-center gap-3 pt-4">
           {mode === "admin" ? (
             <>
-              <button disabled={isSubmitting} onClick={() => handleSubmit("approve")} className="gradient-button px-8 py-3 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50"><CheckCircle className="w-4 h-4" />{isSubmitting ? "กำลังดำเนินการ..." : "อนุมัติ"}</button>
+              <button disabled={isSubmitting} onClick={handleOpenPreview} className="gradient-button px-8 py-3 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50"><CheckCircle className="w-4 h-4" />{isSubmitting ? "กำลังดำเนินการ..." : "อนุมัติ"}</button>
               <button disabled={isSubmitting} onClick={() => handleSubmit("reject")} className="px-8 py-3 rounded-xl bg-red-500 text-white text-sm font-medium flex items-center justify-center gap-2 hover:bg-red-600 disabled:opacity-50"><XCircle className="w-4 h-4" />ปฏิเสธ</button>
             </>
           ) : (
@@ -340,6 +376,40 @@ const FormTransfer = ({ mode = "user" }: { mode?: FormMode }) => {
           )}
         </div>
       )}
+
+      <PreviewApproveModal
+        isOpen={showPreviewModal}
+        onClose={() => setShowPreviewModal(false)}
+        onConfirm={handleConfirmApprove}
+        isSubmitting={isSubmitting}
+        documentType="transfer"
+        documentData={{
+          docCode: formData.docNumber,
+          fullName: formData.fullName,
+          company: formData.company,
+          phone: formData.phone,
+          note: note,
+          vendor: userVendor,
+        }}
+        shopInfo={{
+          shopCode: shopCode,
+          shopName: shopName,
+          startInstallDate: transferDate,
+          endInstallDate: "",
+          q7b7: "",
+          shopFocus: "",
+        }}
+        assets={assets.filter(a => a.barcode && a.barcode.trim() !== "").map(a => ({
+          name: a.name,
+          size: a.size,
+          grade: a.grade,
+          kv: "",
+          qty: a.qty,
+          withdrawFor: shopName,
+          barcode: a.barcode,
+        }))}
+        securitySets={[]}
+      />
     </div>
   );
 };

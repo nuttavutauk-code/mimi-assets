@@ -12,6 +12,7 @@ import { Plus, Trash2, User, Store, Package, FileText, Save, CheckCircle, XCircl
 import { toast } from "sonner";
 import OtherActivitiesSelect, { OtherActivity } from "@/components/ui/admin/OtherActivitiesSelect";
 import StatusSelect, { StatusOption } from "@/components/ui/admin/StatusSelect";
+import PreviewApproveModal from "@/components/ui/PreviewApproveModal";
 
 type ShopItem = { mcsCode: string; shopName: string };
 type AssetRow = {
@@ -27,7 +28,7 @@ type AssetRow = {
   customD?: string;
   customH?: string;
   customXX?: string;
-  isSelected?: boolean; // ✅ เพิ่ม: true = เลือกจาก Dropdown แล้ว (Read-Only)
+  isSelected?: boolean;
 };
 
 const isCustomSizeAsset = (name: string) => {
@@ -37,7 +38,6 @@ const isCustomSizeAsset = (name: string) => {
 type FormMode = "user" | "admin";
 type SubmitAction = "save" | "approve" | "reject";
 
-// ✅ ตัวเลือกประเภทการยืม
 const BORROW_TYPE_OPTIONS = ["EVENT", "TEMP SHOP"];
 
 const FormBorrow = ({ mode = "user" }: { mode?: FormMode }) => {
@@ -74,6 +74,8 @@ const FormBorrow = ({ mode = "user" }: { mode?: FormMode }) => {
   const [sizeOptions, setSizeOptions] = useState<Record<number, string[]>>({});
   const [showAssetDropdown, setShowAssetDropdown] = useState<Record<number, boolean>>({});
   const [borrowType, setBorrowType] = useState("");
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [userVendor, setUserVendor] = useState("");
 
   useEffect(() => {
     const fetchVendors = async () => {
@@ -107,7 +109,6 @@ const FormBorrow = ({ mode = "user" }: { mode?: FormMode }) => {
               const loadedAssets = shop.assets.map((a: any, idx: number) => ({ id: idx + 1, name: a.name || "", size: a.size || "", kv: a.kv || "", qty: a.qty || 1, withdrawFor: a.withdrawFor || "", isSelected: !!(a.name) }));
               setAssets(loadedAssets);
               assetIdCounter.current = shop.assets.length + 1;
-              // ✅ โหลด size options สำหรับแต่ละ asset
               loadedAssets.forEach(async (asset: any) => {
                 if (asset.name) {
                   try {
@@ -122,6 +123,7 @@ const FormBorrow = ({ mode = "user" }: { mode?: FormMode }) => {
           setNote(doc.note || "");
           setBorrowType(doc.borrowType || "");
           setTransactionStatus(doc.transactionStatus || "");
+          setUserVendor(doc.createdBy?.vendor || "");
         }
         setDataLoaded(true);
       } catch (err) { console.error(err); toast.error("โหลดข้อมูลไม่สำเร็จ"); }
@@ -130,7 +132,6 @@ const FormBorrow = ({ mode = "user" }: { mode?: FormMode }) => {
     loadExisting();
   }, [editIdFromUrl, dataLoaded]);
 
-  // ✅ Fixed: Load user data using session email
   useEffect(() => {
     if (isEdit || dataLoaded || !data?.user) return;
     const initForm = async () => {
@@ -146,13 +147,13 @@ const FormBorrow = ({ mode = "user" }: { mode?: FormMode }) => {
           company: user?.company || "",
           phone: user?.phone || "",
         });
+        setUserVendor(user?.vendor || "");
       } catch (err) { console.error(err); }
       finally { setLoading(false); }
     };
     initForm();
   }, [data, isEdit, dataLoaded]);
 
-  // ✅ Fixed: Shop search with correct API param "query"
   const fetchShops = useCallback(async (rawQuery: string) => {
     const query = rawQuery.trim();
     if (query.length < 2) { setSearchResults([]); setShowDropdown(false); return; }
@@ -171,7 +172,6 @@ const FormBorrow = ({ mode = "user" }: { mode?: FormMode }) => {
 
   const debouncedSearch = useMemo(() => debounce(fetchShops, 300), [fetchShops]);
 
-  // ✅ Fixed: Asset search with correct API param "query"
   const fetchAssetNames = async (query: string, rowId: number) => {
     if (!query || query.trim().length < 2) { setAssetSearchResults([]); setShowAssetDropdown(p => ({ ...p, [rowId]: false })); return; }
     try {
@@ -193,23 +193,43 @@ const FormBorrow = ({ mode = "user" }: { mode?: FormMode }) => {
     } catch (err) { console.error(err); }
   };
 
+  const handleOpenPreview = () => {
+    if (!borrowType) {
+      toast.error("กรุณาเลือกประเภทการยืม");
+      return;
+    }
+    if (mode === "admin" && !transactionStatus) {
+      toast.error("กรุณาเลือก Status ก่อนอนุมัติ");
+      return;
+    }
+    if (mode === "admin") {
+      const filledAssets = assets.filter(a => a.name && a.name.trim() !== "");
+      const missingWarehouse = filledAssets.some(a => !a.withdrawFor || a.withdrawFor.trim() === "");
+      if (missingWarehouse) {
+        toast.error("กรุณาเลือกโกดังให้ครบทุกรายการก่อนอนุมัติ");
+        return;
+      }
+    }
+    setShowPreviewModal(true);
+  };
+
+  const handleConfirmApprove = async () => {
+    setShowPreviewModal(false);
+    await handleSubmit("approve");
+  };
+
   const handleSubmit = async (action: SubmitAction) => {
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
-      // ✅ Validate borrowType
       if (!borrowType) {
         toast.error("กรุณาเลือกประเภทการยืม");
         return;
       }
-
-      // ✅ Admin ต้องเลือก Status ก่อนอนุมัติ
       if (action === "approve" && mode === "admin" && !transactionStatus) {
         toast.error("กรุณาเลือก Status ก่อนอนุมัติ");
         return;
       }
-
-      // ✅ Admin ต้องเลือกโกดังครบทุก Asset ก่อนอนุมัติ
       if (action === "approve" && mode === "admin") {
         const missingWarehouse = assets.some(a => !a.withdrawFor || a.withdrawFor.trim() === "");
         if (missingWarehouse) {
@@ -219,7 +239,6 @@ const FormBorrow = ({ mode = "user" }: { mode?: FormMode }) => {
       }
 
       if (action === "approve" && isEdit && editId) {
-        // ✅ บันทึกข้อมูลก่อน (รวมถึง withdrawFor ที่ Admin เลือก)
         const updatePayload = {
           documentType: "borrow", docCode: formData.docNumber, fullName: formData.fullName, company: formData.company, phone: formData.phone, note, status: "submitted",
           borrowType,
@@ -229,7 +248,6 @@ const FormBorrow = ({ mode = "user" }: { mode?: FormMode }) => {
         const updateRes = await fetch(`/api/document/update/${editId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(updatePayload) });
         const updateResult = await updateRes.json();
         if (!updateResult.success) throw new Error(updateResult.message);
-        // ✅ จากนั้นค่อยอนุมัติ
         const res = await fetch("/api/document/approve", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ documentId: parseInt(editId), otherActivity: otherActivity || null }) });
         const result = await res.json();
         if (!result.success) throw new Error(result.message);
@@ -281,7 +299,6 @@ const FormBorrow = ({ mode = "user" }: { mode?: FormMode }) => {
         </div>
       </div>
 
-      {/* ข้อมูลผู้ยืม */}
       <div className="glass-card p-4 sm:p-5">
         <div className="flex items-center gap-2 mb-4"><div className="icon-container blue !w-8 !h-8"><User className="w-4 h-4" /></div><h2 className="font-semibold text-foreground">ข้อมูลผู้ยืม</h2></div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -292,7 +309,6 @@ const FormBorrow = ({ mode = "user" }: { mode?: FormMode }) => {
         </div>
       </div>
 
-      {/* ✅ ประเภทการยืม */}
       <div className="glass-card p-4 sm:p-5">
         <div className="flex items-center gap-2 mb-4">
           <div className="icon-container purple !w-8 !h-8"><ClipboardList className="w-4 h-4" /></div>
@@ -321,7 +337,6 @@ const FormBorrow = ({ mode = "user" }: { mode?: FormMode }) => {
         </div>
       </div>
 
-      {/* ข้อมูล Shop */}
       <div className="glass-card p-4 sm:p-5">
         <div className="flex items-center gap-2 mb-4"><div className="icon-container green !w-8 !h-8"><Store className="w-4 h-4" /></div><h2 className="font-semibold text-foreground">ข้อมูล Shop</h2></div>
         <div className="space-y-4">
@@ -347,7 +362,6 @@ const FormBorrow = ({ mode = "user" }: { mode?: FormMode }) => {
         </div>
       </div>
 
-      {/* Asset */}
       <div className="glass-card p-4 sm:p-5">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2"><div className="icon-container orange !w-8 !h-8"><Package className="w-4 h-4" /></div><h2 className="font-semibold text-foreground">Asset</h2><span className="text-xs text-muted-foreground">({assets.length}/5)</span></div>
@@ -399,7 +413,6 @@ const FormBorrow = ({ mode = "user" }: { mode?: FormMode }) => {
         </div>
       </div>
 
-      {/* หมายเหตุ */}
       <div className="glass-card p-4 sm:p-5">
         <div className="flex items-center gap-2 mb-4"><div className="icon-container gray !w-8 !h-8"><FileText className="w-4 h-4" /></div><h2 className="font-semibold text-foreground">หมายเหตุ</h2></div>
         <Input placeholder="หมายเหตุเพิ่มเติม (ถ้ามี)" value={note} onChange={(e) => setNote(e.target.value)} className="glass-input" />
@@ -407,15 +420,13 @@ const FormBorrow = ({ mode = "user" }: { mode?: FormMode }) => {
 
       {mode === "admin" && <OtherActivitiesSelect value={otherActivity} onChange={setOtherActivity} />}
 
-      {/* Status - Admin only (บังคับเลือก) */}
       {mode === "admin" && <StatusSelect value={transactionStatus} onChange={setTransactionStatus} />}
 
-      {/* Action Buttons */}
       {!isReadOnly && (
         <div className="flex flex-col sm:flex-row justify-center gap-3 pt-4">
           {mode === "admin" ? (
             <>
-              <button disabled={isSubmitting} onClick={() => handleSubmit("approve")} className="gradient-button px-8 py-3 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50"><CheckCircle className="w-4 h-4" />{isSubmitting ? "กำลังดำเนินการ..." : "อนุมัติ"}</button>
+              <button disabled={isSubmitting} onClick={handleOpenPreview} className="gradient-button px-8 py-3 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50"><CheckCircle className="w-4 h-4" />{isSubmitting ? "กำลังดำเนินการ..." : "อนุมัติ"}</button>
               <button disabled={isSubmitting} onClick={() => handleSubmit("reject")} className="px-8 py-3 rounded-xl bg-red-500 text-white text-sm font-medium flex items-center justify-center gap-2 hover:bg-red-600 transition-colors disabled:opacity-50"><XCircle className="w-4 h-4" />ปฏิเสธ</button>
             </>
           ) : (
@@ -423,6 +434,39 @@ const FormBorrow = ({ mode = "user" }: { mode?: FormMode }) => {
           )}
         </div>
       )}
+
+      <PreviewApproveModal
+        isOpen={showPreviewModal}
+        onClose={() => setShowPreviewModal(false)}
+        onConfirm={handleConfirmApprove}
+        isSubmitting={isSubmitting}
+        documentType="borrow"
+        documentData={{
+          docCode: formData.docNumber,
+          fullName: formData.fullName,
+          company: formData.company,
+          phone: formData.phone,
+          note: note,
+          vendor: userVendor,
+        }}
+        shopInfo={{
+          shopCode: shopCode,
+          shopName: shopName,
+          startInstallDate: startInstallDate,
+          endInstallDate: endInstallDate,
+          q7b7: q7b7 || "",
+          shopFocus: shopFocus || "",
+        }}
+        assets={assets.filter(a => a.name && a.name.trim() !== "").map(a => ({
+          name: a.name,
+          size: a.size,
+          grade: "",
+          kv: a.kv,
+          qty: a.qty,
+          withdrawFor: a.withdrawFor,
+        }))}
+        securitySets={[]}
+      />
     </div>
   );
 };

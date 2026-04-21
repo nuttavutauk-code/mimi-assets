@@ -11,6 +11,7 @@ import { getMe } from "./loader";
 import { Plus, Trash2, User, Store, Package, FileText, Save, CheckCircle, XCircle, Loader2, ArrowLeftRight, Shield } from "lucide-react";
 import { toast } from "sonner";
 import OtherActivitiesSelect, { OtherActivity } from "@/components/ui/admin/OtherActivitiesSelect";
+import PreviewApproveModal from "@/components/ui/PreviewApproveModal";
 
 type ShopItem = { mcsCode: string; shopName: string };
 type AssetRow = { id: number; barcode: string; name: string; size: string; grade: string; qty: number };
@@ -36,6 +37,8 @@ const FormShopToShop = ({ mode = "user" }: { mode?: FormMode }) => {
   const [searchResults, setSearchResults] = useState<ShopItem[]>([]); const [showDropdown, setShowDropdown] = useState<"from" | "to" | null>(null);
   const [transferDate, setTransferDate] = useState(""); const [note, setNote] = useState(""); const [otherActivity, setOtherActivity] = useState<OtherActivity>("");
   const [barcodeResults, setBarcodeResults] = useState<{ barcode: string; assetName: string; size?: string }[]>([]); const [showBarcode, setShowBarcode] = useState<Record<number, boolean>>({});
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [userVendor, setUserVendor] = useState("");
 
   useEffect(() => { fetch("/api/vendor/list").then(r => r.json()).then(j => j.success && setVendors(j.vendors?.filter((v: string) => v.trim()) || [])); }, []);
 
@@ -47,6 +50,7 @@ const FormShopToShop = ({ mode = "user" }: { mode?: FormMode }) => {
         const doc = json.document;
         setDocStatus(doc.status || "");
         setFormData({ docNumber: doc.docCode, fullName: doc.fullName || "", company: doc.company || "", phone: doc.phone || "" });
+        setUserVendor(doc.createdBy?.vendor || "");
         if (doc.shops?.[0]) { setShopCodeFrom(doc.shops[0].shopCode || ""); setShopNameFrom(doc.shops[0].shopName || ""); if (doc.shops[0].startInstallDate) setTransferDate(new Date(doc.shops[0].startInstallDate).toISOString().split('T')[0]); if (doc.shops[0].assets?.length > 0) setAssets(doc.shops[0].assets.map((a: any, i: number) => ({ id: i + 1, barcode: a.barcode || "", name: a.name || "", size: a.size || "", grade: a.grade || "", qty: a.qty || 1 }))); }
         if (doc.shops?.[1]) { setShopCodeTo(doc.shops[1].shopCode || ""); setShopNameTo(doc.shops[1].shopName || ""); }
         setNote(doc.note || "");
@@ -55,7 +59,7 @@ const FormShopToShop = ({ mode = "user" }: { mode?: FormMode }) => {
     }).finally(() => setLoading(false));
   }, [editIdFromUrl, dataLoaded]);
 
-  useEffect(() => { if (dataLoaded || isEdit) return; getMe(data?.user?.email ?? '').then(me => { fetch("/api/document/generate").then(r => r.json()).then(json => { setFormData({ docNumber: json.docCode || "", fullName: `${me?.user?.firstName || ""} ${me?.user?.lastName || ""}`.trim() || "", company: me?.user?.company || "", phone: me?.user?.phone || "" }); }); }); }, [dataLoaded, isEdit]);
+  useEffect(() => { if (dataLoaded || isEdit) return; getMe(data?.user?.email ?? '').then(me => { fetch("/api/document/generate").then(r => r.json()).then(json => { setFormData({ docNumber: json.docCode || "", fullName: `${me?.user?.firstName || ""} ${me?.user?.lastName || ""}`.trim() || "", company: me?.user?.company || "", phone: me?.user?.phone || "" }); setUserVendor(me?.user?.vendor || ""); }); }); }, [dataLoaded, isEdit]);
 
   const searchShop = async (q: string) => { if (!q || q.length < 2) { setSearchResults([]); setShowDropdown(null); return; } const res = await fetch(`/api/shop/search?query=${encodeURIComponent(q)}&status=OPEN`); const json = await res.json(); const list = Array.isArray(json?.shops) ? json.shops : []; setSearchResults(list); if (list.length > 0) setShowDropdown; };
   const debouncedSearch = useMemo(() => debounce(searchShop, 300), []);
@@ -78,6 +82,22 @@ const FormShopToShop = ({ mode = "user" }: { mode?: FormMode }) => {
     setShowBarcode(p => ({ ...p, [rowId]: true })); 
   };
   const debouncedBarcode = useMemo(() => debounce(fetchBarcodes, 300), [shopCodeFrom]);
+
+  const handleOpenPreview = () => {
+    // Validation: Security Set กรอกได้สูงสุด 3 รายการ
+    const filledSecuritySets = securitySets.filter(s => s.qty > 0);
+    if (filledSecuritySets.length > 3) {
+      toast.error("Security Set กรอกได้สูงสุด 3 รายการเท่านั้น");
+      return;
+    }
+
+    setShowPreviewModal(true);
+  };
+
+  const handleConfirmApprove = async () => {
+    setShowPreviewModal(false);
+    await handleSubmit("approve");
+  };
 
   const handleSubmit = async (action: string) => {
     if (isSubmitting) return;
@@ -138,7 +158,53 @@ const FormShopToShop = ({ mode = "user" }: { mode?: FormMode }) => {
 
       {mode === "admin" && <OtherActivitiesSelect value={otherActivity} onChange={setOtherActivity} />}
 
-      {!isReadOnly && (<div className="flex flex-col sm:flex-row justify-center gap-3 pt-4">{mode === "admin" ? (<><button disabled={isSubmitting} onClick={() => handleSubmit("approve")} className="gradient-button px-8 py-3 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50"><CheckCircle className="w-4 h-4" />{isSubmitting ? "กำลังดำเนินการ..." : "อนุมัติ"}</button><button disabled={isSubmitting} onClick={() => handleSubmit("reject")} className="px-8 py-3 rounded-xl bg-red-500 text-white text-sm font-medium flex items-center justify-center gap-2 hover:bg-red-600 disabled:opacity-50"><XCircle className="w-4 h-4" />ปฏิเสธ</button></>) : (<button disabled={isSubmitting} onClick={() => handleSubmit("save")} className="gradient-button px-10 py-3 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50"><Save className="w-4 h-4" />{isSubmitting ? "กำลังบันทึก..." : (isEdit ? "บันทึกการแก้ไข" : "บันทึก")}</button>)}</div>)}
+      {!isReadOnly && (<div className="flex flex-col sm:flex-row justify-center gap-3 pt-4">{mode === "admin" ? (<><button disabled={isSubmitting} onClick={handleOpenPreview} className="gradient-button px-8 py-3 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50"><CheckCircle className="w-4 h-4" />{isSubmitting ? "กำลังดำเนินการ..." : "อนุมัติ"}</button><button disabled={isSubmitting} onClick={() => handleSubmit("reject")} className="px-8 py-3 rounded-xl bg-red-500 text-white text-sm font-medium flex items-center justify-center gap-2 hover:bg-red-600 disabled:opacity-50"><XCircle className="w-4 h-4" />ปฏิเสธ</button></>) : (<button disabled={isSubmitting} onClick={() => handleSubmit("save")} className="gradient-button px-10 py-3 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50"><Save className="w-4 h-4" />{isSubmitting ? "กำลังบันทึก..." : (isEdit ? "บันทึกการแก้ไข" : "บันทึก")}</button>)}</div>)}
+
+      <PreviewApproveModal
+        isOpen={showPreviewModal}
+        onClose={() => setShowPreviewModal(false)}
+        onConfirm={handleConfirmApprove}
+        isSubmitting={isSubmitting}
+        documentType="shoptoShop"
+        documentData={{
+          docCode: formData.docNumber,
+          fullName: formData.fullName,
+          company: formData.company,
+          phone: formData.phone,
+          note: note,
+          vendor: userVendor,
+        }}
+        shopInfo={{
+          shopCode: shopCodeFrom,
+          shopName: shopNameFrom,
+          startInstallDate: transferDate,
+          endInstallDate: "",
+          q7b7: "",
+          shopFocus: "",
+        }}
+        assets={assets.filter(a => a.barcode && a.barcode.trim() !== "").map(a => ({
+          name: a.name,
+          size: a.size,
+          grade: a.grade,
+          kv: "",
+          qty: a.qty,
+          withdrawFor: "",
+          barcode: a.barcode,
+        }))}
+        securitySets={securitySets.filter(s => s.qty > 0).map(s => ({
+          name: s.name,
+          qty: s.qty,
+          withdrawFor: s.withdrawFor,
+        }))}
+        shopFrom={{
+          shopCode: shopCodeFrom,
+          shopName: shopNameFrom,
+        }}
+        shopTo={{
+          shopCode: shopCodeTo,
+          shopName: shopNameTo,
+        }}
+      />
     </div>
   );
 };

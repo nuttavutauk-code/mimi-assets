@@ -12,6 +12,7 @@ import { useRouter, useParams } from "next/navigation";
 import { toast } from "sonner";
 import OtherActivitiesSelect, { OtherActivity } from "@/components/ui/admin/OtherActivitiesSelect";
 import StatusSelect, { StatusOption } from "@/components/ui/admin/StatusSelect";
+import PreviewApproveModal from "@/components/ui/PreviewApproveModal";
 
 type ShopItem = { mcsCode: string; shopName: string };
 type AssetRow = {
@@ -23,7 +24,6 @@ type AssetRow = {
   qty: number;
   withdrawFor: string;
   autoWarehouse?: boolean;
-  // ✅ Custom size fields for Lightbox / ACC WALL
   useCustomSize?: boolean;
   customW?: string;
   customD?: string;
@@ -34,7 +34,6 @@ type SecuritySet = { id: number; name: string; qty: number; withdrawFor: string 
 type FormMode = "user" | "admin";
 type SubmitAction = "save" | "approve" | "reject";
 
-// ✅ Helper: เช็คว่าเป็น Asset ที่ต้องกรอก custom size
 const isCustomSizeAsset = (name: string) => {
   const lowerName = name.toLowerCase().replace(/\s+/g, '');
   return lowerName.includes("lightbox") || lowerName.includes("accwall") || lowerName.includes("wallkv-low") || lowerName.includes("wallkv - low");
@@ -80,6 +79,8 @@ const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {
   const [sizeOptions, setSizeOptions] = useState<Record<number, string[]>>({});
   const [showAssetDropdown, setShowAssetDropdown] = useState<Record<number, boolean>>({});
   const abortRef = useRef<AbortController | null>(null);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [userVendor, setUserVendor] = useState("");
 
   useEffect(() => {
     const fetchVendors = async () => {
@@ -113,7 +114,6 @@ const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {
             setShopFocus(shop.shopFocus || "");
             if (shop.assets?.length > 0) {
               const loadedAssets = shop.assets.map((a: any, idx: number) => {
-                // ✅ Parse custom size if it matches pattern W*D*H(XX)
                 const sizeStr = a.size || "";
                 const customMatch = sizeStr.match(/^([^*]*)\*([^*]*)\*([^(]*)\(([^)]*)\)$/);
                 const isCustom = isCustomSizeAsset(a.name || "") && customMatch;
@@ -135,7 +135,6 @@ const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {
               });
               setAssets(loadedAssets);
               assetIdCounter.current = shop.assets.length + 1;
-              // ✅ โหลด size options สำหรับแต่ละ asset
               loadedAssets.forEach(async (asset: any) => {
                 if (asset.name) {
                   try {
@@ -155,6 +154,7 @@ const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {
           }
           setNote(doc.note || "");
           setTransactionStatus(doc.transactionStatus || "");
+          setUserVendor(doc.createdBy?.vendor || "");
         }
         setDataLoaded(true);
       } catch (err) { console.error("Error loading document:", err); toast.error("โหลดข้อมูลไม่สำเร็จ"); }
@@ -163,7 +163,6 @@ const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {
     loadExisting();
   }, [editIdFromUrl, dataLoaded]);
 
-  // ✅ Fixed: Load user data using session email
   useEffect(() => {
     if (isEdit || dataLoaded || !data?.user) return;
     const initForm = async () => {
@@ -179,13 +178,13 @@ const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {
           company: user?.company || "",
           phone: user?.phone || "",
         });
+        setUserVendor(user?.vendor || "");
       } catch (err) { console.error("Error init:", err); }
       finally { setLoading(false); }
     };
     initForm();
   }, [data, isEdit, dataLoaded]);
 
-  // ✅ Fixed: Shop search with correct API param "query"
   const fetchShops = useCallback(async (rawQuery: string) => {
     const query = rawQuery.trim();
     if (query.length < 2) { setSearchResults([]); setShowDropdown(false); return; }
@@ -204,7 +203,6 @@ const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {
 
   const debouncedSearch = useMemo(() => debounce(fetchShops, 300), [fetchShops]);
 
-  // ✅ Fixed: Asset search with correct API param "query"
   const fetchAssetNames = async (query: string, rowId: number) => {
     if (!query || query.trim().length < 2) { setAssetSearchResults([]); setShowAssetDropdown(p => ({ ...p, [rowId]: false })); return; }
     try {
@@ -226,11 +224,44 @@ const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {
     } catch (err) { console.error(err); }
   };
 
+  const handleOpenPreview = () => {
+    const filledSecuritySets = securitySets.filter(s => s.qty > 0);
+    if (filledSecuritySets.length > 3) {
+      toast.error("Security Set กรอกได้สูงสุด 3 รายการเท่านั้น");
+      return;
+    }
+
+    const filledAssets = assets.filter(a => a.name && a.name.trim() !== "");
+    if (filledAssets.length === 0 && filledSecuritySets.length === 0) {
+      toast.error("กรุณาเลือก Asset หรือ Security Set อย่างน้อย 1 รายการ");
+      return;
+    }
+
+    if (mode === "admin" && !transactionStatus) {
+      toast.error("กรุณาเลือก Status ก่อนอนุมัติ");
+      return;
+    }
+
+    if (mode === "admin") {
+      const missingWarehouse = filledAssets.some(a => !a.withdrawFor || a.withdrawFor.trim() === "");
+      if (missingWarehouse) {
+        toast.error("กรุณาเลือกโกดังให้ครบทุกรายการก่อนอนุมัติ");
+        return;
+      }
+    }
+
+    setShowPreviewModal(true);
+  };
+
+  const handleConfirmApprove = async () => {
+    setShowPreviewModal(false);
+    await handleSubmit("approve");
+  };
+
   const handleSubmit = async (action: SubmitAction) => {
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
-      // ✅ Validation: Security Set กรอกได้สูงสุด 3 รายการ
       const filledSecuritySets = securitySets.filter(s => s.qty > 0);
       if (filledSecuritySets.length > 3) {
         toast.error("Security Set กรอกได้สูงสุด 3 รายการเท่านั้น");
@@ -238,7 +269,6 @@ const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {
         return;
       }
 
-      // ✅ Validation: ต้องมี Asset หรือ Security Set อย่างน้อย 1 รายการ
       const filledAssets = assets.filter(a => a.name && a.name.trim() !== "");
       if (filledAssets.length === 0 && filledSecuritySets.length === 0) {
         toast.error("กรุณาเลือก Asset หรือ Security Set อย่างน้อย 1 รายการ");
@@ -246,14 +276,12 @@ const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {
         return;
       }
 
-      // ✅ Admin ต้องเลือก Status ก่อนอนุมัติ
       if (action === "approve" && mode === "admin" && !transactionStatus) {
         toast.error("กรุณาเลือก Status ก่อนอนุมัติ");
         setIsSubmitting(false);
         return;
       }
 
-      // ✅ Admin ต้องเลือกโกดังครบทุก Asset ก่อนอนุมัติ (เฉพาะ Asset ที่กรอกชื่อแล้ว)
       if (action === "approve" && mode === "admin") {
         const missingWarehouse = filledAssets.some(a => !a.withdrawFor || a.withdrawFor.trim() === "");
         if (missingWarehouse) {
@@ -264,7 +292,6 @@ const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {
       }
 
       if (action === "approve" && isEdit && editId) {
-        // ✅ บันทึกข้อมูลก่อน (รวมถึง withdrawFor ที่ Admin เลือก และ transactionStatus)
         const updatePayload = {
           documentType: "withdraw", docCode: formData.docNumber, fullName: formData.fullName, company: formData.company, phone: formData.phone, note, status: "submitted",
           transactionStatus: transactionStatus || null,
@@ -280,7 +307,6 @@ const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {
         const updateResult = await updateRes.json();
         if (!updateResult.success) throw new Error(updateResult.message);
 
-        // ✅ จากนั้นค่อยอนุมัติ
         const res = await fetch("/api/document/approve", {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ documentId: parseInt(editId), otherActivity: otherActivity || null }),
@@ -343,7 +369,6 @@ const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {
         </div>
       </div>
 
-      {/* ข้อมูลผู้เบิก */}
       <div className="glass-card p-4 sm:p-5">
         <div className="flex items-center gap-2 mb-4">
           <div className="icon-container blue !w-8 !h-8"><User className="w-4 h-4" /></div>
@@ -357,7 +382,6 @@ const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {
         </div>
       </div>
 
-      {/* ข้อมูล Shop */}
       <div className="glass-card p-4 sm:p-5">
         <div className="flex items-center gap-2 mb-4">
           <div className="icon-container green !w-8 !h-8"><Store className="w-4 h-4" /></div>
@@ -416,7 +440,6 @@ const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {
         </div>
       </div>
 
-      {/* Asset */}
       <div className="glass-card p-4 sm:p-5">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
@@ -461,7 +484,6 @@ const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {
                     value={asset.useCustomSize ? "ไม่มีsize" : asset.size}
                     onValueChange={(v) => {
                       if (v === "ไม่มีsize") {
-                        // Set flag and reset custom fields
                         setAssets(p => p.map(a => a.id === asset.id ? { ...a, size: "", useCustomSize: true, customW: "", customD: "", customH: "", customXX: "" } : a));
                       } else {
                         setAssets(p => p.map(a => a.id === asset.id ? { ...a, size: v, useCustomSize: false, customW: undefined, customD: undefined, customH: undefined, customXX: undefined } : a));
@@ -500,7 +522,6 @@ const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {
                 </div>
               </div>
 
-              {/* ✅ Custom Size Fields for Lightbox / ACC WALL - outside grid */}
               {asset.useCustomSize && isCustomSizeAsset(asset.name) && (
                 <div className="mt-3 p-3 rounded-lg bg-amber-50 border border-amber-200">
                   <label className="block text-xs text-amber-700 font-medium mb-2">กรอกขนาด (W*D*H(XX))</label>
@@ -587,7 +608,6 @@ const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {
         )}
       </div>
 
-      {/* Security Set */}
       <div className="glass-card p-4 sm:p-5">
         <div className="flex items-center gap-2 mb-4">
           <div className="icon-container purple !w-8 !h-8"><Shield className="w-4 h-4" /></div>
@@ -620,7 +640,6 @@ const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {
         </div>
       </div>
 
-      {/* หมายเหตุ */}
       <div className="glass-card p-4 sm:p-5">
         <div className="flex items-center gap-2 mb-4">
           <div className="icon-container gray !w-8 !h-8"><FileText className="w-4 h-4" /></div>
@@ -629,18 +648,15 @@ const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {
         <Input placeholder="หมายเหตุเพิ่มเติม (ถ้ามี)" value={note} onChange={(e) => setNote(e.target.value)} disabled={isReadOnly} className="glass-input" />
       </div>
 
-      {/* Other Activities - Admin only */}
       {mode === "admin" && <OtherActivitiesSelect value={otherActivity} onChange={setOtherActivity} />}
 
-      {/* Status - Admin only (บังคับเลือก) */}
       {mode === "admin" && <StatusSelect value={transactionStatus} onChange={setTransactionStatus} />}
 
-      {/* Action Buttons */}
       {!isReadOnly && (
         <div className="flex flex-col sm:flex-row justify-center gap-3 pt-4">
           {mode === "admin" ? (
             <>
-              <button disabled={isSubmitting} onClick={() => handleSubmit("approve")} className="gradient-button px-8 py-3 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50">
+              <button disabled={isSubmitting} onClick={handleOpenPreview} className="gradient-button px-8 py-3 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50">
                 <CheckCircle className="w-4 h-4" />{isSubmitting ? "กำลังดำเนินการ..." : "อนุมัติ"}
               </button>
               <button disabled={isSubmitting} onClick={() => handleSubmit("reject")} className="px-8 py-3 rounded-xl bg-red-500 text-white text-sm font-medium flex items-center justify-center gap-2 hover:bg-red-600 transition-colors disabled:opacity-50">
@@ -654,6 +670,43 @@ const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {
           )}
         </div>
       )}
+
+      <PreviewApproveModal
+        isOpen={showPreviewModal}
+        onClose={() => setShowPreviewModal(false)}
+        onConfirm={handleConfirmApprove}
+        isSubmitting={isSubmitting}
+        documentType="withdraw"
+        documentData={{
+          docCode: formData.docNumber,
+          fullName: formData.fullName,
+          company: formData.company,
+          phone: formData.phone,
+          note: note,
+          vendor: userVendor,
+        }}
+        shopInfo={{
+          shopCode: shopCode,
+          shopName: shopName,
+          startInstallDate: startInstallDate,
+          endInstallDate: endInstallDate,
+          q7b7: q7b7 || "",
+          shopFocus: shopFocus || "",
+        }}
+        assets={assets.filter(a => a.name && a.name.trim() !== "").map(a => ({
+          name: a.name,
+          size: a.size,
+          grade: a.grade || "",
+          kv: a.kv,
+          qty: a.qty,
+          withdrawFor: a.withdrawFor,
+        }))}
+        securitySets={securitySets.filter(s => s.qty > 0).map(s => ({
+          name: s.name,
+          qty: s.qty,
+          withdrawFor: s.withdrawFor,
+        }))}
+      />
     </div>
   );
 };

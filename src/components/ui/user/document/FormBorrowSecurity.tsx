@@ -12,6 +12,7 @@ import { Plus, Trash2, User, Store, Package, Shield, FileText, Save, CheckCircle
 import { toast } from "sonner";
 import OtherActivitiesSelect, { OtherActivity } from "@/components/ui/admin/OtherActivitiesSelect";
 import StatusSelect, { StatusOption } from "@/components/ui/admin/StatusSelect";
+import PreviewApproveModal from "@/components/ui/PreviewApproveModal";
 
 type ShopItem = { mcsCode: string; shopName: string };
 type AssetRow = {
@@ -21,7 +22,6 @@ type AssetRow = {
   kv: string;
   qty: number;
   withdrawFor: string;
-  // Custom size fields for Lightbox/ACC WALL
   useCustomSize?: boolean;
   customW?: string;
   customD?: string;
@@ -33,7 +33,6 @@ type FormMode = "user" | "admin";
 
 const BORROW_TYPE_OPTIONS = ["EVENT", "TEMP SHOP"];
 
-// Helper function to check if asset requires custom size
 const isCustomSizeAsset = (name: string) => {
   const lowerName = name.toLowerCase().replace(/\s+/g, '');
   return lowerName.includes("lightbox") || lowerName.includes("accwall") || lowerName.includes("wallkv-low") || lowerName.includes("wallkv - low");
@@ -50,7 +49,6 @@ const FormBorrowSecurity = ({ mode = "user" }: { mode?: FormMode }) => {
   const [docStatus, setDocStatus] = useState("");
   const assetIdCounter = useRef(1);
 
-  // Asset state
   const [assets, setAssets] = useState<AssetRow[]>([
     { id: assetIdCounter.current++, name: "", size: "", kv: "", qty: 1, withdrawFor: "" }
   ]);
@@ -58,7 +56,6 @@ const FormBorrowSecurity = ({ mode = "user" }: { mode?: FormMode }) => {
   const [sizeOptions, setSizeOptions] = useState<Record<number, string[]>>({});
   const [showAssetDropdown, setShowAssetDropdown] = useState<Record<number, boolean>>({});
 
-  // Security Set state
   const defaultSecuritySets: SecuritySet[] = [
     { id: 1, name: "CONTROLBOX 6 PORT (M-60000R) with power cable", qty: 0, withdrawFor: "" },
     { id: 2, name: "CONTROLBOX 5 PORT (M-60000R) with power cable", qty: 0, withdrawFor: "" },
@@ -85,15 +82,15 @@ const FormBorrowSecurity = ({ mode = "user" }: { mode?: FormMode }) => {
   const [vendors, setVendors] = useState<string[]>([]);
   const [borrowType, setBorrowType] = useState("");
   const abortRef = useRef<AbortController | null>(null);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [userVendor, setUserVendor] = useState("");
 
-  // Fetch vendors
   useEffect(() => {
     fetch("/api/vendor/list").then(r => r.json()).then(j => {
       if (j.success) setVendors(j.vendors?.filter((v: string) => v && v.trim() !== "" && v !== "-") || []);
     });
   }, []);
 
-  // Load existing document
   useEffect(() => {
     if (!editIdFromUrl || dataLoaded) return;
     setLoading(true);
@@ -111,7 +108,6 @@ const FormBorrowSecurity = ({ mode = "user" }: { mode?: FormMode }) => {
           setQ7b7(shop.q7b7 || "");
           setShopFocus(shop.shopFocus || "");
 
-          // Load assets
           if (shop.assets?.length > 0) {
             setAssets(shop.assets.map((a: any, idx: number) => ({
               id: idx + 1,
@@ -124,12 +120,10 @@ const FormBorrowSecurity = ({ mode = "user" }: { mode?: FormMode }) => {
             assetIdCounter.current = shop.assets.length + 1;
           }
 
-          // Load security sets
           if (shop.securitySets?.length > 0) {
             setSecuritySets(defaultSecuritySets.map(def => {
               const found = shop.securitySets.find((s: any) => s.name === def.name);
               if (found) {
-                // ✅ ถ้า qty > 0 และไม่มี withdrawFor → set default เป็น NEWLOOK
                 const defaultVendor = found.withdrawFor || (found.qty > 0 ? "NEWLOOK" : "");
                 return { ...def, qty: found.qty || 0, withdrawFor: defaultVendor };
               }
@@ -140,12 +134,12 @@ const FormBorrowSecurity = ({ mode = "user" }: { mode?: FormMode }) => {
         setNote(doc.note || "");
         setBorrowType(doc.borrowType || "");
         setTransactionStatus(doc.transactionStatus || "");
+        setUserVendor(doc.createdBy?.vendor || "");
       }
       setDataLoaded(true);
     }).finally(() => setLoading(false));
   }, [editIdFromUrl, dataLoaded]);
 
-  // Init new form
   useEffect(() => {
     if (dataLoaded || isEdit || !data?.user) return;
     getMe(data.user.email ?? '').then(me => {
@@ -156,11 +150,11 @@ const FormBorrowSecurity = ({ mode = "user" }: { mode?: FormMode }) => {
           company: me?.user?.company || "",
           phone: me?.user?.phone || "",
         });
+        setUserVendor(me?.user?.vendor || "");
       });
     });
   }, [dataLoaded, isEdit, data]);
 
-  // Shop search
   const fetchShops = useCallback(async (query: string) => {
     if (query.length < 2) { setSearchResults([]); setShowDropdown(false); return; }
     if (abortRef.current) abortRef.current.abort();
@@ -176,7 +170,6 @@ const FormBorrowSecurity = ({ mode = "user" }: { mode?: FormMode }) => {
 
   const debouncedShopSearch = useMemo(() => debounce(fetchShops, 300), [fetchShops]);
 
-  // Asset search
   const fetchAssetNames = async (query: string, rowId: number) => {
     if (!query || query.length < 2) { setAssetSearchResults([]); setShowAssetDropdown(p => ({ ...p, [rowId]: false })); return; }
     try {
@@ -190,7 +183,6 @@ const FormBorrowSecurity = ({ mode = "user" }: { mode?: FormMode }) => {
 
   const debouncedAssetSearch = useMemo(() => debounce(fetchAssetNames, 300), []);
 
-  // Fetch sizes by asset name
   const fetchSizesByAssetName = async (name: string, rowId: number) => {
     try {
       const res = await fetch(`/api/asset/sizes?name=${encodeURIComponent(name)}`);
@@ -199,7 +191,45 @@ const FormBorrowSecurity = ({ mode = "user" }: { mode?: FormMode }) => {
     } catch (err) { console.error(err); }
   };
 
-  // Submit
+  const handleOpenPreview = () => {
+    if (!borrowType) {
+      toast.error("กรุณาเลือกประเภทการยืม");
+      return;
+    }
+
+    const filledSecuritySets = securitySets.filter(s => s.qty > 0);
+    if (filledSecuritySets.length > 3) {
+      toast.error("Security Set กรอกได้สูงสุด 3 รายการเท่านั้น");
+      return;
+    }
+
+    const filledAssets = assets.filter(a => a.name && a.name.trim() !== "");
+    if (filledAssets.length === 0 && filledSecuritySets.length === 0) {
+      toast.error("กรุณาเลือก Asset หรือ Security Set อย่างน้อย 1 รายการ");
+      return;
+    }
+
+    if (mode === "admin" && !transactionStatus) {
+      toast.error("กรุณาเลือก Status ก่อนอนุมัติ");
+      return;
+    }
+
+    if (mode === "admin") {
+      const missingWarehouse = filledAssets.some(a => !a.withdrawFor || a.withdrawFor.trim() === "");
+      if (missingWarehouse) {
+        toast.error("กรุณาเลือกโกดังให้ครบทุกรายการก่อนอนุมัติ");
+        return;
+      }
+    }
+
+    setShowPreviewModal(true);
+  };
+
+  const handleConfirmApprove = async () => {
+    setShowPreviewModal(false);
+    await handleSubmit("approve");
+  };
+
   const handleSubmit = async (action: string) => {
     if (isSubmitting) return;
     setIsSubmitting(true);
@@ -210,7 +240,6 @@ const FormBorrowSecurity = ({ mode = "user" }: { mode?: FormMode }) => {
         return;
       }
 
-      // ✅ Validation: Security Set กรอกได้สูงสุด 3 รายการ
       const filledSecuritySets = securitySets.filter(s => s.qty > 0);
       if (filledSecuritySets.length > 3) {
         toast.error("Security Set กรอกได้สูงสุด 3 รายการเท่านั้น");
@@ -218,7 +247,6 @@ const FormBorrowSecurity = ({ mode = "user" }: { mode?: FormMode }) => {
         return;
       }
 
-      // ✅ Validation: ต้องมี Asset หรือ Security Set อย่างน้อย 1 รายการ
       const filledAssets = assets.filter(a => a.name && a.name.trim() !== "");
       if (filledAssets.length === 0 && filledSecuritySets.length === 0) {
         toast.error("กรุณาเลือก Asset หรือ Security Set อย่างน้อย 1 รายการ");
@@ -232,7 +260,6 @@ const FormBorrowSecurity = ({ mode = "user" }: { mode?: FormMode }) => {
         return;
       }
 
-      // ✅ Admin ต้องเลือกโกดังครบทุก Asset ก่อนอนุมัติ (เฉพาะ Asset ที่กรอกชื่อแล้ว)
       if (action === "approve" && mode === "admin") {
         const missingWarehouse = filledAssets.some(a => !a.withdrawFor || a.withdrawFor.trim() === "");
         if (missingWarehouse) {
@@ -334,7 +361,6 @@ const FormBorrowSecurity = ({ mode = "user" }: { mode?: FormMode }) => {
         </div>
       )}
 
-      {/* Header */}
       <div className="flex items-center gap-2">
         <div className="icon-container purple !w-10 !h-10"><KeyRound className="w-5 h-5" /></div>
         <div>
@@ -343,7 +369,6 @@ const FormBorrowSecurity = ({ mode = "user" }: { mode?: FormMode }) => {
         </div>
       </div>
 
-      {/* ข้อมูลผู้ยืม */}
       <div className="glass-card p-4 sm:p-5">
         <div className="flex items-center gap-2 mb-4">
           <div className="icon-container blue !w-8 !h-8"><User className="w-4 h-4" /></div>
@@ -357,7 +382,6 @@ const FormBorrowSecurity = ({ mode = "user" }: { mode?: FormMode }) => {
         </div>
       </div>
 
-      {/* ประเภทการยืม */}
       <div className="glass-card p-4 sm:p-5">
         <div className="flex items-center gap-2 mb-4">
           <div className="icon-container cyan !w-8 !h-8"><ClipboardList className="w-4 h-4" /></div>
@@ -378,7 +402,6 @@ const FormBorrowSecurity = ({ mode = "user" }: { mode?: FormMode }) => {
         </div>
       </div>
 
-      {/* ข้อมูล Shop */}
       <div className="glass-card p-4 sm:p-5">
         <div className="flex items-center gap-2 mb-4">
           <div className="icon-container green !w-8 !h-8"><Store className="w-4 h-4" /></div>
@@ -444,7 +467,6 @@ const FormBorrowSecurity = ({ mode = "user" }: { mode?: FormMode }) => {
         </div>
       </div>
 
-      {/* Asset Card */}
       <div className="glass-card p-4 sm:p-5">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
@@ -472,7 +494,6 @@ const FormBorrowSecurity = ({ mode = "user" }: { mode?: FormMode }) => {
           {assets.map((asset) => (
             <div key={asset.id} className="p-4 rounded-xl bg-black/2 border border-black/5">
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-                {/* Asset Name */}
                 <div className={`${mode === "admin" ? "sm:col-span-4" : "sm:col-span-4"} relative`}>
                   <label className="block text-xs text-muted-foreground mb-1">Asset Name <span className="text-red-500">*</span></label>
                   <Input
@@ -506,17 +527,14 @@ const FormBorrowSecurity = ({ mode = "user" }: { mode?: FormMode }) => {
                   )}
                 </div>
 
-                {/* Size */}
                 <div className={mode === "admin" ? "sm:col-span-2" : "sm:col-span-3"}>
                   <label className="block text-xs text-muted-foreground mb-1">Size</label>
                   <Select
                     value={asset.useCustomSize ? "ไม่มีsize" : asset.size}
                     onValueChange={(v) => {
                       if (v === "ไม่มีsize") {
-                        // เลือก "ไม่มี size" → แสดง custom size fields
                         setAssets(p => p.map(a => a.id === asset.id ? { ...a, size: "", useCustomSize: true, customW: "", customD: "", customH: "", customXX: "" } : a));
                       } else {
-                        // เลือก size ปกติ
                         setAssets(p => p.map(a => a.id === asset.id ? { ...a, size: v, useCustomSize: false, customW: "", customD: "", customH: "", customXX: "" } : a));
                       }
                     }}
@@ -529,7 +547,6 @@ const FormBorrowSecurity = ({ mode = "user" }: { mode?: FormMode }) => {
                   </Select>
                 </div>
 
-                {/* KV */}
                 <div className="sm:col-span-2">
                   <label className="block text-xs text-muted-foreground mb-1">KV</label>
                   <Input
@@ -541,7 +558,6 @@ const FormBorrowSecurity = ({ mode = "user" }: { mode?: FormMode }) => {
                   />
                 </div>
 
-                {/* Qty */}
                 <div className={mode === "admin" ? "sm:col-span-1" : "sm:col-span-2"}>
                   <label className="block text-xs text-muted-foreground mb-1">จำนวน</label>
                   <Input
@@ -554,7 +570,6 @@ const FormBorrowSecurity = ({ mode = "user" }: { mode?: FormMode }) => {
                   />
                 </div>
 
-                {/* Vendor (admin only) */}
                 {mode === "admin" && (
                   <div className="sm:col-span-2">
                     <label className="block text-xs text-muted-foreground mb-1">โกดัง</label>
@@ -565,7 +580,6 @@ const FormBorrowSecurity = ({ mode = "user" }: { mode?: FormMode }) => {
                   </div>
                 )}
 
-                {/* Delete button */}
                 {!isReadOnly && (
                   <div className="flex items-end">
                     <button onClick={() => setAssets(p => p.filter(a => a.id !== asset.id))} className="p-2 rounded-lg bg-red-50 text-red-500 hover:bg-red-100">
@@ -575,7 +589,6 @@ const FormBorrowSecurity = ({ mode = "user" }: { mode?: FormMode }) => {
                 )}
               </div>
 
-              {/* Custom Size - แสดงเมื่อเลือก "ไม่มี size" */}
               {asset.useCustomSize && (
                 <div className="mt-3 p-3 rounded-lg bg-amber-50 border border-amber-200">
                   <p className="text-xs text-amber-700 mb-2">กรอกขนาด Custom สำหรับ {asset.name}:</p>
@@ -668,7 +681,6 @@ const FormBorrowSecurity = ({ mode = "user" }: { mode?: FormMode }) => {
         )}
       </div>
 
-      {/* Security Set */}
       <div className="glass-card p-4 sm:p-5">
         <div className="flex items-center gap-2 mb-4">
           <div className="icon-container red !w-8 !h-8"><Shield className="w-4 h-4" /></div>
@@ -714,7 +726,6 @@ const FormBorrowSecurity = ({ mode = "user" }: { mode?: FormMode }) => {
         </div>
       </div>
 
-      {/* หมายเหตุ */}
       <div className="glass-card p-4 sm:p-5">
         <div className="flex items-center gap-2 mb-4">
           <div className="icon-container gray !w-8 !h-8"><FileText className="w-4 h-4" /></div>
@@ -723,16 +734,14 @@ const FormBorrowSecurity = ({ mode = "user" }: { mode?: FormMode }) => {
         <Input placeholder="หมายเหตุ (ถ้ามี)" value={note} onChange={(e) => setNote(e.target.value)} className="glass-input" disabled={isReadOnly} />
       </div>
 
-      {/* Admin Controls */}
       {mode === "admin" && <OtherActivitiesSelect value={otherActivity} onChange={setOtherActivity} />}
       {mode === "admin" && <StatusSelect value={transactionStatus} onChange={setTransactionStatus} />}
 
-      {/* Buttons */}
       {!isReadOnly && (
         <div className="flex flex-col sm:flex-row justify-center gap-3 pt-4">
           {mode === "admin" ? (
             <>
-              <button disabled={isSubmitting} onClick={() => handleSubmit("approve")} className="gradient-button px-8 py-3 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50">
+              <button disabled={isSubmitting} onClick={handleOpenPreview} className="gradient-button px-8 py-3 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50">
                 <CheckCircle className="w-4 h-4" />{isSubmitting ? "กำลังดำเนินการ..." : "อนุมัติ"}
               </button>
               <button disabled={isSubmitting} onClick={() => handleSubmit("reject")} className="px-8 py-3 rounded-xl bg-red-500 text-white text-sm font-medium flex items-center justify-center gap-2 hover:bg-red-600 disabled:opacity-50">
@@ -746,6 +755,43 @@ const FormBorrowSecurity = ({ mode = "user" }: { mode?: FormMode }) => {
           )}
         </div>
       )}
+
+      <PreviewApproveModal
+        isOpen={showPreviewModal}
+        onClose={() => setShowPreviewModal(false)}
+        onConfirm={handleConfirmApprove}
+        isSubmitting={isSubmitting}
+        documentType="borrowsecurity"
+        documentData={{
+          docCode: formData.docNumber,
+          fullName: formData.fullName,
+          company: formData.company,
+          phone: formData.phone,
+          note: note,
+          vendor: userVendor,
+        }}
+        shopInfo={{
+          shopCode: shopCode,
+          shopName: shopName,
+          startInstallDate: startDate,
+          endInstallDate: endDate,
+          q7b7: q7b7 || "",
+          shopFocus: shopFocus || "",
+        }}
+        assets={assets.filter(a => a.name && a.name.trim() !== "").map(a => ({
+          name: a.name,
+          size: a.size,
+          grade: "",
+          kv: a.kv,
+          qty: a.qty,
+          withdrawFor: a.withdrawFor,
+        }))}
+        securitySets={securitySets.filter(s => s.qty > 0).map(s => ({
+          name: s.name,
+          qty: s.qty,
+          withdrawFor: s.withdrawFor,
+        }))}
+      />
     </div>
   );
 };

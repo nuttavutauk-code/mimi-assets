@@ -13,6 +13,7 @@ import { Plus, Trash2, User, Store, Package, FileText, Save, CheckCircle, XCircl
 import { toast } from "sonner";
 import OtherActivitiesSelect, { OtherActivity } from "@/components/ui/admin/OtherActivitiesSelect";
 import StatusSelect, { StatusOption } from "@/components/ui/admin/StatusSelect";
+import PreviewApproveModal from "@/components/ui/PreviewApproveModal";
 
 type ShopItem = { mcsCode: string; shopName: string };
 type AssetRow = {
@@ -27,7 +28,7 @@ type AssetRow = {
   customD?: string;
   customH?: string;
   customXX?: string;
-  isSelected?: boolean; // ✅ เพิ่ม: true = เลือกจาก Dropdown แล้ว (Read-Only)
+  isSelected?: boolean;
 };
 
 const isCustomSizeAsset = (name: string) => {
@@ -75,6 +76,8 @@ const FormOther = ({ mode = "user" }: { mode?: FormMode }) => {
   const [assetSearchResults, setAssetSearchResults] = useState<string[]>([]);
   const [sizeOptions, setSizeOptions] = useState<Record<number, string[]>>({});
   const [showAssetDropdown, setShowAssetDropdown] = useState<Record<number, boolean>>({});
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [userVendor, setUserVendor] = useState("");
 
   useEffect(() => { fetch("/api/vendor/list").then(r => r.json()).then(j => j.success && setVendors(j.vendors?.filter((v: string) => v.trim()) || [])); }, []);
 
@@ -96,7 +99,6 @@ const FormOther = ({ mode = "user" }: { mode?: FormMode }) => {
           if (shop.assets?.length > 0) {
             const loadedAssets = shop.assets.map((a: any, idx: number) => ({ id: idx + 1, name: a.name || "", size: a.size || "", grade: a.grade || "", qty: a.qty || 1, withdrawFor: a.withdrawFor || "", isSelected: !!(a.name) }));
             setAssets(loadedAssets);
-            // ✅ โหลด size options สำหรับแต่ละ asset
             loadedAssets.forEach(async (asset: any) => {
               if (asset.name) {
                 try {
@@ -110,6 +112,7 @@ const FormOther = ({ mode = "user" }: { mode?: FormMode }) => {
           if (shop.securitySets?.length > 0) setSecuritySets(defaultSecuritySets.map(def => { const found = shop.securitySets.find((s: any) => s.name === def.name); return found ? { ...def, qty: found.qty || 0, withdrawFor: found.withdrawFor || "" } : def; }));
         }
         setNote(doc.note || "");
+        setUserVendor(doc.createdBy?.vendor || "");
       }
       setDataLoaded(true);
     }).finally(() => setLoading(false));
@@ -120,6 +123,7 @@ const FormOther = ({ mode = "user" }: { mode?: FormMode }) => {
     getMe(data?.user?.email ?? '').then(me => {
       fetch("/api/document/generate").then(r => r.json()).then(json => {
         setFormData({ docNumber: json.docCode || "", fullName: `${me?.user?.firstName || ""} ${me?.user?.lastName || ""}`.trim() || "", company: me?.user?.company || "", phone: me?.user?.phone || "" });
+        setUserVendor(me?.user?.vendor || "");
       });
     });
   }, [dataLoaded, isEdit]);
@@ -143,18 +147,52 @@ const FormOther = ({ mode = "user" }: { mode?: FormMode }) => {
     setSizeOptions(p => ({ ...p, [rowId]: json.sizes || [] }));
   };
 
+  const handleOpenPreview = () => {
+    if (!startDate) {
+      toast.error("กรุณาเลือกวันที่โอนย้าย");
+      return;
+    }
+
+    const hasAsset = assets.some(a => a.name.trim());
+    const hasSecuritySet = securitySets.some(s => s.qty > 0);
+    if (!hasAsset && !hasSecuritySet) {
+      toast.error("กรุณาเพิ่ม Asset หรือ Security Set อย่างน้อย 1 รายการ");
+      return;
+    }
+
+    const filledSecuritySets = securitySets.filter(s => s.qty > 0);
+    if (filledSecuritySets.length > 3) {
+      toast.error("Security Set กรอกได้สูงสุด 3 รายการเท่านั้น");
+      return;
+    }
+
+    if (mode === "admin") {
+      const missingAssetWarehouse = assets.filter(a => a.name.trim()).some(a => !a.withdrawFor || a.withdrawFor.trim() === "");
+      const missingSecurityWarehouse = securitySets.filter(s => s.qty > 0).some(s => !s.withdrawFor || s.withdrawFor.trim() === "");
+      if (missingAssetWarehouse || missingSecurityWarehouse) {
+        toast.error("กรุณาเลือกโกดังให้ครบทุกรายการก่อนอนุมัติ");
+        return;
+      }
+    }
+
+    setShowPreviewModal(true);
+  };
+
+  const handleConfirmApprove = async () => {
+    setShowPreviewModal(false);
+    await handleSubmit("approve");
+  };
+
   const handleSubmit = async (action: string) => {
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
-      // ✅ Validation: ต้องเลือกวันที่โอนย้าย
       if (!startDate) {
         toast.error("กรุณาเลือกวันที่โอนย้าย");
         setIsSubmitting(false);
         return;
       }
 
-      // ✅ Validation: ต้องมี Asset หรือ Security Set อย่างน้อย 1 รายการ
       const hasAsset = assets.some(a => a.name.trim());
       const hasSecuritySet = securitySets.some(s => s.qty > 0);
       if (!hasAsset && !hasSecuritySet) {
@@ -163,7 +201,6 @@ const FormOther = ({ mode = "user" }: { mode?: FormMode }) => {
         return;
       }
 
-      // ✅ Validation: Security Set กรอกได้สูงสุด 3 รายการ
       const filledSecuritySets = securitySets.filter(s => s.qty > 0);
       if (filledSecuritySets.length > 3) {
         toast.error("Security Set กรอกได้สูงสุด 3 รายการเท่านั้น");
@@ -171,7 +208,6 @@ const FormOther = ({ mode = "user" }: { mode?: FormMode }) => {
         return;
       }
 
-      // ✅ Admin ต้องเลือกโกดังครบทุก Asset ก่อนอนุมัติ
       if (action === "approve" && mode === "admin") {
         const missingAssetWarehouse = assets.filter(a => a.name.trim()).some(a => !a.withdrawFor || a.withdrawFor.trim() === "");
         const missingSecurityWarehouse = securitySets.filter(s => s.qty > 0).some(s => !s.withdrawFor || s.withdrawFor.trim() === "");
@@ -183,12 +219,10 @@ const FormOther = ({ mode = "user" }: { mode?: FormMode }) => {
       }
 
       if (action === "approve" && editId) {
-        // ✅ บันทึกข้อมูลก่อน (รวมถึง withdrawFor ที่ Admin เลือก)
         const updatePayload = { documentType: "other", docCode: formData.docNumber, fullName: formData.fullName, company: formData.company, phone: formData.phone, note, status: "submitted", shops: [{ shopCode, shopName, startInstallDate: startDate, endInstallDate: endDate, q7b7, shopFocus, assets: assets.map(a => ({ name: a.name, size: a.size, grade: a.grade, qty: a.qty, withdrawFor: a.withdrawFor })), securitySets: securitySets.filter(s => s.qty > 0).map(s => ({ name: s.name, qty: s.qty, withdrawFor: s.withdrawFor })) }] };
         const updateRes = await fetch(`/api/document/update/${editId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(updatePayload) });
         const updateR = await updateRes.json();
         if (!updateR.success) throw new Error(updateR.message);
-        // ✅ จากนั้นค่อยอนุมัติ
         const res = await fetch("/api/document/approve", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ documentId: parseInt(editId), otherActivity }) }); const r = await res.json(); if (!r.success) throw new Error(r.message); toast.success("อนุมัติสำเร็จ!"); router.push("/dashboard/admin-list"); return;
       }
       if (action === "reject" && editId) {
@@ -303,18 +337,54 @@ const FormOther = ({ mode = "user" }: { mode?: FormMode }) => {
 
       {mode === "admin" && <OtherActivitiesSelect value={otherActivity} onChange={setOtherActivity} />}
 
-      {/* Status - Admin only (บังคับเลือก) */}
       {mode === "admin" && <StatusSelect value={transactionStatus} onChange={setTransactionStatus} />}
 
       {!isReadOnly && (
         <div className="flex flex-col sm:flex-row justify-center gap-3 pt-4">
           {mode === "admin" ? (
-            <><button disabled={isSubmitting} onClick={() => handleSubmit("approve")} className="gradient-button px-8 py-3 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50"><CheckCircle className="w-4 h-4" />{isSubmitting ? "กำลังดำเนินการ..." : "อนุมัติ"}</button><button disabled={isSubmitting} onClick={() => handleSubmit("reject")} className="px-8 py-3 rounded-xl bg-red-500 text-white text-sm font-medium flex items-center justify-center gap-2 hover:bg-red-600 disabled:opacity-50"><XCircle className="w-4 h-4" />ปฏิเสธ</button></>
+            <><button disabled={isSubmitting} onClick={handleOpenPreview} className="gradient-button px-8 py-3 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50"><CheckCircle className="w-4 h-4" />{isSubmitting ? "กำลังดำเนินการ..." : "อนุมัติ"}</button><button disabled={isSubmitting} onClick={() => handleSubmit("reject")} className="px-8 py-3 rounded-xl bg-red-500 text-white text-sm font-medium flex items-center justify-center gap-2 hover:bg-red-600 disabled:opacity-50"><XCircle className="w-4 h-4" />ปฏิเสธ</button></>
           ) : (
             <button disabled={isSubmitting} onClick={() => handleSubmit("save")} className="gradient-button px-10 py-3 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50"><Save className="w-4 h-4" />{isSubmitting ? "กำลังบันทึก..." : (isEdit ? "บันทึกการแก้ไข" : "บันทึก")}</button>
           )}
         </div>
       )}
+
+      <PreviewApproveModal
+        isOpen={showPreviewModal}
+        onClose={() => setShowPreviewModal(false)}
+        onConfirm={handleConfirmApprove}
+        isSubmitting={isSubmitting}
+        documentType="other"
+        documentData={{
+          docCode: formData.docNumber,
+          fullName: formData.fullName,
+          company: formData.company,
+          phone: formData.phone,
+          note: note,
+          vendor: userVendor,
+        }}
+        shopInfo={{
+          shopCode: shopCode,
+          shopName: shopName,
+          startInstallDate: startDate,
+          endInstallDate: endDate,
+          q7b7: q7b7 || "",
+          shopFocus: shopFocus || "",
+        }}
+        assets={assets.filter(a => a.name && a.name.trim() !== "").map(a => ({
+          name: a.name,
+          size: a.size,
+          grade: a.grade || "",
+          kv: "",
+          qty: a.qty,
+          withdrawFor: a.withdrawFor,
+        }))}
+        securitySets={securitySets.filter(s => s.qty > 0).map(s => ({
+          name: s.name,
+          qty: s.qty,
+          withdrawFor: s.withdrawFor,
+        }))}
+      />
     </div>
   );
 };
