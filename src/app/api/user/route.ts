@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import { writeAuditLog, AuditAction, getSessionUser } from "@/lib/audit-log";
 
 // ===== Helper: ตรวจสอบ Admin =====
 async function checkAdminAuth() {
@@ -140,6 +141,9 @@ export async function POST(req: Request) {
     });
 
     const { password, ...result } = newUser;
+    const session = await getServerSession(authOptions);
+    const { userId, username, userRole } = getSessionUser(session ?? {});
+    await writeAuditLog({ userId, username, userRole, action: AuditAction.USER_CREATE, entity: "User", entityId: String(newUser.id), detail: { targetUsername: newUser.username, role: newUser.role }, req });
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
     console.error("[CREATE USER ERROR]", error);
@@ -186,6 +190,9 @@ export async function PUT(req: Request) {
     });
 
     const { password, ...result } = updatedUser;
+    const session = await getServerSession(authOptions);
+    const { userId, username, userRole } = getSessionUser(session ?? {});
+    await writeAuditLog({ userId, username, userRole, action: AuditAction.USER_UPDATE, entity: "User", entityId: id, detail: { targetUsername: updatedUser.username }, req });
     return NextResponse.json(result);
   } catch (error) {
     console.error("[UPDATE USER ERROR]", error);
@@ -212,6 +219,9 @@ export async function DELETE(req: Request) {
     }
 
     await prisma.user.delete({ where: { id: Number(id) } });
+    const session = await getServerSession(authOptions);
+    const { userId, username, userRole } = getSessionUser(session ?? {});
+    await writeAuditLog({ userId, username, userRole, action: AuditAction.USER_DELETE, entity: "User", entityId: id!, detail: { targetId: id }, req });
     return NextResponse.json({ message: "User deleted successfully" });
   } catch (error) {
     console.error("[DELETE USER ERROR]", error);

@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { writeAuditLog, AuditAction, getSessionUser } from "@/lib/audit-log";
 
 export async function POST(req: NextRequest) {
     try {
@@ -47,7 +48,8 @@ export async function POST(req: NextRequest) {
             },
         });
 
-        console.log(`✅ Task ${taskId} cancelled by user ${session.user.email}`);
+        const { userId, username, userRole } = getSessionUser(session);
+        await writeAuditLog({ userId, username, userRole, action: AuditAction.PICK_TASK_CANCEL, entity: "PickAssetTask", entityId: String(taskId), detail: { taskId, assetName: task.assetName, documentId: task.documentId }, req });
 
         return NextResponse.json({
             success: true,

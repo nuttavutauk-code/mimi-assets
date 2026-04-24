@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { writeAuditLog, AuditAction, getSessionUser } from "@/lib/audit-log";
 
 // ✅ ฟังก์ชันคำนวณ Week Number
 function getWeekNumber(date: Date): string {
@@ -196,6 +197,9 @@ export async function POST(req: NextRequest) {
                 }
             }
         }
+
+        const { userId: auditUserId, username: auditUsername, userRole: auditUserRole } = getSessionUser(session);
+        await writeAuditLog({ userId: auditUserId, username: auditUsername, userRole: auditUserRole, action: AuditAction.TRANSFER_RECEIVE_COMPLETE, entity: "TransferReceiveTask", entityId: String(documentId), detail: { documentId, receivedCount, rejectedCount, transactionsCreated }, req });
 
         return NextResponse.json({
             success: true,

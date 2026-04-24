@@ -2,6 +2,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import type { NextAuthOptions } from "next-auth";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import { writeAuditLog, AuditAction } from "@/lib/audit-log";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -70,4 +71,17 @@ export const authOptions: NextAuthOptions = {
   },
   pages: { signIn: "/login", error: '/' },
   secret: process.env.NEXTAUTH_SECRET,
+  events: {
+    async signIn({ user }) {
+      await writeAuditLog({
+        userId: user.id ? parseInt(user.id) : null,
+        username: (user as any).username || user.name || null,
+        userRole: (user as any).role || null,
+        action: AuditAction.USER_LOGIN,
+        entity: "User",
+        entityId: user.id || null,
+        detail: { email: user.email },
+      });
+    },
+  },
 };

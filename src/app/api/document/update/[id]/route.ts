@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { writeAuditLog, AuditAction, getSessionUser } from "@/lib/audit-log";
 
 // ✅ Next.js 15: params เป็น Promise
 export async function PUT(
@@ -188,6 +189,9 @@ export async function PUT(
 
             console.log("✅ Pick Asset Tasks created successfully");
         }
+
+        const { userId, username, userRole } = getSessionUser(session);
+        await writeAuditLog({ userId, username, userRole, action: AuditAction.DOCUMENT_UPDATE, entity: "Document", entityId: String(documentId), detail: { docCode: updatedDocument.docCode, documentType: updatedDocument.documentType, status: updatedDocument.status }, req });
 
         return NextResponse.json({
             success: true,

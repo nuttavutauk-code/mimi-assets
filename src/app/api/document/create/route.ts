@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { writeAuditLog, AuditAction, getSessionUser } from "@/lib/audit-log";
 
-export async function POST(req: Request) {
+export async function POST(req: Request): Promise<Response> {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
@@ -89,6 +90,18 @@ export async function POST(req: Request) {
           },
         },
       },
+    });
+
+    const { userId, username, userRole } = getSessionUser(session);
+    await writeAuditLog({
+      userId,
+      username,
+      userRole,
+      action: status === "submitted" ? AuditAction.DOCUMENT_SUBMIT : AuditAction.DOCUMENT_CREATE,
+      entity: "Document",
+      entityId: String(document.id),
+      detail: { docCode: document.docCode, documentType: document.documentType, status: document.status },
+      req,
     });
 
     return NextResponse.json({ success: true, document });

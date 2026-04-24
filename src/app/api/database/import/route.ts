@@ -1,13 +1,10 @@
 // app/api/database/import/route.ts
-// API สำหรับ Import ข้อมูลเก่าเข้า AssetTransactionHistory
-// ใช้ Document กลาง "IMPORT-LEGACY" เป็น reference
-// พร้อม Validation และสร้าง Asset อัตโนมัติ
-
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import * as XLSX from "xlsx";
+import { writeAuditLog, AuditAction, getSessionUser } from "@/lib/audit-log";
 
 // Helper: แปลงวันที่จาก Excel
 const parseDate = (value: any): Date | null => {
@@ -307,7 +304,8 @@ export async function POST(req: Request) {
       }
     }
 
-    console.log(`✅ Import completed: ${insertedTransactions} transactions, ${insertedAssets} assets created, ${skippedAssets} assets skipped`);
+    const { userId: auditUserId, username: auditUsername, userRole: auditUserRole } = getSessionUser(session);
+    await writeAuditLog({ userId: auditUserId, username: auditUsername, userRole: auditUserRole, action: AuditAction.DATABASE_IMPORT, entity: "AssetTransactionHistory", detail: { insertedTransactions, insertedAssets, skippedAssets }, req });
 
     return NextResponse.json({
       success: true,

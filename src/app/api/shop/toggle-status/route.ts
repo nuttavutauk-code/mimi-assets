@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth-helpers";
+import { writeAuditLog, AuditAction, getSessionUser } from "@/lib/audit-log";
 
 /**
  * 📦 PATCH /api/shop/toggle-status
@@ -11,6 +12,7 @@ export async function PATCH(req: Request) {
     // เช็ค Authentication (Admin only)
     const auth = await requireAdmin();
     if (auth.response) return auth.response;
+    const { userId, username, userRole } = getSessionUser(auth.session);
 
 
         const body = await req.json();
@@ -45,6 +47,7 @@ export async function PATCH(req: Request) {
             data: { status: newStatus },
         });
 
+        await writeAuditLog({ userId, username, userRole, action: AuditAction.SHOP_TOGGLE_STATUS, entity: "Shop", entityId: mcsCode, detail: { mcsCode, oldStatus: currentStatus || null, newStatus }, req });
         return NextResponse.json({
             success: true,
             message: `เปลี่ยนสถานะเป็น ${newStatus} สำเร็จ`,

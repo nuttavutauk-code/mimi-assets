@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { writeAuditLog, AuditAction, getSessionUser } from "@/lib/audit-log";
 
 // ประเภทเอกสารที่ต้องผ่าน Pick Asset (1-8) - ขาออกอย่างเดียว
 const NEEDS_PICK_ASSET_TYPES = [
@@ -697,6 +698,9 @@ export async function POST(req: NextRequest) {
         // 7. ตรวจสอบประเภทเอกสาร
         const isDirectTransaction = DIRECT_TRANSACTION_TYPES.includes(document.documentType);
 
+        const { userId, username, userRole } = getSessionUser(session);
+        const auditDetail = { docCode: document.docCode, documentType: document.documentType, otherActivity: otherActivity || null };
+
         if (isDirectTransaction) {
             // กรณี returnasset หรือ shoptoshop: บันทึกลง AssetTransactionHistory ทันที
             const result = await createDirectTransactions(documentId);
@@ -709,6 +713,7 @@ export async function POST(req: NextRequest) {
                 message += ` Warning: ${result.notFound.length} barcodes not found.`;
             }
 
+            await writeAuditLog({ userId, username, userRole, action: AuditAction.DOCUMENT_APPROVE, entity: "Document", entityId: String(documentId), detail: { ...auditDetail, transactionsCreated: result.created }, req });
             return NextResponse.json({
                 success: true,
                 message,
@@ -727,6 +732,7 @@ export async function POST(req: NextRequest) {
             // กรณีที่ 1: ต้องผ่าน Picker (ลำดับ 1-8)
             const tasksCreated = await createPickAssetTasks(documentId);
 
+            await writeAuditLog({ userId, username, userRole, action: AuditAction.DOCUMENT_APPROVE, entity: "Document", entityId: String(documentId), detail: { ...auditDetail, tasksCreated }, req });
             return NextResponse.json({
                 success: true,
                 message: `Document approved successfully. Created ${tasksCreated} pick tasks.`,
@@ -735,6 +741,7 @@ export async function POST(req: NextRequest) {
             });
         } else {
             // กรณีที่ 2: ไม่ต้องผ่าน Picker และไม่ใช่ Direct Transaction
+            await writeAuditLog({ userId, username, userRole, action: AuditAction.DOCUMENT_APPROVE, entity: "Document", entityId: String(documentId), detail: auditDetail, req });
             return NextResponse.json({
                 success: true,
                 message: "Document approved successfully.",

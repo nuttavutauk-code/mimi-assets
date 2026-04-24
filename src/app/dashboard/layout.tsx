@@ -37,8 +37,9 @@ import {
     LogOut,
     ChevronDown,
     LayoutDashboard,
-    Eye, // ✅ เพิ่ม icon สำหรับ View
-    Truck, // ✅ เพิ่ม icon สำหรับ รับของโอนย้าย
+    Eye,
+    Truck,
+    ScrollText,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 
@@ -86,6 +87,7 @@ const ADMIN_MENU = [
             { href: "/dashboard/admin-library-sis", label: "Library SIS", icon: Library },
         ],
     },
+    { href: "/dashboard/admin-audit-log", label: "Audit Log", icon: ScrollText },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {

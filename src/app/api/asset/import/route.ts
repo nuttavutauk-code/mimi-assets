@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import * as XLSX from "xlsx";
+import { writeAuditLog, AuditAction, getSessionUser } from "@/lib/audit-log";
 
 // ✅ ขนาด Batch (ปรับได้ตามความเหมาะสม)
 const BATCH_SIZE = 500;
@@ -385,7 +386,8 @@ export async function POST(req: Request) {
       message += ` | ⚠️ Warehouse ไม่ตรงกับ Vendor: ${invalidWarehouse.join(", ")}`;
     }
 
-    console.log(`🎉 Import completed: ${message}`);
+    const { userId, username, userRole } = getSessionUser(session);
+    await writeAuditLog({ userId, username, userRole, action: AuditAction.ASSET_IMPORT_NEW, entity: "Asset", detail: { assetCount, transactionCount, securityTransactionCount, skipped }, req });
 
     return NextResponse.json({
       success: true,

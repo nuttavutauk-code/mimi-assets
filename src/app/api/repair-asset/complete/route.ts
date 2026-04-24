@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { writeAuditLog, AuditAction, getSessionUser } from "@/lib/audit-log";
 
 // ✅ ฟังก์ชันคำนวณ Week Number (ตามสูตร Excel: WEEKNUM(date, 15) = ISO Week เริ่มวันจันทร์)
 // Output Format: "2025 WK 11"
@@ -122,6 +123,9 @@ export async function POST(req: NextRequest) {
                 completedBy: repairer?.id,
             },
         });
+
+        const { userId, username, userRole } = getSessionUser(session);
+        await writeAuditLog({ userId, username, userRole, action: AuditAction.REPAIR_TASK_COMPLETE, entity: "RepairTask", entityId: String(taskId), detail: { taskId, barcode: task.barcode, assetName: task.assetName, repairWarehouse: task.repairWarehouse }, req });
 
         return NextResponse.json({
             success: true,

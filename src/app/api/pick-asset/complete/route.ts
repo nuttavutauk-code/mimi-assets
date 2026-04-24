@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { writeAuditLog, AuditAction, getSessionUser } from "@/lib/audit-log";
 
 // ✅ ฟังก์ชันคำนวณ Week Number (ตามสูตร Excel: WEEKNUM(date, 15) = ISO Week เริ่มวันจันทร์)
 // Output Format: "2025 WK 11"
@@ -504,6 +505,9 @@ export async function POST(req: NextRequest) {
         if (transactionsNotFound > 0) {
             message += ` Warning: ${transactionsNotFound} barcodes not found in system (${notFoundBarcodes.join(", ")}).`;
         }
+
+        const { userId, username, userRole } = getSessionUser(session);
+        await writeAuditLog({ userId, username, userRole, action: AuditAction.PICK_TASK_COMPLETE, entity: "PickAssetTask", entityId: String(documentId), detail: { documentId, shopCode: shopCode || null, tasksCompleted: activeTasks.length, tasksCancelled: cancelledTasks.length, transactionsUpdated }, req });
 
         return NextResponse.json({
             success: true,

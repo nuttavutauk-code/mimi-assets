@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { sendRejectionEmail } from "@/lib/email";
+import { writeAuditLog, AuditAction, getSessionUser } from "@/lib/audit-log";
 
 export async function POST(req: NextRequest) {
     try {
@@ -79,6 +80,9 @@ export async function POST(req: NextRequest) {
                 reason: reason || undefined,
             }).catch((err) => console.error("Failed to send rejection email:", err));
         }
+
+        const { userId, username, userRole } = getSessionUser(session);
+        await writeAuditLog({ userId, username, userRole, action: AuditAction.DOCUMENT_REJECT, entity: "Document", entityId: String(documentId), detail: { docCode: document.docCode, documentType: document.documentType, reason: reason || null }, req });
 
         return NextResponse.json({
             success: true,

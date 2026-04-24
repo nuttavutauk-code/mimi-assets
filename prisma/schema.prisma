@@ -446,6 +446,26 @@ model SecuritySetTransaction {
   @@index([balance])
 }
 
+// ✅ ========== AuditLog Model (ตาราง Audit Log สำหรับตรวจสอบการทำรายการ) ==========
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int?     // User ID ที่ทำรายการ (null = system)
+  username  String?  // snapshot username
+  userRole  String?  // snapshot role
+  action    String   // เช่น DOCUMENT_CREATE, DOCUMENT_APPROVE, USER_LOGIN
+  entity    String   // เช่น Document, Asset, User, Shop
+  entityId  String?  // ID ของ entity นั้น
+  detail    Json?    // ข้อมูลเพิ่มเติม เช่น docCode, barcode
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([entity])
+  @@index([createdAt])
+}
+
 // ✅ ========== TransferReceiveTask Model (งานรับของโอนย้าย) ==========
 model TransferReceiveTask {
   id         Int      @id @default(autoincrement())

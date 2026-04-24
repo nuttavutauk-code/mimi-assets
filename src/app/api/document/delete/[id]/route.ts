@@ -6,6 +6,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { writeAuditLog, AuditAction, getSessionUser } from "@/lib/audit-log";
 
 // ✅ Next.js 15: params เป็น Promise
 export async function DELETE(
@@ -116,12 +117,8 @@ export async function DELETE(
             where: { id },
         });
 
-        console.log(`✅ Deleted document ${id}:`);
-        console.log(`   - Transactions reset: ${resetTransactions.count}`);
-        console.log(`   - Security transactions reset: ${resetSecurityTransactions.count}`);
-        console.log(`   - Pick tasks deleted: ${deletedPickTasks.count}`);
-        console.log(`   - Transfer tasks deleted: ${deletedTransferTasks.count}`);
-        console.log(`   - Repair tasks deleted: ${deletedRepairTasks.count}`);
+        const { userId, username, userRole } = getSessionUser(session);
+        await writeAuditLog({ userId, username, userRole, action: AuditAction.DOCUMENT_DELETE, entity: "Document", entityId: String(id), detail: { docCode: existing.docCode, documentType: existing.documentType }, req });
 
         return NextResponse.json({
             success: true,
