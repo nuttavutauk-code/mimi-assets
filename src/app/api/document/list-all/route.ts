@@ -44,6 +44,8 @@ export async function GET(req: Request) {
         const documentType = searchParams.get("documentType")?.trim() || "";
         const status = searchParams.get("status")?.trim() || "";
         const createdBy = searchParams.get("createdBy")?.trim() || "";
+        const dateFrom = searchParams.get("dateFrom")?.trim() || "";
+        const dateTo = searchParams.get("dateTo")?.trim() || "";
         const page = parseInt(searchParams.get("page") || "1", 10);
         const limit = parseInt(searchParams.get("limit") || "10", 10);
         const skip = (page - 1) * limit;
@@ -56,6 +58,8 @@ export async function GET(req: Request) {
                 documentType ? { documentType: { equals: documentType } } : {},
                 status ? { status: { equals: status } } : {},
                 createdBy ? { fullName: { contains: createdBy, mode: Prisma.QueryMode.insensitive } } : {},
+                dateFrom ? { createdAt: { gte: new Date(dateFrom + "T00:00:00.000+07:00") } } : {},
+                dateTo ? { createdAt: { lte: new Date(dateTo + "T23:59:59.999+07:00") } } : {},
             ],
         };
 

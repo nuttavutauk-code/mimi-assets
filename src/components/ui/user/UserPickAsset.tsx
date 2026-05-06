@@ -39,7 +39,7 @@ export default function UserPickAsset() {
 
       if (data.success) {
         setTasks(data.tasks);
-        setTotalPages(data.totalPages);
+        setTotalPages(data.pagination?.totalPages ?? 1);
       }
     } catch (error) {
       console.error("Error fetching pick tasks:", error);

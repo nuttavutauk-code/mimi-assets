@@ -29,6 +29,8 @@ export default function AdminList() {
   const [documentType, setDocumentType] = useState("");
   const [status, setStatus] = useState("");
   const [createdBy, setCreatedBy] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [showFilters, setShowFilters] = useState(false);
 
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
@@ -64,6 +66,8 @@ export default function AdminList() {
         documentType,
         status,
         createdBy,
+        dateFrom,
+        dateTo,
       });
 
       const res = await fetch(`/api/document/list-all?${query}`);
@@ -171,7 +175,7 @@ export default function AdminList() {
 
       {/* Filter - Desktop */}
       <div className="glass-card p-4 sm:p-5 hidden sm:block">
-        <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <Input value={docCode} onChange={(e) => setDocCode(e.target.value)} placeholder="เลขที่เอกสาร" className="glass-input" />
           <Input value={vendor} onChange={(e) => setVendor(e.target.value)} placeholder="Vendor" className="glass-input" />
           <Input value={createdBy} onChange={(e) => setCreatedBy(e.target.value)} placeholder="ชื่อผู้สร้าง" className="glass-input" />
@@ -189,6 +193,14 @@ export default function AdminList() {
               <SelectItem value="rejected">รอแก้ไข</SelectItem>
             </SelectContent>
           </Select>
+          <div className="relative">
+            <label className="absolute -top-2 left-3 text-[10px] font-medium text-muted-foreground bg-white px-1 z-10">วันเริ่มต้น</label>
+            <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="glass-input" />
+          </div>
+          <div className="relative">
+            <label className="absolute -top-2 left-3 text-[10px] font-medium text-muted-foreground bg-white px-1 z-10">วันสิ้นสุด</label>
+            <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="glass-input" />
+          </div>
           <button onClick={handleSearch} className="gradient-button py-2 flex items-center justify-center gap-2 text-sm font-medium">
             <Search className="w-4 h-4" />ค้นหา
           </button>
@@ -208,6 +220,16 @@ export default function AdminList() {
               <SelectItem value="rejected">รอแก้ไข</SelectItem>
             </SelectContent>
           </Select>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="relative">
+              <label className="absolute -top-2 left-3 text-[10px] font-medium text-muted-foreground bg-white px-1 z-10">วันเริ่มต้น</label>
+              <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="glass-input" />
+            </div>
+            <div className="relative">
+              <label className="absolute -top-2 left-3 text-[10px] font-medium text-muted-foreground bg-white px-1 z-10">วันสิ้นสุด</label>
+              <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="glass-input" />
+            </div>
+          </div>
           <button onClick={handleSearch} className="w-full gradient-button py-2.5 text-sm font-medium">ค้นหา</button>
         </div>
       )}
@@ -224,7 +246,7 @@ export default function AdminList() {
           <>
             <div className="overflow-x-auto">
               <table className="glass-table w-full">
-                <thead><tr className="bg-black/2"><th>เลขเอกสาร</th><th>ผู้สร้าง</th><th>Vendor</th><th>วันที่</th><th>ประเภท</th><th>สถานะ</th><th>สถานะ Pick Asset</th><th className="text-center">จัดการ</th></tr></thead>
+                <thead><tr className="bg-black/2"><th className="text-center">เลขเอกสาร</th><th className="text-center">ผู้สร้าง</th><th className="text-center">Vendor</th><th className="text-center">วันที่</th><th className="text-center">ประเภท</th><th className="text-center">สถานะ</th><th className="text-center">สถานะ Pick Asset</th><th className="text-center">จัดการ</th></tr></thead>
                 <tbody>
                   {data.map((item, i) => {
                     const statusInfo = statusConfig[item.status] || { text: item.status, className: "status-badge" };
