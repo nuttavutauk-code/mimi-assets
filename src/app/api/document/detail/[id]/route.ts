@@ -25,9 +25,10 @@ export async function GET(
             where: { id: Number(id) },
             include: {
                 shops: {
+                    orderBy: { id: "asc" },
                     include: {
-                        assets: true,
-                        securitySets: true,
+                        assets: { orderBy: { id: "asc" } },
+                        securitySets: { orderBy: { id: "asc" } },
                     },
                 },
                 createdBy: {
@@ -46,9 +47,43 @@ export async function GET(
             return NextResponse.json({ success: false, message: "ไม่พบเอกสาร" }, { status: 404 });
         }
 
+        // ✅ ดึง PickAssetTask มาผูก barcode กลับให้แต่ละ asset/security row (สำหรับ download/preview)
+        // จัดกลุ่ม tasks ตาม assetName + shopCode → array ของ barcode ตามลำดับ
+        const pickTasks = await prisma.pickAssetTask.findMany({
+            where: { documentId: Number(id) },
+            orderBy: { id: "asc" },
+            select: {
+                assetName: true,
+                shopCode: true,
+                barcode: true,
+                isSecuritySet: true,
+                status: true,
+            },
+        });
+
+        const barcodesByKey: Record<string, string[]> = {};
+        for (const t of pickTasks) {
+            if (!t.barcode) continue;
+            const key = `${t.isSecuritySet ? "s" : "a"}|${t.assetName}|${t.shopCode || ""}`;
+            (barcodesByKey[key] ||= []).push(t.barcode);
+        }
+
+        // map กลับ assets/securitySets ของแต่ละ shop → ใส่ assignedBarcodes
+        const enrichedShops = doc.shops.map((s) => ({
+            ...s,
+            assets: s.assets.map((a) => ({
+                ...a,
+                assignedBarcodes: barcodesByKey[`a|${a.name}|${s.shopCode || ""}`] || [],
+            })),
+            securitySets: s.securitySets.map((sec) => ({
+                ...sec,
+                assignedBarcodes: barcodesByKey[`s|${sec.name}|${s.shopCode || ""}`] || [],
+            })),
+        }));
+
         return NextResponse.json({
             success: true,
-            document: doc,
+            document: { ...doc, shops: enrichedShops },
         });
 
     } catch (error) {

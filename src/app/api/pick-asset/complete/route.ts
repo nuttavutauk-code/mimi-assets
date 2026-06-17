@@ -197,6 +197,44 @@ export async function POST(req: NextRequest) {
             );
         }
 
+        // ✅ 6b. Pre-check: barcode ของทุก active task (non Type C) ยังต้องมี balance=1
+        //         (กัน admin assign ไว้แล้วของถูกใช้ทางอื่นก่อน picker confirm)
+        const preCheckErrors: { barcode: string; reason: string }[] = [];
+        for (const task of activeTasks) {
+            if (task.assetName.includes("Security Type C")) continue;
+            if (!task.barcode) continue;
+            const isControlbox = task.assetName.includes("CONTROLBOX");
+            if (isControlbox) {
+                const latest = await prisma.securitySetTransaction.findFirst({
+                    where: { barcode: task.barcode },
+                    orderBy: { id: "desc" },
+                    select: { balance: true },
+                });
+                if (!latest || latest.balance !== 1) {
+                    preCheckErrors.push({ barcode: task.barcode, reason: "Security Barcode ไม่พร้อมใช้งาน" });
+                }
+            } else {
+                const latest = await prisma.assetTransactionHistory.findFirst({
+                    where: { barcode: task.barcode },
+                    orderBy: { id: "desc" },
+                    select: { balance: true },
+                });
+                if (!latest || latest.balance !== 1) {
+                    preCheckErrors.push({ barcode: task.barcode, reason: "Barcode ไม่พร้อมใช้งาน (ออกไปแล้ว)" });
+                }
+            }
+        }
+        if (preCheckErrors.length > 0) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    message: `Barcode บางรายการไม่พร้อมใช้งานแล้ว กรุณาให้ Admin แก้ไข`,
+                    invalidBarcodes: preCheckErrors,
+                },
+                { status: 409 }
+            );
+        }
+
         // 7. Mark active Tasks เป็น completed (เฉพาะ Shop นี้ ไม่รวม cancelled)
         const updateWhereClause: any = {
             documentId,

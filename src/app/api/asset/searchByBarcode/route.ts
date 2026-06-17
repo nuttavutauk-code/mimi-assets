@@ -20,6 +20,24 @@ export async function GET(req: Request) {
     const balanceFilter = searchParams.get("balanceFilter"); // "0" หรือ "1" หรือ null
     const warehouse = searchParams.get("warehouse"); // Vendor ของ User
     const mcsCode = searchParams.get("mcsCode"); // MCS Code ของ Shop ต้นทาง (สำหรับ Shop to Shop)
+    const excludeAssigned = searchParams.get("excludeAssigned") === "true"; // ✅ exclude barcode ที่ admin assign แล้ว
+    const assetName = (searchParams.get("assetName") || "").trim(); // ✅ filter ตามชื่อ asset (ตรงสเปก)
+    const isSecuritySet = searchParams.get("isSecuritySet") === "true"; // ✅ CONTROLBOX/Security
+    const excludePickTaskId = searchParams.get("excludePickTaskId"); // ✅ ตอน edit-barcode: ไม่นับ task ตัวเองเป็น assigned
+
+    // ✅ Helper: หา barcode ที่ถูก assign ค้างใน PickAssetTask อื่น
+    const getAssignedBarcodes = async (): Promise<Set<string>> => {
+        if (!excludeAssigned) return new Set();
+        const assigned = await prisma.pickAssetTask.findMany({
+            where: {
+                barcode: { not: null },
+                status: { notIn: ["completed", "cancelled"] },
+                ...(excludePickTaskId ? { id: { not: Number(excludePickTaskId) } } : {}),
+            },
+            select: { barcode: true },
+        });
+        return new Set(assigned.map((t) => t.barcode!).filter(Boolean));
+    };
 
     // ✅ ถ้ามี mcsCode → ค้นหา Barcode ที่อยู่ใน Shop นั้น (ไม่ต้องมี query)
     if (mcsCode) {
@@ -50,32 +68,87 @@ export async function GET(req: Request) {
       return NextResponse.json({ assets: Array.from(uniqueBarcodes.values()).slice(0, 20) }, { status: 200 });
     }
 
+    // ✅ isSecuritySet + balanceFilter=0 → CONTROLBOX ที่ออกไปแล้ว (balance=0) สำหรับ Return Asset
+    if (isSecuritySet && balanceFilter === "0") {
+      const secTransactions = await prisma.securitySetTransaction.findMany({
+        where: {
+          balance: 0,
+          barcode: { not: null },
+          ...(query ? { barcode: { startsWith: query, mode: "insensitive" } } : {}),
+        },
+        select: { barcode: true, assetName: true },
+        orderBy: { id: "desc" },
+        take: 200,
+      });
+
+      const uniqueSec = new Map<string, { barcode: string; assetName: string; size: string | null }>();
+      for (const t of secTransactions) {
+        if (!t.barcode) continue;
+        if (!uniqueSec.has(t.barcode)) {
+          uniqueSec.set(t.barcode, { barcode: t.barcode, assetName: t.assetName, size: null });
+        }
+      }
+      return NextResponse.json({ assets: Array.from(uniqueSec.values()).slice(0, 50) }, { status: 200 });
+    }
+
     // ✅ ถ้ามี warehouse + balanceFilter=1 → ค้นหา Barcode ที่อยู่ในโกดังนั้น (ไม่ต้องมี query)
     if (warehouse && balanceFilter === "1") {
+      // ✅ CONTROLBOX/Security → ดึงจาก SecuritySetTransaction แทน
+      if (isSecuritySet) {
+        const secTransactions = await prisma.securitySetTransaction.findMany({
+          where: {
+            warehouseIn: warehouse,
+            balance: 1,
+            barcode: { not: null },
+            ...(assetName ? { assetName } : {}),
+            ...(query ? { barcode: { startsWith: query, mode: "insensitive" } } : {}),
+          },
+          select: { barcode: true, assetName: true },
+          orderBy: { id: "desc" },
+          take: 200,
+        });
+
+        const assignedSet = await getAssignedBarcodes();
+        const uniqueSec = new Map<string, { barcode: string; assetName: string; size: string | null }>();
+        for (const t of secTransactions) {
+          if (!t.barcode) continue;
+          if (assignedSet.has(t.barcode)) continue;
+          if (!uniqueSec.has(t.barcode)) {
+            uniqueSec.set(t.barcode, { barcode: t.barcode, assetName: t.assetName, size: null });
+          }
+        }
+        return NextResponse.json({ assets: Array.from(uniqueSec.values()).slice(0, 50) }, { status: 200 });
+      }
+
       const transactions = await prisma.assetTransactionHistory.findMany({
         where: {
           warehouseIn: warehouse,
           balance: 1,
+          ...(assetName ? { assetName } : {}),
           ...(query ? { barcode: { startsWith: query, mode: "insensitive" } } : {}),
         },
         select: {
           barcode: true,
           assetName: true,
           size: true,
+          grade: true,
         },
         orderBy: { id: "desc" },
-        take: 50,
+        take: 200,
       });
 
+      const assignedSet = await getAssignedBarcodes();
+
       // กรอง duplicate barcode (เอาเฉพาะ transaction ล่าสุดของแต่ละ barcode)
-      const uniqueBarcodes = new Map<string, { barcode: string; assetName: string; size: string | null }>();
+      const uniqueBarcodes = new Map<string, { barcode: string; assetName: string; size: string | null; grade: string | null }>();
       for (const t of transactions) {
+        if (assignedSet.has(t.barcode)) continue;
         if (!uniqueBarcodes.has(t.barcode)) {
-          uniqueBarcodes.set(t.barcode, { barcode: t.barcode, assetName: t.assetName, size: t.size });
+          uniqueBarcodes.set(t.barcode, { barcode: t.barcode, assetName: t.assetName, size: t.size, grade: t.grade });
         }
       }
 
-      return NextResponse.json({ assets: Array.from(uniqueBarcodes.values()).slice(0, 20) }, { status: 200 });
+      return NextResponse.json({ assets: Array.from(uniqueBarcodes.values()).slice(0, 50) }, { status: 200 });
     }
 
     // ✅ ถ้ามี balanceFilter=0 → ค้นหา Barcode ที่ออกไปแล้ว (สำหรับ Return Asset)

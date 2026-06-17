@@ -61,9 +61,9 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        if (pickTask.status !== "completed") {
+        if (pickTask.status !== "completed" && pickTask.status !== "picking") {
             return NextResponse.json(
-                { success: false, message: "สามารถแก้ไขได้เฉพาะรายการที่ completed แล้วเท่านั้น" },
+                { success: false, message: "สามารถแก้ไขได้เฉพาะรายการที่ picking หรือ completed เท่านั้น" },
                 { status: 400 }
             );
         }
@@ -82,6 +82,76 @@ export async function POST(req: NextRequest) {
                 { success: false, message: "Barcode ใหม่ต้องไม่เหมือนกับ Barcode เดิม" },
                 { status: 400 }
             );
+        }
+
+        const isControlbox = pickTask.assetName.includes("CONTROLBOX");
+
+        // ✅ Branch: status === "picking" → ยังไม่มี OUT transaction (admin assign แล้ว picker ยังไม่ confirm)
+        //          แค่ตรวจ barcode ใหม่ + update task.barcode
+        if (pickTask.status === "picking") {
+            // เช็ค barcode ใหม่ balance=1 + warehouse + assetName ตรง
+            if (isControlbox) {
+                const latest = await prisma.securitySetTransaction.findFirst({
+                    where: { barcode: newBarcode },
+                    orderBy: { id: "desc" },
+                    select: { balance: true, warehouseIn: true, assetName: true },
+                });
+                if (!latest) {
+                    return NextResponse.json({ success: false, message: "ไม่พบ Security Barcode ใหม่" }, { status: 400 });
+                }
+                if (latest.balance !== 1) {
+                    return NextResponse.json({ success: false, message: "Barcode ใหม่ไม่พร้อมใช้งาน" }, { status: 400 });
+                }
+                if (latest.warehouseIn !== pickTask.warehouse) {
+                    return NextResponse.json({ success: false, message: `Barcode ไม่ได้อยู่ในโกดัง ${pickTask.warehouse}` }, { status: 400 });
+                }
+                if (latest.assetName !== pickTask.assetName) {
+                    return NextResponse.json({ success: false, message: "Barcode ไม่ตรงประเภท Security" }, { status: 400 });
+                }
+            } else {
+                const latest = await prisma.assetTransactionHistory.findFirst({
+                    where: { barcode: newBarcode },
+                    orderBy: { id: "desc" },
+                    select: { balance: true, warehouseIn: true, assetName: true },
+                });
+                if (!latest) {
+                    return NextResponse.json({ success: false, message: "ไม่พบ Barcode ใหม่ในระบบ" }, { status: 400 });
+                }
+                if (latest.balance !== 1) {
+                    return NextResponse.json({ success: false, message: "Barcode ใหม่ไม่พร้อมใช้งาน (ออกไปแล้ว)" }, { status: 400 });
+                }
+                if (latest.warehouseIn !== pickTask.warehouse) {
+                    return NextResponse.json({ success: false, message: `Barcode ไม่ได้อยู่ในโกดัง ${pickTask.warehouse}` }, { status: 400 });
+                }
+                if (latest.assetName !== pickTask.assetName) {
+                    return NextResponse.json({ success: false, message: `Barcode เป็นของ ${latest.assetName} ไม่ตรงกับ ${pickTask.assetName}` }, { status: 400 });
+                }
+            }
+
+            // เช็คว่าไม่ถูก assign ค้างใน PickAssetTask อื่น
+            const conflict = await prisma.pickAssetTask.findFirst({
+                where: {
+                    barcode: newBarcode,
+                    status: { notIn: ["completed", "cancelled"] },
+                    id: { not: Number(pickTaskId) },
+                },
+                select: { id: true },
+            });
+            if (conflict) {
+                return NextResponse.json({ success: false, message: "Barcode ถูกใช้งานอยู่ใน task อื่น" }, { status: 400 });
+            }
+
+            await prisma.pickAssetTask.update({
+                where: { id: Number(pickTaskId) },
+                data: { barcode: newBarcode },
+            });
+
+            return NextResponse.json({
+                success: true,
+                message: `แก้ไข Barcode สำเร็จ: ${oldBarcode} → ${newBarcode}`,
+                oldBarcode,
+                newBarcode,
+            });
         }
 
         // 5. เช็คว่า Barcode เก่ามี Transaction ใหม่หรือยัง

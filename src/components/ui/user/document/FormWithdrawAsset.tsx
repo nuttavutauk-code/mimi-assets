@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import OtherActivitiesSelect, { OtherActivity } from "@/components/ui/admin/OtherActivitiesSelect";
 import StatusSelect, { StatusOption } from "@/components/ui/admin/StatusSelect";
 import PreviewApproveModal from "@/components/ui/PreviewApproveModal";
+import BarcodeAssignSelector from "@/components/ui/admin/BarcodeAssignSelector";
 
 type ShopItem = { mcsCode: string; shopName: string };
 type AssetRow = {
@@ -81,6 +82,9 @@ const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {
   const abortRef = useRef<AbortController | null>(null);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [userVendor, setUserVendor] = useState("");
+  // ✅ Admin assigns barcode ตอน approve — แยกเก็บต่อ row.id (local id)
+  const [assetBarcodes, setAssetBarcodes] = useState<Record<number, string[]>>({});
+  const [securityBarcodes, setSecurityBarcodes] = useState<Record<number, string[]>>({});
 
   useEffect(() => {
     const fetchVendors = async () => {
@@ -248,6 +252,25 @@ const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {
         toast.error("กรุณาเลือกโกดังให้ครบทุกรายการก่อนอนุมัติ");
         return;
       }
+      // ✅ ตรวจ barcode admin assign ครบทุก row + ครบ qty
+      const assetMissing = filledAssets.find(a => {
+        const arr = assetBarcodes[a.id] || [];
+        return arr.length !== a.qty || arr.some(b => !b || !b.trim());
+      });
+      if (assetMissing) {
+        toast.error(`กรุณาเลือก Barcode ให้ครบทุกรายการ (Asset: ${assetMissing.name})`);
+        return;
+      }
+      const secMissing = filledSecuritySets
+        .filter(s => !s.name.includes("Security Type C"))
+        .find(s => {
+          const arr = securityBarcodes[s.id] || [];
+          return arr.length !== s.qty || arr.some(b => !b || !b.trim());
+        });
+      if (secMissing) {
+        toast.error(`กรุณาเลือก Barcode ให้ครบทุกรายการ (Security: ${secMissing.name})`);
+        return;
+      }
     }
 
     setShowPreviewModal(true);
@@ -289,6 +312,27 @@ const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {
           setIsSubmitting(false);
           return;
         }
+        // ✅ ตรวจ barcode ก่อนยิง API
+        const assetMissing = filledAssets.find(a => {
+          const arr = assetBarcodes[a.id] || [];
+          return arr.length !== a.qty || arr.some(b => !b || !b.trim());
+        });
+        if (assetMissing) {
+          toast.error(`กรุณาเลือก Barcode ให้ครบทุกรายการ (Asset: ${assetMissing.name})`);
+          setIsSubmitting(false);
+          return;
+        }
+        const secMissing = filledSecuritySets
+          .filter(s => !s.name.includes("Security Type C"))
+          .find(s => {
+            const arr = securityBarcodes[s.id] || [];
+            return arr.length !== s.qty || arr.some(b => !b || !b.trim());
+          });
+        if (secMissing) {
+          toast.error(`กรุณาเลือก Barcode ให้ครบทุกรายการ (Security: ${secMissing.name})`);
+          setIsSubmitting(false);
+          return;
+        }
       }
 
       if (action === "approve" && isEdit && editId) {
@@ -307,9 +351,24 @@ const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {
         const updateResult = await updateRes.json();
         if (!updateResult.success) throw new Error(updateResult.message);
 
+        // ✅ Build assignedBarcodes payload (ordinal-based to match DB after update)
+        const assignedBarcodes = {
+          assetBarcodes: filledAssets.map((a, idx) => ({
+            shopIndex: 0,
+            assetIndex: idx,
+            barcodes: (assetBarcodes[a.id] || []).slice(0, a.qty),
+          })),
+          securityBarcodes: filledSecuritySets.map((s, idx) => ({
+            shopIndex: 0,
+            securityIndex: idx,
+            barcodes: s.name.includes("Security Type C")
+              ? []
+              : (securityBarcodes[s.id] || []).slice(0, s.qty),
+          })),
+        };
         const res = await fetch("/api/document/approve", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ documentId: parseInt(editId), otherActivity: otherActivity || null }),
+          body: JSON.stringify({ documentId: parseInt(editId), otherActivity: otherActivity || null, assignedBarcodes }),
         });
         const result = await res.json();
         if (!result.success) throw new Error(result.message);
@@ -522,6 +581,21 @@ const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {
                 </div>
               </div>
 
+              {mode === "admin" && !isReadOnly && asset.name && (
+                <div className="mt-3 p-3 rounded-lg bg-blue-50/40 border border-blue-200">
+                  <label className="block text-xs text-blue-700 font-medium mb-2">
+                    เลือก Barcode ที่จะเบิก (qty {asset.qty})
+                  </label>
+                  <BarcodeAssignSelector
+                    warehouse={asset.withdrawFor}
+                    assetName={asset.name}
+                    qty={asset.qty}
+                    value={assetBarcodes[asset.id] || []}
+                    onChange={(next) => setAssetBarcodes(p => ({ ...p, [asset.id]: next }))}
+                  />
+                </div>
+              )}
+
               {asset.useCustomSize && isCustomSizeAsset(asset.name) && (
                 <div className="mt-3 p-3 rounded-lg bg-amber-50 border border-amber-200">
                   <label className="block text-xs text-amber-700 font-medium mb-2">กรอกขนาด (W*D*H(XX))</label>
@@ -635,6 +709,21 @@ const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {
                   </div>
                 )}
               </div>
+              {mode === "admin" && !isReadOnly && set.qty > 0 && !set.name.includes("Security Type C") && (
+                <div className="mt-3 p-3 rounded-lg bg-purple-50/40 border border-purple-200">
+                  <label className="block text-xs text-purple-700 font-medium mb-2">
+                    เลือก Barcode CONTROLBOX ที่จะเบิก (qty {set.qty})
+                  </label>
+                  <BarcodeAssignSelector
+                    warehouse={set.withdrawFor}
+                    assetName={set.name}
+                    qty={set.qty}
+                    value={securityBarcodes[set.id] || []}
+                    onChange={(next) => setSecurityBarcodes(p => ({ ...p, [set.id]: next }))}
+                    isSecuritySet
+                  />
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -700,11 +789,13 @@ const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {
           kv: a.kv,
           qty: a.qty,
           withdrawFor: a.withdrawFor,
+          assignedBarcodes: assetBarcodes[a.id] || [],
         }))}
         securitySets={securitySets.filter(s => s.qty > 0).map(s => ({
           name: s.name,
           qty: s.qty,
           withdrawFor: s.withdrawFor,
+          assignedBarcodes: s.name.includes("Security Type C") ? [] : (securityBarcodes[s.id] || []),
         }))}
       />
     </div>

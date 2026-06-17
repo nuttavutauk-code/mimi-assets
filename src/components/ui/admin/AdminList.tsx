@@ -12,12 +12,11 @@ import {
 } from "@/components/ui/select";
 import { Edit, Trash2, Download, Loader2, Search, Filter, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { downloadAsImage } from "@/lib/downloadDocument";
 import DocumentTemplateSelector from "@/components/ui/document/DocumentTemplateSelector";
 
 export default function AdminList() {
-  const router = useRouter();
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -88,20 +87,24 @@ export default function AdminList() {
     fetchDocuments(page);
   }, [page]);
 
+  const documentTypeOptions: { key: string; label: string }[] = [
+    { key: "withdraw", label: "ใบเบิก Asset" },
+    { key: "routing2shops", label: "Routing 2 shops" },
+    { key: "routing3shops", label: "Routing 3 shops" },
+    { key: "routing4shops", label: "Routing 4 shops" },
+    { key: "other", label: "ใบเบิกของอื่นๆ" },
+    { key: "transfer", label: "ใบย้ายของ" },
+    { key: "borrowsecurity", label: "ใบยืม+Security" },
+    { key: "borrow", label: "ใบยืม" },
+    { key: "return", label: "เก็บ Asset กลับ" },
+    { key: "shop-to-shop", label: "Shop to Shop" },
+    { key: "repair", label: "ใบแจ้งซ่อม" },
+  ];
+
   const typeMap: Record<string, string> = {
-    withdraw: "ใบเบิก Asset",
-    routing2shops: "Routing 2 shops",
-    routing3shops: "Routing 3 shops",
-    routing4shops: "Routing 4 shops",
-    other: "ใบเบิกของอื่นๆ",
-    transfer: "ใบย้ายของ",
-    borrowsecurity: "ใบยืม+Security",
-    borrow: "ใบยืม",
-    return: "เก็บ Asset กลับ",
+    ...Object.fromEntries(documentTypeOptions.map(o => [o.key, o.label])),
     returnasset: "เก็บ Asset กลับ",
     shoptoshop: "Shop to Shop",
-    "shop-to-shop": "Shop to Shop",
-    repair: "ใบแจ้งซ่อม",
   };
 
   const statusConfig: Record<string, { text: string; className: string }> = {
@@ -182,7 +185,7 @@ export default function AdminList() {
           <Select onValueChange={setDocumentType}>
             <SelectTrigger className="glass-input"><SelectValue placeholder="ประเภท" /></SelectTrigger>
             <SelectContent>
-              {Object.entries(typeMap).map(([key, label]) => (<SelectItem key={key} value={key}>{label}</SelectItem>))}
+              {documentTypeOptions.map(({ key, label }) => (<SelectItem key={key} value={key}>{label}</SelectItem>))}
             </SelectContent>
           </Select>
           <Select onValueChange={setStatus}>
@@ -279,7 +282,7 @@ export default function AdminList() {
                                 {downloadingId === item.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                               </button>
                             )}
-                            <button onClick={() => router.push(getEditPath(item.documentType, item.id))} className="p-2 rounded-lg hover:bg-blue-50 text-blue-500"><Edit className="w-4 h-4" /></button>
+                            <Link href={getEditPath(item.documentType, item.id)} className="p-2 rounded-lg hover:bg-blue-50 text-blue-500"><Edit className="w-4 h-4 pointer-events-none" /></Link>
                             <button onClick={() => handleDelete(item.id)} className="p-2 rounded-lg hover:bg-red-50 text-red-500"><Trash2 className="w-4 h-4" /></button>
                           </div>
                         </td>
@@ -324,9 +327,9 @@ export default function AdminList() {
                         {downloadingId === item.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                       </button>
                     )}
-                    <button onClick={() => router.push(getEditPath(item.documentType, item.id))} className="flex-1 py-2.5 rounded-lg bg-blue-50 text-blue-600 font-medium text-sm flex items-center justify-center gap-1">
+                    <Link href={getEditPath(item.documentType, item.id)} className="flex-1 py-2.5 rounded-lg bg-blue-50 text-blue-600 font-medium text-sm flex items-center justify-center gap-1">
                       <Edit className="w-4 h-4" />แก้ไข
-                    </button>
+                    </Link>
                     <button onClick={() => handleDelete(item.id)} className="py-2.5 px-3 rounded-lg bg-red-50 text-red-500">
                       <Trash2 className="w-4 h-4" />
                     </button>

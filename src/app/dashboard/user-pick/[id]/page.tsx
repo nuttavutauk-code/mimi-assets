@@ -662,20 +662,27 @@ export default function PickAssetDetailPage() {
                                             {isCancelled ? (
                                                 <Input value="-" readOnly className="bg-gray-200 text-gray-500" />
                                             ) : isCompleted || taskDetail.documentType === "transfer" ? (
-                                                // ✅ View-only mode หรือ Transfer: แสดงแบบ readonly
-                                                <Input 
-                                                    value={localBarcodes[asset.id] || asset.barcode || ""} 
-                                                    readOnly 
-                                                    className="bg-gray-50 font-mono" 
+                                                // ✅ View-only mode หรือ Transfer (picker กรอกเอง — อยู่ในเงื่อนไขด้านล่าง)
+                                                <Input
+                                                    value={localBarcodes[asset.id] || asset.barcode || ""}
+                                                    readOnly
+                                                    className="bg-gray-50 font-mono"
+                                                />
+                                            ) : asset.barcode ? (
+                                                // ✅ Flow ใหม่: Admin assign barcode แล้ว — picker แค่ดู
+                                                <Input
+                                                    value={asset.barcode}
+                                                    readOnly
+                                                    className="bg-blue-50 font-mono border-blue-200"
                                                 />
                                             ) : (
+                                                // legacy fallback: ไม่มี barcode ที่ admin assign → ให้ picker กรอกเอง
                                                 <BarcodeSearchInput
                                                     taskId={asset.id}
                                                     assetName={asset.assetName}
                                                     value={localBarcodes[asset.id] || ""}
                                                     onChange={handleBarcodeChange}
                                                     selectedBarcodes={
-                                                        // ✅ รวม Barcodes ที่ถูกเลือกแล้วจาก Asset ที่มี assetName เดียวกัน (ไม่รวมตัวเอง)
                                                         taskDetail.assets
                                                             .filter(a => a.assetName === asset.assetName && a.id !== asset.id && !cancelledTasks[a.id])
                                                             .map(a => localBarcodes[a.id])
@@ -777,11 +784,17 @@ export default function PickAssetDetailPage() {
                                                 {isCancelled ? (
                                                     <Input value="-" readOnly className="bg-gray-200 text-gray-500" />
                                                 ) : isCompleted ? (
-                                                    // ✅ View-only mode: แสดงแบบ readonly
-                                                    <Input 
-                                                        value={localBarcodes[security.id] || ""} 
-                                                        readOnly 
-                                                        className="bg-gray-50 font-mono" 
+                                                    <Input
+                                                        value={localBarcodes[security.id] || ""}
+                                                        readOnly
+                                                        className="bg-gray-50 font-mono"
+                                                    />
+                                                ) : security.barcode ? (
+                                                    // ✅ Flow ใหม่: Admin assign barcode CONTROLBOX แล้ว
+                                                    <Input
+                                                        value={security.barcode}
+                                                        readOnly
+                                                        className="bg-purple-50 font-mono border-purple-200"
                                                     />
                                                 ) : (
                                                     <BarcodeSearchInput
@@ -790,7 +803,6 @@ export default function PickAssetDetailPage() {
                                                         value={localBarcodes[security.id] || ""}
                                                         onChange={handleBarcodeChange}
                                                         selectedBarcodes={
-                                                            // ✅ รวม Barcodes ที่ถูกเลือกแล้วจาก Security Set ที่มี assetName เดียวกัน (ไม่รวมตัวเอง)
                                                             taskDetail.securitySets
                                                                 .filter(s => s.assetName === security.assetName && s.id !== security.id && !cancelledTasks[s.id])
                                                                 .map(s => localBarcodes[s.id])

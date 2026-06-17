@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { SimplePagination } from "@/components/ui/SimplePagination";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, Search, RefreshCw, Database, Filter, Pencil, Save, X, Download, Upload } from "lucide-react";
+import { Loader2, Search, RefreshCw, Database, Filter, Pencil, Save, X, Download, Upload, FileDown } from "lucide-react";
 import { toast } from "sonner";
 
 interface TransactionData {
@@ -78,6 +78,47 @@ const orderedColumns = [
   { name: "Discarded", group: "auto" }, { name: "Adjust Error", group: "auto" },
 ];
 
+// ✅ Map ชื่อคอลัมน์ทั้งหมด -> field name ใน API (สำหรับการแสดงผล)
+const COLUMN_FIELD_MAP: Record<string, string> = {
+  "Barcode": "barcode",
+  "Asset Name": "assetName",
+  "Warehouse": "warehouseIn",
+  "Asset Status": "assetStatus",
+  "In stock Date": "inStockDate",
+  "Start Warranty": "startWarranty",
+  "End Warranty": "endWarranty",
+  "Cheil PO": "cheilPO",
+  "Unit In": "unitIn",
+  "From Vendor": "fromVendor",
+  "MCS Code (In)": "mcsCodeIn",
+  "From Shop": "fromShop",
+  "Out Date": "outDate",
+  "Unit Out": "unitOut",
+  "To Vendor": "toVendor",
+  "Status": "status",
+  "Shop Type": "shopType",
+  "MCS Code (Out)": "mcsCodeOut",
+  "To Shop": "toShop",
+  "Balance": "balance",
+  "Size": "size",
+  "Grade": "grade",
+  "Remark IN": "remarkIn",
+  "Remark OUT": "remarkOut",
+  "WK OUT": "wkOut",
+  "WK IN": "wkIn",
+  "WK OUT for Repair": "wkOutForRepair",
+  "WK IN for Repair": "wkInForRepair",
+  "New In Stock": "newInStock",
+  "Refurbished Instock": "refurbishedInStock",
+  "Borrow": "borrow",
+  "Return": "return",
+  "Repair": "repair",
+  "Out to Rental WH": "outToRentalWarehouse",
+  "In to Rental WH": "inToRentalWarehouse",
+  "Discarded": "discarded",
+  "Adjust Error": "adjustError",
+};
+
 // ✅ คอลัมน์ที่สามารถแก้ไขได้ (map ชื่อคอลัมน์ -> field name)
 const EDITABLE_COLUMNS: Record<string, string> = {
   "Asset Name": "assetName",
@@ -150,6 +191,26 @@ export default function AdminDatabase() {
     } finally {
       setUploading(false);
       e.target.value = "";
+    }
+  };
+
+  // ✅ Download Template Function
+  const handleDownloadTemplate = async () => {
+    try {
+      const res = await fetch("/api/database/template");
+      if (!res.ok) throw new Error("Download failed");
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "Template_Import_Database.xlsx";
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success("ดาวน์โหลด Template สำเร็จ");
+    } catch (err) {
+      toast.error("ไม่สามารถดาวน์โหลด Template ได้");
     }
   };
 
@@ -288,10 +349,10 @@ export default function AdminDatabase() {
 
   // ✅ Render cell value (ปกติ หรือ Input ถ้าอยู่ใน Edit Mode)
   const renderCellValue = (item: TransactionData, columnName: string, rowIndex: number) => {
-    const fieldName = EDITABLE_COLUMNS[columnName];
+    const fieldName = EDITABLE_COLUMNS[columnName] ?? COLUMN_FIELD_MAP[columnName];
     const isEditable = isEditableColumn(columnName);
     const currentData = isEditMode ? editedData[rowIndex] : item;
-    const value = (currentData as any)[fieldName] ?? (currentData as any)[columnName.toLowerCase().replace(/ /g, "")] ?? "-";
+    const value = (currentData as any)[fieldName] ?? "-";
 
     // ✅ ถ้าอยู่ใน Edit Mode และคอลัมน์แก้ไขได้
     if (isEditMode && isEditable) {
@@ -375,6 +436,14 @@ export default function AdminDatabase() {
                 <span className="hidden sm:inline">Import</span>
                 <input type="file" accept=".xlsx,.xls" onChange={handleImport} className="hidden" disabled={uploading} />
               </label>
+              <button
+                onClick={handleDownloadTemplate}
+                title="ดาวน์โหลด Template Import"
+                className="glass-button px-4 py-2.5 text-sm font-medium flex items-center gap-2 text-indigo-600 border-indigo-300 hover:bg-indigo-50"
+              >
+                <FileDown className="w-4 h-4" />
+                <span className="hidden sm:inline">Template</span>
+              </button>
               <button onClick={handleExport} disabled={exporting} className="glass-button px-4 py-2.5 text-sm font-medium flex items-center gap-2 text-green-600 border-green-300 hover:bg-green-50">
                 {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                 <span className="hidden sm:inline">Export</span>

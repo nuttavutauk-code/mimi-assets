@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Download, Loader2, X } from "lucide-react";
 import DocumentTemplateSelector from "./DocumentTemplateSelector";
-import { downloadAsImage } from "@/lib/downloadDocument";
+import { downloadAsImage, downloadDocumentPages } from "@/lib/downloadDocument";
 
 interface DocumentData {
     docCode: string;
@@ -35,10 +35,8 @@ export function DocumentPreviewModal({
     const handleDownload = async () => {
         setDownloading(true);
         try {
-            const success = await downloadAsImage("document-to-print", `${doc.docCode}`);
-            if (success) {
-                // ดาวน์โหลดสำเร็จ
-            } else {
+            const result = await downloadDocumentPages("document-to-print", `${doc.docCode}`);
+            if (!result.success) {
                 alert("ไม่สามารถสร้างรูปภาพได้");
             }
         } catch (error) {
@@ -175,8 +173,8 @@ export function QuickDownloadButton({
         await new Promise((resolve) => setTimeout(resolve, 100));
 
         try {
-            const success = await downloadAsImage("document-to-print", `${doc.docCode}`);
-            if (!success) {
+            const result = await downloadDocumentPages("document-to-print", `${doc.docCode}`);
+            if (!result.success) {
                 alert("ไม่สามารถสร้างรูปภาพได้");
             }
         } catch (error) {

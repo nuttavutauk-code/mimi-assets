@@ -20,6 +20,23 @@ export async function GET(req: NextRequest) {
         const { searchParams } = new URL(req.url);
         const search = searchParams.get("search") || "";
         const assetName = searchParams.get("assetName");
+        const excludeAssigned = searchParams.get("excludeAssigned") === "true";
+        const excludePickTaskId = searchParams.get("excludePickTaskId");
+        const warehouse = searchParams.get("warehouse");
+
+        // ✅ Helper: หา barcode ที่ถูก assign ค้างใน PickAssetTask อื่น
+        const assignedSet: Set<string> = new Set();
+        if (excludeAssigned) {
+            const assigned = await prisma.pickAssetTask.findMany({
+                where: {
+                    barcode: { not: null },
+                    status: { notIn: ["completed", "cancelled"] },
+                    ...(excludePickTaskId ? { id: { not: Number(excludePickTaskId) } } : {}),
+                },
+                select: { barcode: true },
+            });
+            for (const t of assigned) if (t.barcode) assignedSet.add(t.barcode);
+        }
 
         // เช็คว่าเป็น CONTROLBOX หรือไม่
         const isControlbox = assetName?.includes("CONTROLBOX");
@@ -43,6 +60,10 @@ export async function GET(req: NextRequest) {
                 };
             }
 
+            if (warehouse) {
+                securityWhere.warehouseIn = warehouse;
+            }
+
             const securityTransactions = await prisma.securitySetTransaction.findMany({
                 where: securityWhere,
                 select: {
@@ -51,13 +72,14 @@ export async function GET(req: NextRequest) {
                 },
                 orderBy: { barcode: "asc" },
                 distinct: ["barcode"],
-                take: 100,
+                take: 200,
             });
 
             return NextResponse.json({
                 success: true,
                 assets: securityTransactions
                     .filter(a => a.barcode && a.barcode.trim() !== "")
+                    .filter(a => !assignedSet.has(a.barcode!))
                     .map((a) => ({
                         barcode: a.barcode!,
                         assetName: a.assetName,
@@ -107,14 +129,16 @@ export async function GET(req: NextRequest) {
                 continue;
             }
 
+            if (assignedSet.has(asset.barcode)) continue;
+
             // หา Transaction ล่าสุดของ Barcode นี้
             const latestTransaction = await prisma.assetTransactionHistory.findFirst({
                 where: { barcode: asset.barcode },
                 orderBy: { id: "desc" },
-                select: { balance: true },
+                select: { balance: true, warehouseIn: true },
             });
 
-            console.log(`🔍 Checking barcode: ${asset.barcode}, size: "${asset.size || ''}", balance: ${latestTransaction?.balance ?? 'NO_TX'}`);
+            if (warehouse && latestTransaction?.warehouseIn !== warehouse) continue;
 
             // ✅ ต้องมี Transaction และ Balance = 1 เท่านั้น (มีขาเข้า พร้อมเบิกออก)
             if (latestTransaction && latestTransaction.balance === 1) {

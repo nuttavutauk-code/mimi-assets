@@ -47,6 +47,7 @@ export async function POST(req: NextRequest) {
         // 4. เช็คว่า Task นี้เป็นของ vendor นี้หรือไม่
         const task = await prisma.pickAssetTask.findUnique({
             where: { id: taskId },
+            include: { document: { select: { documentType: true } } },
         });
 
         if (!task) {
@@ -59,6 +60,17 @@ export async function POST(req: NextRequest) {
         if (task.warehouse !== user.vendor) {
             return NextResponse.json(
                 { success: false, message: "Access denied: Task does not belong to your warehouse" },
+                { status: 403 }
+            );
+        }
+
+        // ✅ Flow ใหม่: เฉพาะ transfer เท่านั้นที่ให้ picker กรอก barcode (admin ไม่รู้สต็อกโกดังปลายทาง)
+        // type อื่นๆ admin assign barcode ตอน approve แล้ว — รับเฉพาะ image upload เท่านั้น
+        const isTransfer = task.document?.documentType === "transfer";
+        const barcodeRequested = body.barcode && body.barcode !== task.barcode;
+        if (barcodeRequested && !isTransfer) {
+            return NextResponse.json(
+                { success: false, message: "ไม่อนุญาตให้ Picker แก้ไข Barcode (Admin assign ไว้แล้ว) — ใช้ /api/pick-asset/edit-barcode" },
                 { status: 403 }
             );
         }

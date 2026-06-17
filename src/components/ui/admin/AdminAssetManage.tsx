@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { SimplePagination } from "@/components/ui/SimplePagination";
-import { Package, Upload, Search, Loader2, Download, Warehouse, Calendar, Pencil, Check, X, PackagePlus } from "lucide-react";
+import { Package, Upload, Search, Loader2, Download, Warehouse, Calendar, Pencil, Check, X, PackagePlus, FileDown } from "lucide-react";
 import { toast } from "sonner";
 
 type EditData = {
@@ -120,6 +120,26 @@ export default function AdminAssetManage() {
     }
   };
 
+  const handleDownloadTemplate = async (
+    type: "new" | "used" | "refurbished",
+    filename: string
+  ) => {
+    try {
+      const res = await fetch(`/api/asset/template/${type}`);
+      if (!res.ok) throw new Error("Download failed");
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      toast.success("ดาวน์โหลด Template สำเร็จ");
+    } catch (err) {
+      toast.error("ไม่สามารถดาวน์โหลด Template ได้");
+    }
+  };
+
   const handleExport = async () => {
     try {
       const res = await fetch("/api/asset/export");
@@ -220,6 +240,34 @@ export default function AdminAssetManage() {
             <span className="hidden sm:inline">Import REFURBISHED</span>
             <input type="file" accept=".xlsx,.xls" onChange={handleImportRefurbished} className="hidden" disabled={uploadingRefurbished} />
           </label>
+          <div className="w-px bg-black/10 mx-1 hidden sm:block" />
+          <button
+            type="button"
+            onClick={() => handleDownloadTemplate("new", "Template_Import_Asset.xlsx")}
+            title="ดาวน์โหลด Template Import"
+            className="px-3 py-2.5 text-sm font-medium flex items-center gap-2 rounded-xl border border-indigo-300 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 transition-colors"
+          >
+            <FileDown className="w-4 h-4" />
+            <span className="hidden sm:inline">Template</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleDownloadTemplate("used", "Template_Import_Asset_USED.xlsx")}
+            title="ดาวน์โหลด Template Import USED"
+            className="px-3 py-2.5 text-sm font-medium flex items-center gap-2 rounded-xl border border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100 transition-colors"
+          >
+            <FileDown className="w-4 h-4" />
+            <span className="hidden sm:inline">Template USED</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleDownloadTemplate("refurbished", "Template_Import_Asset_REFURBISHED.xlsx")}
+            title="ดาวน์โหลด Template Import REFURBISHED"
+            className="px-3 py-2.5 text-sm font-medium flex items-center gap-2 rounded-xl border border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors"
+          >
+            <FileDown className="w-4 h-4" />
+            <span className="hidden sm:inline">Template REFURBISHED</span>
+          </button>
           <button onClick={handleExport} className="glass-button px-4 py-2.5 text-sm font-medium flex items-center gap-2">
             <Download className="w-4 h-4" />
             <span className="hidden sm:inline">Export</span>

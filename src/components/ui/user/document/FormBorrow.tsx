@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import OtherActivitiesSelect, { OtherActivity } from "@/components/ui/admin/OtherActivitiesSelect";
 import StatusSelect, { StatusOption } from "@/components/ui/admin/StatusSelect";
 import PreviewApproveModal from "@/components/ui/PreviewApproveModal";
+import BarcodeAssignSelector from "@/components/ui/admin/BarcodeAssignSelector";
 
 type ShopItem = { mcsCode: string; shopName: string };
 type AssetRow = {
@@ -76,6 +77,7 @@ const FormBorrow = ({ mode = "user" }: { mode?: FormMode }) => {
   const [borrowType, setBorrowType] = useState("");
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [userVendor, setUserVendor] = useState("");
+  const [assetBarcodes, setAssetBarcodes] = useState<Record<number, string[]>>({});
 
   useEffect(() => {
     const fetchVendors = async () => {
@@ -209,6 +211,14 @@ const FormBorrow = ({ mode = "user" }: { mode?: FormMode }) => {
         toast.error("กรุณาเลือกโกดังให้ครบทุกรายการก่อนอนุมัติ");
         return;
       }
+      const assetMissing = filledAssets.find(a => {
+        const arr = assetBarcodes[a.id] || [];
+        return arr.length !== a.qty || arr.some(b => !b || !b.trim());
+      });
+      if (assetMissing) {
+        toast.error(`กรุณาเลือก Barcode ให้ครบทุกรายการ (Asset: ${assetMissing.name})`);
+        return;
+      }
     }
     setShowPreviewModal(true);
   };
@@ -230,10 +240,21 @@ const FormBorrow = ({ mode = "user" }: { mode?: FormMode }) => {
         toast.error("กรุณาเลือก Status ก่อนอนุมัติ");
         return;
       }
+      const filledAssets = assets.filter(a => a.name && a.name.trim() !== "");
       if (action === "approve" && mode === "admin") {
         const missingWarehouse = assets.some(a => !a.withdrawFor || a.withdrawFor.trim() === "");
         if (missingWarehouse) {
           toast.error("กรุณาเลือกโกดังให้ครบทุกรายการก่อนอนุมัติ");
+          setIsSubmitting(false);
+          return;
+        }
+        const assetMissing = filledAssets.find(a => {
+          const arr = assetBarcodes[a.id] || [];
+          return arr.length !== a.qty || arr.some(b => !b || !b.trim());
+        });
+        if (assetMissing) {
+          toast.error(`กรุณาเลือก Barcode ให้ครบทุกรายการ (Asset: ${assetMissing.name})`);
+          setIsSubmitting(false);
           return;
         }
       }
@@ -248,7 +269,15 @@ const FormBorrow = ({ mode = "user" }: { mode?: FormMode }) => {
         const updateRes = await fetch(`/api/document/update/${editId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(updatePayload) });
         const updateResult = await updateRes.json();
         if (!updateResult.success) throw new Error(updateResult.message);
-        const res = await fetch("/api/document/approve", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ documentId: parseInt(editId), otherActivity: otherActivity || null }) });
+        const assignedBarcodes = {
+          assetBarcodes: filledAssets.map((a, idx) => ({
+            shopIndex: 0,
+            assetIndex: idx,
+            barcodes: (assetBarcodes[a.id] || []).slice(0, a.qty),
+          })),
+          securityBarcodes: [],
+        };
+        const res = await fetch("/api/document/approve", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ documentId: parseInt(editId), otherActivity: otherActivity || null, assignedBarcodes }) });
         const result = await res.json();
         if (!result.success) throw new Error(result.message);
         toast.success("อนุมัติสำเร็จ!"); router.push("/dashboard/admin-list"); return;
@@ -408,6 +437,18 @@ const FormBorrow = ({ mode = "user" }: { mode?: FormMode }) => {
                 {mode === "admin" && (<div className="sm:col-span-2"><label className="block text-xs text-muted-foreground mb-1">โกดัง</label><Select value={asset.withdrawFor} onValueChange={(v) => setAssets(p => p.map(a => a.id === asset.id ? { ...a, withdrawFor: v } : a))}><SelectTrigger className="glass-input"><SelectValue placeholder="เลือก" /></SelectTrigger><SelectContent>{vendors.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent></Select></div>)}
                 {assets.length > 1 && <div className="flex items-end"><button onClick={() => setAssets(p => p.filter(a => a.id !== asset.id))} className="p-2 rounded-lg bg-red-50 text-red-500 hover:bg-red-100"><Trash2 className="w-4 h-4" /></button></div>}
               </div>
+              {mode === "admin" && !isReadOnly && asset.name && (
+                <div className="mt-3 p-3 rounded-lg bg-blue-50/40 border border-blue-200">
+                  <label className="block text-xs text-blue-700 font-medium mb-2">เลือก Barcode ที่จะเบิก (qty {asset.qty})</label>
+                  <BarcodeAssignSelector
+                    warehouse={asset.withdrawFor}
+                    assetName={asset.name}
+                    qty={asset.qty}
+                    value={assetBarcodes[asset.id] || []}
+                    onChange={(next) => setAssetBarcodes(p => ({ ...p, [asset.id]: next }))}
+                  />
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -464,6 +505,7 @@ const FormBorrow = ({ mode = "user" }: { mode?: FormMode }) => {
           kv: a.kv,
           qty: a.qty,
           withdrawFor: a.withdrawFor,
+          assignedBarcodes: assetBarcodes[a.id] || [],
         }))}
         securitySets={[]}
       />

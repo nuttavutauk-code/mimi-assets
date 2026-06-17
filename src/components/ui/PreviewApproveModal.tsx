@@ -34,11 +34,14 @@ interface PreviewApproveModalProps {
     qty: number;
     withdrawFor: string;
     barcode?: string;
+    assignedBarcodes?: string[];
   }>;
   securitySets: Array<{
     name: string;
     qty: number;
     withdrawFor: string;
+    barcode?: string;
+    assignedBarcodes?: string[];
   }>;
   // สำหรับ Routing forms
   shops?: Array<{
@@ -200,7 +203,6 @@ const PreviewApproveModal = ({
               transform: `scale(${zoom / 100})`,
               transformOrigin: "top center",
               width: "794px",
-              minHeight: "1123px",
             }}
           >
             <DocumentTemplateSelector document={documentObject} />

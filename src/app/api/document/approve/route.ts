@@ -111,17 +111,145 @@ async function needsPickerProcess(documentId: number): Promise<boolean> {
     return false;
 }
 
+// ✅ Payload จาก Admin form: barcode ที่ admin assign ให้แต่ละรายการ
+// ใช้ ordinal (shopIndex, rowIndex) เพราะ frontend อาจเพิ่งสั่ง update เอกสาร → DB ID เปลี่ยน
+type AssignedBarcodesPayload = {
+    assetBarcodes?: { shopIndex: number; assetIndex: number; barcodes: string[] }[];
+    securityBarcodes?: { shopIndex: number; securityIndex: number; barcodes: string[] }[];
+};
+
+type DocAssetLike = { name: string; size: string | null; grade: string | null; qty: number; withdrawFor: string | null };
+type DocSecurityLike = { name: string; qty: number; withdrawFor: string | null };
+type DocShopLike = { assets: DocAssetLike[]; securitySets: DocSecurityLike[] };
+
+// ✅ Validate barcode pool ก่อนสร้าง PickAssetTask
+// คืน error string ถ้าไม่ผ่าน (caller จะ early-return 400)
+async function validateAssignedBarcodes(
+    documentId: number,
+    documentType: string,
+    assigned: AssignedBarcodesPayload,
+    documentShops: DocShopLike[]
+): Promise<string | null> {
+    if (documentType === "transfer") return null; // transfer ใช้ flow เดิม
+
+    const allBarcodes: string[] = [];
+
+    // 1. ทุก Asset ที่ qty > 0 ต้องมี barcode ครบ qty
+    for (let si = 0; si < documentShops.length; si++) {
+        const shop = documentShops[si];
+        for (let ai = 0; ai < shop.assets.length; ai++) {
+            const da = shop.assets[ai];
+            if (da.qty <= 0) continue;
+            const row = assigned.assetBarcodes?.find((b) => b.shopIndex === si && b.assetIndex === ai);
+            if (!row || row.barcodes.length !== da.qty) {
+                return `กรุณาเลือก Barcode ให้ครบทุกรายการ (Asset: ${da.name})`;
+            }
+            for (const bc of row.barcodes) {
+                if (!bc || !bc.trim()) return `Barcode ของ Asset "${da.name}" ว่าง`;
+                allBarcodes.push(bc.trim());
+            }
+        }
+
+        // 2. CONTROLBOX ต้องมี barcode ครบ qty (Security Type C ไม่ต้อง)
+        for (let si2 = 0; si2 < shop.securitySets.length; si2++) {
+            const ds = shop.securitySets[si2];
+            if (ds.qty <= 0) continue;
+            if (ds.name.includes("Security Type C")) continue;
+            const row = assigned.securityBarcodes?.find((b) => b.shopIndex === si && b.securityIndex === si2);
+            if (!row || row.barcodes.length !== ds.qty) {
+                return `กรุณาเลือก Barcode ให้ครบทุกรายการ (Security: ${ds.name})`;
+            }
+            for (const bc of row.barcodes) {
+                if (!bc || !bc.trim()) return `Barcode ของ Security "${ds.name}" ว่าง`;
+                allBarcodes.push(bc.trim());
+            }
+        }
+    }
+
+    // 3. ไม่มี barcode ซ้ำใน request
+    const seen = new Set<string>();
+    for (const bc of allBarcodes) {
+        if (seen.has(bc)) return `Barcode ซ้ำในรายการ: ${bc}`;
+        seen.add(bc);
+    }
+
+    // 4. barcode ไม่ถูก assign ค้างใน PickAssetTask อื่น
+    if (allBarcodes.length > 0) {
+        const conflictTasks = await prisma.pickAssetTask.findMany({
+            where: {
+                barcode: { in: allBarcodes },
+                status: { notIn: ["completed", "cancelled"] },
+                documentId: { not: documentId },
+            },
+            select: { barcode: true },
+        });
+        if (conflictTasks.length > 0) {
+            return `Barcode ถูกใช้งานอยู่ในเอกสารอื่น: ${conflictTasks.map((t) => t.barcode).join(", ")}`;
+        }
+    }
+
+    // 5. แต่ละ barcode ต้องมี balance=1 + warehouse ตรง + assetName ตรง
+    for (let si = 0; si < documentShops.length; si++) {
+        const shop = documentShops[si];
+        for (let ai = 0; ai < shop.assets.length; ai++) {
+            const da = shop.assets[ai];
+            const row = assigned.assetBarcodes?.find((b) => b.shopIndex === si && b.assetIndex === ai);
+            if (!row) continue;
+            for (const bc of row.barcodes) {
+                const latest = await prisma.assetTransactionHistory.findFirst({
+                    where: { barcode: bc },
+                    orderBy: { id: "desc" },
+                    select: { balance: true, warehouseIn: true, assetName: true },
+                });
+                if (!latest) return `Barcode ${bc} ไม่พบในระบบ`;
+                if (latest.balance !== 1) return `Barcode ${bc} ไม่พร้อมใช้งาน (ออกไปแล้ว)`;
+                if (da.withdrawFor && latest.warehouseIn !== da.withdrawFor) {
+                    return `Barcode ${bc} ไม่ได้อยู่ในโกดัง ${da.withdrawFor} (อยู่ที่ ${latest.warehouseIn || "ไม่ระบุ"})`;
+                }
+                if (latest.assetName !== da.name) {
+                    return `Barcode ${bc} เป็นของ ${latest.assetName} ไม่ตรงกับ ${da.name}`;
+                }
+            }
+        }
+
+        for (let si2 = 0; si2 < shop.securitySets.length; si2++) {
+            const ds = shop.securitySets[si2];
+            if (ds.qty <= 0 || ds.name.includes("Security Type C")) continue;
+            const row = assigned.securityBarcodes?.find((b) => b.shopIndex === si && b.securityIndex === si2);
+            if (!row) continue;
+            for (const bc of row.barcodes) {
+                const latest = await prisma.securitySetTransaction.findFirst({
+                    where: { barcode: bc },
+                    orderBy: { id: "desc" },
+                    select: { balance: true, warehouseIn: true, assetName: true },
+                });
+                if (!latest) return `Security Barcode ${bc} ไม่พบในระบบ`;
+                if (latest.balance !== 1) return `Security Barcode ${bc} ไม่พร้อมใช้งาน (ออกไปแล้ว)`;
+                if (ds.withdrawFor && latest.warehouseIn !== ds.withdrawFor) {
+                    return `Security Barcode ${bc} ไม่ได้อยู่ในโกดัง ${ds.withdrawFor}`;
+                }
+                if (latest.assetName !== ds.name) {
+                    return `Security Barcode ${bc} ไม่ตรงประเภท (${latest.assetName})`;
+                }
+            }
+        }
+    }
+
+    return null;
+}
+
 // ฟังก์ชันสร้าง Pick Asset Tasks (สำหรับลำดับ 1-8)
-async function createPickAssetTasks(documentId: number): Promise<number> {
+async function createPickAssetTasks(documentId: number, assigned?: AssignedBarcodesPayload): Promise<number> {
     const document = await prisma.document.findUnique({
         where: { id: documentId },
         include: {
             createdBy: true, // ✅ เพิ่มเพื่อดึง vendor ของผู้สร้างเอกสาร
             shops: {
                 include: {
-                    assets: true,
-                    securitySets: true,
+                    assets: { orderBy: { id: "asc" } },
+                    securitySets: { orderBy: { id: "asc" } },
                 },
+                orderBy: { id: "asc" },
             },
         },
     });
@@ -134,12 +262,22 @@ async function createPickAssetTasks(documentId: number): Promise<number> {
     const isTransfer = document.documentType === "transfer";
     const creatorVendor = document.createdBy?.vendor || "Unknown";
 
-    // Loop ผ่านแต่ละ Shop
-    for (const shop of document.shops) {
+    // Loop ผ่านแต่ละ Shop (ใช้ ordinal index เพื่อ map กับ assignedBarcodes)
+    for (let shopIdx = 0; shopIdx < document.shops.length; shopIdx++) {
+        const shop = document.shops[shopIdx];
         // สร้าง Tasks สำหรับ Assets
-        for (const asset of shop.assets) {
+        for (let assetIdx = 0; assetIdx < shop.assets.length; assetIdx++) {
+            const asset = shop.assets[assetIdx];
+            // ✅ ดึง barcode pool ที่ admin assign ไว้ของ DocumentAsset นี้
+            const assignedRow = !isTransfer
+                ? assigned?.assetBarcodes?.find((b) => b.shopIndex === shopIdx && b.assetIndex === assetIdx)
+                : undefined;
+
             // สร้าง Task เท่ากับจำนวน qty (แต่ละ Task มี qty = 1)
             for (let i = 0; i < asset.qty; i++) {
+                // ✅ Transfer: barcode = ที่ User ระบุใน DocumentAsset (เหมือนเดิม)
+                // อื่นๆ: barcode = admin assign (จาก pool) → status = "picking"
+                const adminBarcode = assignedRow?.barcodes[i] || null;
                 await prisma.pickAssetTask.create({
                     data: {
                         documentId: document.id,
@@ -159,9 +297,10 @@ async function createPickAssetTasks(documentId: number): Promise<number> {
                         requesterName: document.fullName,
                         requesterCompany: document.company,
                         requesterPhone: document.phone,
-                        status: "pending",
-                        // ✅ Transfer: ส่ง barcode ที่ User ระบุมาด้วย
-                        barcode: isTransfer ? (asset.barcode || null) : null,
+                        // ✅ ถ้า admin assign barcode มาแล้ว → status = "picking" (รอ picker confirm)
+                        status: adminBarcode ? "picking" : "pending",
+                        // ✅ Transfer: ส่ง barcode ที่ User ระบุมาด้วย, อื่นๆ: admin assign
+                        barcode: isTransfer ? (asset.barcode || null) : adminBarcode,
                     },
                 });
                 tasksCreated++;
@@ -169,7 +308,8 @@ async function createPickAssetTasks(documentId: number): Promise<number> {
         }
 
         // สร้าง Tasks สำหรับ Security Sets (เฉพาะที่ qty > 0)
-        for (const security of shop.securitySets) {
+        for (let secIdx = 0; secIdx < shop.securitySets.length; secIdx++) {
+            const security = shop.securitySets[secIdx];
             // ✅ เช็คว่า qty > 0 ก่อนสร้าง Task
             if (security.qty <= 0) {
                 continue; // ข้าม Security Set ที่ qty = 0
@@ -202,7 +342,12 @@ async function createPickAssetTasks(documentId: number): Promise<number> {
                 tasksCreated++;
             } else {
                 // ✅ CONTROLBOX: แยกรายการเป็น 1 ต่อชิ้น (ต้องระบุ Barcode)
+                const assignedSecRow = !isTransfer
+                    ? assigned?.securityBarcodes?.find((b) => b.shopIndex === shopIdx && b.securityIndex === secIdx)
+                    : undefined;
+
                 for (let i = 0; i < security.qty; i++) {
+                    const adminBarcode = assignedSecRow?.barcodes[i] || null;
                     await prisma.pickAssetTask.create({
                         data: {
                             documentId: document.id,
@@ -219,7 +364,8 @@ async function createPickAssetTasks(documentId: number): Promise<number> {
                             requesterName: document.fullName,
                             requesterCompany: document.company,
                             requesterPhone: document.phone,
-                            status: "pending",
+                            status: adminBarcode ? "picking" : "pending",
+                            barcode: adminBarcode,
                         },
                     });
                     tasksCreated++;
@@ -329,7 +475,63 @@ async function createDirectTransactions(documentId: number): Promise<{ created: 
 
     if (!sourceShop) return { created: 0, updated: 0, notFound: [], securityCreated: 0 };
 
-    for (const asset of sourceShop.assets) {
+    // For return/returnasset: iterate ALL shops (multi-shop support)
+    if (document.documentType === "returnasset" || document.documentType === "return") {
+        const wkColumn = getWkColumnForDocumentType(document.documentType, document.returnCondition);
+        for (const returnShop of document.shops) {
+            for (const asset of returnShop.assets) {
+                if (!asset.barcode) continue;
+                const assetData = await prisma.asset.findUnique({ where: { barcode: asset.barcode } });
+
+                await prisma.assetTransactionHistory.create({
+                    data: {
+                        documentId: document.id,
+                        barcode: asset.barcode,
+                        assetName: assetData?.assetName || asset.name,
+                        size: assetData?.size || asset.size || null,
+                        grade: asset.grade || "A",
+                        startWarranty: assetData?.startWarranty || null,
+                        endWarranty: assetData?.endWarranty || null,
+                        cheilPO: assetData?.cheilPO || null,
+                        warehouseIn: documentCreator?.vendor || null,
+                        inStockDate: returnShop.startInstallDate || currentDate,
+                        unitIn: 1,
+                        fromVendor: documentCreator?.vendor || null,
+                        mcsCodeIn: returnShop.shopCode || null,
+                        fromShop: returnShop.shopName || null,
+                        remarkIn: "-",
+                        assetStatus: "USED",
+                        balance: 1,
+                        transactionCategory: "-",
+                        ...getWkDataForTransaction(wkColumn, weekNumber, document.otherActivity),
+                    },
+                });
+                transactionsCreated++;
+
+                if (asset.barcode && asset.barcode.startsWith("NOBC-")) {
+                    const existingAsset = await prisma.asset.findUnique({ where: { barcode: asset.barcode } });
+                    if (!existingAsset) {
+                        await prisma.asset.create({
+                            data: {
+                                barcode: asset.barcode,
+                                assetName: asset.name || null,
+                                size: asset.size || null,
+                                warehouse: documentCreator?.vendor || null,
+                                startWarranty: "-",
+                                endWarranty: "-",
+                                cheilPO: "-",
+                                statusAsset: "NO Barcode",
+                            },
+                        });
+                        console.log(`✅ Created NO BARCODE Asset: ${asset.barcode}`);
+                    }
+                }
+            }
+        }
+    }
+
+    // For shoptoshop, repair: use sourceShop (first shop only)
+    for (const asset of (document.documentType === "returnasset" || document.documentType === "return" ? [] : sourceShop.assets)) {
         if (!asset.barcode) continue; // ข้ามถ้าไม่มี barcode
 
         // ดึงข้อมูล Asset จาก Asset table (ถ้ามี)
@@ -412,80 +614,6 @@ async function createDirectTransactions(documentId: number): Promise<{ created: 
             });
 
             transactionsCreated++;
-
-        } else if (document.documentType === "returnasset" || document.documentType === "return") {
-            // ===== ลำดับ 9: Return Asset (ใบเก็บ Asset กลับ) =====
-            // Logic: ขาเข้าอย่างเดียว (สร้าง Transaction ใหม่)
-            // - เก็บของกลับจาก Shop เข้าโกดัง
-            // - Balance = 1 (กลับมาอยู่ในโกดังแล้ว)
-            // - บันทึก wkIn (เก็บกลับปกติ) หรือ return (เก็บกลับจากการยืม) ตาม returnCondition
-
-            // ✅ กำหนดคอลัมน์ WK ที่จะบันทึก
-            const wkColumn = getWkColumnForDocumentType(document.documentType, document.returnCondition);
-
-            await prisma.assetTransactionHistory.create({
-                data: {
-                    documentId: document.id,
-
-                    // ข้อมูล Asset (ดึงจาก Barcode)
-                    barcode: asset.barcode,
-                    assetName: assetData?.assetName || asset.name,
-                    size: assetData?.size || asset.size || null,
-                    grade: asset.grade || "A",
-                    startWarranty: assetData?.startWarranty || null,
-                    endWarranty: assetData?.endWarranty || null,
-                    cheilPO: assetData?.cheilPO || null,
-
-                    // ===== ขา IN (เก็บกลับเข้าโกดัง) =====
-                    // Warehouse: ดึงจาก Vendor ของผู้ออกเอกสาร (เก็บกลับเข้าโกดังของตัวเอง)
-                    warehouseIn: documentCreator?.vendor || null,
-                    // In Stock Date: ดึงจาก วันที่เริ่มติดตั้ง
-                    inStockDate: sourceShop.startInstallDate || currentDate,
-                    // Unit In: 1
-                    unitIn: 1,
-                    // From Vendor: Vendor ของผู้ออกเอกสาร
-                    fromVendor: documentCreator?.vendor || null,
-                    // MCS Code (In): ดึงจาก MCS Code
-                    mcsCodeIn: sourceShop.shopCode || null,
-                    // From Shop: ดึงจาก Shop Name
-                    fromShop: sourceShop.shopName || null,
-                    // Remark IN: "-"
-                    remarkIn: "-",
-
-                    // ===== Auto by Logic =====
-                    assetStatus: "USED", // ✅ นำเข้าจากการเก็บกลับ
-                    balance: 1, // กลับเข้าโกดังแล้ว (พร้อมใช้งาน)
-                    transactionCategory: "-",
-                    // ✅ บันทึก WK ตามเงื่อนไขหรือ otherActivity
-                    ...getWkDataForTransaction(wkColumn, weekNumber, document.otherActivity),
-                },
-            });
-
-            transactionsCreated++;
-
-            // ✅ สร้าง Asset ใหม่สำหรับ NO BARCODE (barcode ขึ้นต้นด้วย NOBC-)
-            if (asset.barcode && asset.barcode.startsWith("NOBC-")) {
-                // เช็คว่ามี Asset นี้อยู่แล้วหรือยัง
-                const existingAsset = await prisma.asset.findUnique({
-                    where: { barcode: asset.barcode },
-                });
-
-                if (!existingAsset) {
-                    await prisma.asset.create({
-                        data: {
-                            barcode: asset.barcode,
-                            assetName: asset.name || null,
-                            size: asset.size || null,
-                            warehouse: documentCreator?.vendor || null,
-                            startWarranty: "-",
-                            endWarranty: "-",
-                            cheilPO: "-",
-                            statusAsset: "NO Barcode", // ✅ สถานะ NO Barcode
-                        },
-                    });
-                    console.log(`✅ Created NO BARCODE Asset: ${asset.barcode}`);
-                }
-            }
 
         } else if (document.documentType === "repair") {
             // ===== ลำดับ 11: ใบแจ้งซ่อม (Repair) =====
@@ -571,7 +699,7 @@ async function createDirectTransactions(documentId: number): Promise<{ created: 
 
                                 // ===== ขา IN (เก็บกลับเข้าโกดัง) =====
                                 warehouseIn: security.withdrawFor || null,
-                                inStockDate: sourceShop?.startInstallDate || currentDate,
+                                inStockDate: shop.startInstallDate || currentDate,
                                 unitIn: 1,
                                 fromVendor: documentCreator?.vendor || null,
                                 mcsCodeIn: shop.shopCode || null,
@@ -592,7 +720,7 @@ async function createDirectTransactions(documentId: number): Promise<{ created: 
 
                                     // ===== ขา IN (เก็บกลับเข้าโกดัง) =====
                                     warehouseIn: security.withdrawFor || null,
-                                    inStockDate: sourceShop?.startInstallDate || currentDate,
+                                    inStockDate: shop.startInstallDate || currentDate,
                                     unitIn: 1,
                                     fromVendor: documentCreator?.vendor || null,
                                     mcsCodeIn: shop.shopCode || null,
@@ -656,7 +784,11 @@ export async function POST(req: NextRequest) {
 
         // 3. รับ documentId และ otherActivity
         const body = await req.json();
-        const { documentId, otherActivity } = body;
+        const { documentId, otherActivity, assignedBarcodes } = body as {
+            documentId: number;
+            otherActivity?: string | null;
+            assignedBarcodes?: AssignedBarcodesPayload;
+        };
 
         if (!documentId || typeof documentId !== "number") {
             return NextResponse.json(
@@ -683,6 +815,44 @@ export async function POST(req: NextRequest) {
                 { success: false, message: "Document must be submitted first" },
                 { status: 400 }
             );
+        }
+
+        // ✅ 5b. Validate assignedBarcodes ก่อน mutate state ใดๆ (เฉพาะ NEEDS_PICK_ASSET_TYPES และไม่ใช่ transfer)
+        if (
+            NEEDS_PICK_ASSET_TYPES.includes(document.documentType) &&
+            document.documentType !== "transfer"
+        ) {
+            const docShops = await prisma.documentShop.findMany({
+                where: { documentId },
+                include: { assets: true, securitySets: true },
+                orderBy: { id: "asc" },
+            });
+            const shopsForValidate: DocShopLike[] = docShops.map((s) => ({
+                assets: s.assets.map((a) => ({
+                    name: a.name,
+                    size: a.size,
+                    grade: a.grade,
+                    qty: a.qty,
+                    withdrawFor: a.withdrawFor,
+                })),
+                securitySets: s.securitySets.map((sec) => ({
+                    name: sec.name,
+                    qty: sec.qty,
+                    withdrawFor: sec.withdrawFor,
+                })),
+            }));
+            const validationError = await validateAssignedBarcodes(
+                documentId,
+                document.documentType,
+                assignedBarcodes || {},
+                shopsForValidate
+            );
+            if (validationError) {
+                return NextResponse.json(
+                    { success: false, message: validationError },
+                    { status: 400 }
+                );
+            }
         }
 
         // 6. Update document status เป็น approved + บันทึก otherActivity (ถ้ามี)
@@ -730,9 +900,9 @@ export async function POST(req: NextRequest) {
 
         if (needsPicker) {
             // กรณีที่ 1: ต้องผ่าน Picker (ลำดับ 1-8)
-            const tasksCreated = await createPickAssetTasks(documentId);
+            const tasksCreated = await createPickAssetTasks(documentId, assignedBarcodes);
 
-            await writeAuditLog({ userId, username, userRole, action: AuditAction.DOCUMENT_APPROVE, entity: "Document", entityId: String(documentId), detail: { ...auditDetail, tasksCreated }, req });
+            await writeAuditLog({ userId, username, userRole, action: AuditAction.DOCUMENT_APPROVE, entity: "Document", entityId: String(documentId), detail: { ...auditDetail, tasksCreated, assignedBarcodes: assignedBarcodes || null }, req });
             return NextResponse.json({
                 success: true,
                 message: `Document approved successfully. Created ${tasksCreated} pick tasks.`,

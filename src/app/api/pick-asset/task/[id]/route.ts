@@ -144,6 +144,7 @@ export async function GET(
                 barcodeImageUrl: task.barcodeImageUrl,
                 assetImageUrl: task.assetImageUrl,
                 status: task.status,
+                warehouse: task.warehouse,
             })),
 
             // รายการ Security Sets
@@ -155,6 +156,7 @@ export async function GET(
                 barcodeImageUrl: task.barcodeImageUrl,
                 assetImageUrl: task.assetImageUrl,
                 status: task.status,
+                warehouse: task.warehouse,
             })),
 
             // สถานะรวม

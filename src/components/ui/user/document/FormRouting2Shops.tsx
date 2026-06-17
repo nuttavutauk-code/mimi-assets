@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import OtherActivitiesSelect, { OtherActivity } from "@/components/ui/admin/OtherActivitiesSelect";
 import StatusSelect, { StatusOption } from "@/components/ui/admin/StatusSelect";
 import PreviewApproveModal from "@/components/ui/PreviewApproveModal";
+import BarcodeAssignSelector from "@/components/ui/admin/BarcodeAssignSelector";
 
 type ShopItem = { mcsCode: string; shopName: string };
 type AssetRow = {
@@ -81,6 +82,10 @@ const FormRouting2Shops = ({ mode = "user" }: { mode?: FormMode }) => {
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [userVendor, setUserVendor] = useState("");
   const [previewShopIndex, setPreviewShopIndex] = useState(0);
+  const [assetBarcodes1, setAssetBarcodes1] = useState<Record<number, string[]>>({});
+  const [securityBarcodes1, setSecurityBarcodes1] = useState<Record<number, string[]>>({});
+  const [assetBarcodes2, setAssetBarcodes2] = useState<Record<number, string[]>>({});
+  const [securityBarcodes2, setSecurityBarcodes2] = useState<Record<number, string[]>>({});
 
   // Shop 1
   const [shop1, setShop1] = useState<ShopState>({
@@ -304,6 +309,28 @@ const FormRouting2Shops = ({ mode = "user" }: { mode?: FormMode }) => {
       return;
     }
 
+    if (mode === "admin") {
+      const filledAssets1 = assets1.filter(a => a.name && a.name.trim() !== "");
+      const filledAssets2 = assets2.filter(a => a.name && a.name.trim() !== "");
+      const check = (label: string, arr: any[], bcMap: Record<number, string[]>) => {
+        const m = arr.find(a => {
+          const v = bcMap[a.id] || [];
+          return v.length !== a.qty || v.some(b => !b || !b.trim());
+        });
+        return m ? `กรุณาเลือก Barcode ให้ครบทุกรายการ ${label}: ${m.name}` : null;
+      };
+      const checkSec = (label: string, arr: any[], bcMap: Record<number, string[]>) => {
+        const m = arr.filter(s => !s.name.includes("Security Type C")).find(s => {
+          const v = bcMap[s.id] || [];
+          return v.length !== s.qty || v.some(b => !b || !b.trim());
+        });
+        return m ? `กรุณาเลือก Barcode ให้ครบทุกรายการ ${label}: ${m.name}` : null;
+      };
+      const err = check("Shop1 Asset", filledAssets1, assetBarcodes1) || check("Shop2 Asset", filledAssets2, assetBarcodes2)
+        || checkSec("Shop1 Security", filledSecuritySets1, securityBarcodes1) || checkSec("Shop2 Security", filledSecuritySets2, securityBarcodes2);
+      if (err) { toast.error(err); return; }
+    }
+
     setPreviewShopIndex(0);
     setShowPreviewModal(true);
   };
@@ -339,6 +366,25 @@ const FormRouting2Shops = ({ mode = "user" }: { mode?: FormMode }) => {
           setIsSubmitting(false);
           return;
         }
+        const filledAssets1 = assets1.filter(a => a.name && a.name.trim() !== "");
+        const filledAssets2 = assets2.filter(a => a.name && a.name.trim() !== "");
+        const check = (label: string, arr: any[], bcMap: Record<number, string[]>) => {
+          const m = arr.find(a => {
+            const v = bcMap[a.id] || [];
+            return v.length !== a.qty || v.some(b => !b || !b.trim());
+          });
+          return m ? `กรุณาเลือก Barcode ให้ครบทุกรายการ ${label}: ${m.name}` : null;
+        };
+        const checkSec = (label: string, arr: any[], bcMap: Record<number, string[]>) => {
+          const m = arr.filter(s => !s.name.includes("Security Type C")).find(s => {
+            const v = bcMap[s.id] || [];
+            return v.length !== s.qty || v.some(b => !b || !b.trim());
+          });
+          return m ? `กรุณาเลือก Barcode ให้ครบทุกรายการ ${label}: ${m.name}` : null;
+        };
+        const err = check("Shop1 Asset", filledAssets1, assetBarcodes1) || check("Shop2 Asset", filledAssets2, assetBarcodes2)
+          || checkSec("Shop1 Security", filledSecuritySets1, securityBarcodes1) || checkSec("Shop2 Security", filledSecuritySets2, securityBarcodes2);
+        if (err) { toast.error(err); setIsSubmitting(false); return; }
       }
 
       if (action === "approve" && editId) {
@@ -361,7 +407,21 @@ const FormRouting2Shops = ({ mode = "user" }: { mode?: FormMode }) => {
         const updateRes = await fetch(`/api/document/update/${editId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(updatePayload) });
         const updateR = await updateRes.json();
         if (!updateR.success) throw new Error(updateR.message);
-        const res = await fetch("/api/document/approve", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ documentId: parseInt(editId), otherActivity }) });
+        const filledAssets1Payload = assets1.filter(a => a.name && a.name.trim() !== "");
+        const filledAssets2Payload = assets2.filter(a => a.name && a.name.trim() !== "");
+        const sec1Payload = securitySets1.filter(s => s.qty > 0);
+        const sec2Payload = securitySets2.filter(s => s.qty > 0);
+        const assignedBarcodes = {
+          assetBarcodes: [
+            ...filledAssets1Payload.map((a, idx) => ({ shopIndex: 0, assetIndex: idx, barcodes: (assetBarcodes1[a.id] || []).slice(0, a.qty) })),
+            ...filledAssets2Payload.map((a, idx) => ({ shopIndex: 1, assetIndex: idx, barcodes: (assetBarcodes2[a.id] || []).slice(0, a.qty) })),
+          ],
+          securityBarcodes: [
+            ...sec1Payload.map((s, idx) => ({ shopIndex: 0, securityIndex: idx, barcodes: s.name.includes("Security Type C") ? [] : (securityBarcodes1[s.id] || []).slice(0, s.qty) })),
+            ...sec2Payload.map((s, idx) => ({ shopIndex: 1, securityIndex: idx, barcodes: s.name.includes("Security Type C") ? [] : (securityBarcodes2[s.id] || []).slice(0, s.qty) })),
+          ],
+        };
+        const res = await fetch("/api/document/approve", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ documentId: parseInt(editId), otherActivity, assignedBarcodes }) });
         const r = await res.json();
         if (!r.success) throw new Error(r.message);
         toast.success("อนุมัติสำเร็จ!"); router.push("/dashboard/admin-list"); return;
@@ -500,6 +560,8 @@ const FormRouting2Shops = ({ mode = "user" }: { mode?: FormMode }) => {
     const setShowAssetDropdown = shopNum === 1 ? setShowAssetDropdown1 : setShowAssetDropdown2;
     const debouncedAssetSearch = shopNum === 1 ? debouncedAssetSearch1 : debouncedAssetSearch2;
     const assetIdCounter = shopNum === 1 ? assetIdCounter1 : assetIdCounter2;
+    const assetBarcodes = shopNum === 1 ? assetBarcodes1 : assetBarcodes2;
+    const setAssetBarcodes = shopNum === 1 ? setAssetBarcodes1 : setAssetBarcodes2;
 
     return (
       <div className="glass-card p-4 sm:p-5">
@@ -676,6 +738,13 @@ const FormRouting2Shops = ({ mode = "user" }: { mode?: FormMode }) => {
                   </div>
                 )}
               </div>
+              {mode === "admin" && asset.name && (
+                <div className="mt-3 p-3 rounded-lg bg-blue-50/40 border border-blue-200">
+                  <label className="block text-xs text-blue-700 font-medium mb-2">เลือก Barcode (qty {asset.qty})</label>
+                  <BarcodeAssignSelector warehouse={asset.withdrawFor} assetName={asset.name} qty={asset.qty}
+                    value={assetBarcodes[asset.id] || []} onChange={(next) => setAssetBarcodes(p => ({ ...p, [asset.id]: next }))} />
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -687,6 +756,8 @@ const FormRouting2Shops = ({ mode = "user" }: { mode?: FormMode }) => {
   const renderSecuritySetCard = (shopNum: 1 | 2) => {
     const securitySets = shopNum === 1 ? securitySets1 : securitySets2;
     const setSecuritySets = shopNum === 1 ? setSecuritySets1 : setSecuritySets2;
+    const securityBarcodes = shopNum === 1 ? securityBarcodes1 : securityBarcodes2;
+    const setSecurityBarcodes = shopNum === 1 ? setSecurityBarcodes1 : setSecurityBarcodes2;
 
     return (
       <div className="glass-card p-4 sm:p-5">
@@ -696,22 +767,31 @@ const FormRouting2Shops = ({ mode = "user" }: { mode?: FormMode }) => {
         </div>
         <div className="space-y-3">
           {securitySets.map(set => (
-            <div key={set.id} className="p-4 rounded-xl bg-black/2 border border-black/5 grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
-              <div className="sm:col-span-6">
-                <label className="block text-xs text-muted-foreground mb-1">ชื่อ Security</label>
-                <Input value={set.name} readOnly className="glass-input bg-black/5" />
+            <div key={set.id} className="p-4 rounded-xl bg-black/2 border border-black/5">
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+                <div className="sm:col-span-6">
+                  <label className="block text-xs text-muted-foreground mb-1">ชื่อ Security</label>
+                  <Input value={set.name} readOnly className="glass-input bg-black/5" />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-xs text-muted-foreground mb-1">จำนวน</label>
+                  <Input type="number" min={0} value={set.qty} onChange={(e) => { const newQty = Math.max(0, +e.target.value); const defaultVendor = vendors.find(v => v === "NEWLOOK") || vendors[0] || ""; setSecuritySets(p => p.map(s => s.id === set.id ? { ...s, qty: newQty, withdrawFor: newQty > 0 && !s.withdrawFor && defaultVendor ? defaultVendor : (newQty === 0 ? "" : s.withdrawFor) } : s)); }} className="glass-input text-center" />
+                </div>
+                {mode === "admin" && (
+                  <div className="sm:col-span-4">
+                    <label className="block text-xs text-muted-foreground mb-1">โกดัง</label>
+                    <Select value={set.withdrawFor} onValueChange={(v) => setSecuritySets(p => p.map(s => s.id === set.id ? { ...s, withdrawFor: v } : s))}>
+                      <SelectTrigger className="glass-input"><SelectValue placeholder="เลือก" /></SelectTrigger>
+                      <SelectContent>{vendors.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
-              <div className="sm:col-span-2">
-                <label className="block text-xs text-muted-foreground mb-1">จำนวน</label>
-                <Input type="number" min={0} value={set.qty} onChange={(e) => { const newQty = Math.max(0, +e.target.value); const defaultVendor = vendors.find(v => v === "NEWLOOK") || vendors[0] || ""; setSecuritySets(p => p.map(s => s.id === set.id ? { ...s, qty: newQty, withdrawFor: newQty > 0 && !s.withdrawFor && defaultVendor ? defaultVendor : (newQty === 0 ? "" : s.withdrawFor) } : s)); }} className="glass-input text-center" />
-              </div>
-              {mode === "admin" && (
-                <div className="sm:col-span-4">
-                  <label className="block text-xs text-muted-foreground mb-1">โกดัง</label>
-                  <Select value={set.withdrawFor} onValueChange={(v) => setSecuritySets(p => p.map(s => s.id === set.id ? { ...s, withdrawFor: v } : s))}>
-                    <SelectTrigger className="glass-input"><SelectValue placeholder="เลือก" /></SelectTrigger>
-                    <SelectContent>{vendors.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent>
-                  </Select>
+              {mode === "admin" && set.qty > 0 && !set.name.includes("Security Type C") && (
+                <div className="mt-3 p-3 rounded-lg bg-purple-50/40 border border-purple-200">
+                  <label className="block text-xs text-purple-700 font-medium mb-2">เลือก Barcode CONTROLBOX (qty {set.qty})</label>
+                  <BarcodeAssignSelector warehouse={set.withdrawFor} assetName={set.name} qty={set.qty}
+                    value={securityBarcodes[set.id] || []} onChange={(next) => setSecurityBarcodes(p => ({ ...p, [set.id]: next }))} isSecuritySet />
                 </div>
               )}
             </div>
@@ -837,11 +917,13 @@ const FormRouting2Shops = ({ mode = "user" }: { mode?: FormMode }) => {
           qty: a.qty,
           withdrawFor: a.withdrawFor,
           barcode: "",
+          assignedBarcodes: (previewShopIndex === 0 ? assetBarcodes1 : assetBarcodes2)[a.id] || [],
         }))}
         securitySets={currentPreviewShop.securitySets.filter(s => s.qty > 0).map(s => ({
           name: s.name,
           qty: s.qty,
           withdrawFor: s.withdrawFor,
+          assignedBarcodes: s.name.includes("Security Type C") ? [] : ((previewShopIndex === 0 ? securityBarcodes1 : securityBarcodes2)[s.id] || []),
         }))}
         shops={shopsForPreview.map(shop => ({
           shopCode: shop.shopCode,

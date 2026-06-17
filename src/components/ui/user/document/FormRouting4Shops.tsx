@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import OtherActivitiesSelect, { OtherActivity } from "@/components/ui/admin/OtherActivitiesSelect";
 import StatusSelect, { StatusOption } from "@/components/ui/admin/StatusSelect";
 import PreviewApproveModal from "@/components/ui/PreviewApproveModal";
+import BarcodeAssignSelector from "@/components/ui/admin/BarcodeAssignSelector";
 
 type ShopItem = { mcsCode: string; shopName: string };
 type AssetRow = { id: number; name: string; size: string; kv: string; qty: number; withdrawFor: string; autoWarehouse?: boolean; useCustomSize?: boolean; customW?: string; customD?: string; customH?: string; customXX?: string; isSelected?: boolean; };
@@ -34,6 +35,14 @@ const FormRouting4Shops = ({ mode = "user" }: { mode?: FormMode }) => {
   const [otherActivity, setOtherActivity] = useState<OtherActivity>(""); const [transactionStatus, setTransactionStatus] = useState<StatusOption>("");
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [userVendor, setUserVendor] = useState("");
+  const [assetBarcodes1, setAssetBarcodes1] = useState<Record<number, string[]>>({});
+  const [securityBarcodes1, setSecurityBarcodes1] = useState<Record<number, string[]>>({});
+  const [assetBarcodes2, setAssetBarcodes2] = useState<Record<number, string[]>>({});
+  const [securityBarcodes2, setSecurityBarcodes2] = useState<Record<number, string[]>>({});
+  const [assetBarcodes3, setAssetBarcodes3] = useState<Record<number, string[]>>({});
+  const [securityBarcodes3, setSecurityBarcodes3] = useState<Record<number, string[]>>({});
+  const [assetBarcodes4, setAssetBarcodes4] = useState<Record<number, string[]>>({});
+  const [securityBarcodes4, setSecurityBarcodes4] = useState<Record<number, string[]>>({});
 
   const [shop1, setShop1] = useState<ShopState>({ noMcs: false, shopCode: "", shopName: "", startDate: "", endDate: "", q7b7: "", focus: "", searchResults: [], showDropdown: false });
   const [assets1, setAssets1] = useState<AssetRow[]>([{ id: assetIdCounter1.current++, name: "", size: "", kv: "", qty: 1, withdrawFor: "" }]);
@@ -110,6 +119,26 @@ const FormRouting4Shops = ({ mode = "user" }: { mode?: FormMode }) => {
     const missingWarehouse = allAssets.some(a => !a.withdrawFor || a.withdrawFor.trim() === "");
     if (missingWarehouse) { toast.error("กรุณาเลือกโกดังให้ครบทุกรายการก่อนอนุมัติ"); return; }
 
+    if (mode === "admin") {
+      const filledAssets1 = assets1.filter(a => a.name && a.name.trim() !== "");
+      const filledAssets2 = assets2.filter(a => a.name && a.name.trim() !== "");
+      const filledAssets3 = assets3.filter(a => a.name && a.name.trim() !== "");
+      const filledAssets4 = assets4.filter(a => a.name && a.name.trim() !== "");
+      const check = (label: string, arr: any[], bcMap: Record<number, string[]>) => {
+        const m = arr.find(a => { const v = bcMap[a.id] || []; return v.length !== a.qty || v.some(b => !b || !b.trim()); });
+        return m ? `กรุณาเลือก Barcode ให้ครบทุกรายการ ${label}: ${m.name}` : null;
+      };
+      const checkSec = (label: string, arr: any[], bcMap: Record<number, string[]>) => {
+        const m = arr.filter(s => !s.name.includes("Security Type C")).find(s => { const v = bcMap[s.id] || []; return v.length !== s.qty || v.some(b => !b || !b.trim()); });
+        return m ? `กรุณาเลือก Barcode ให้ครบทุกรายการ ${label}: ${m.name}` : null;
+      };
+      const err = check("Shop1 Asset", filledAssets1, assetBarcodes1) || check("Shop2 Asset", filledAssets2, assetBarcodes2)
+        || check("Shop3 Asset", filledAssets3, assetBarcodes3) || check("Shop4 Asset", filledAssets4, assetBarcodes4)
+        || checkSec("Shop1 Security", filledSec1, securityBarcodes1) || checkSec("Shop2 Security", filledSec2, securityBarcodes2)
+        || checkSec("Shop3 Security", filledSec3, securityBarcodes3) || checkSec("Shop4 Security", filledSec4, securityBarcodes4);
+      if (err) { toast.error(err); return; }
+    }
+
     setShowPreviewModal(true);
   };
 
@@ -145,8 +174,56 @@ const FormRouting4Shops = ({ mode = "user" }: { mode?: FormMode }) => {
           setIsSubmitting(false);
           return;
         }
+        const filledAssets1V = assets1.filter(a => a.name && a.name.trim() !== "");
+        const filledAssets2V = assets2.filter(a => a.name && a.name.trim() !== "");
+        const filledAssets3V = assets3.filter(a => a.name && a.name.trim() !== "");
+        const filledAssets4V = assets4.filter(a => a.name && a.name.trim() !== "");
+        const check = (label: string, arr: any[], bcMap: Record<number, string[]>) => {
+          const m = arr.find(a => { const v = bcMap[a.id] || []; return v.length !== a.qty || v.some(b => !b || !b.trim()); });
+          return m ? `กรุณาเลือก Barcode ให้ครบทุกรายการ ${label}: ${m.name}` : null;
+        };
+        const checkSec = (label: string, arr: any[], bcMap: Record<number, string[]>) => {
+          const m = arr.filter(s => !s.name.includes("Security Type C")).find(s => { const v = bcMap[s.id] || []; return v.length !== s.qty || v.some(b => !b || !b.trim()); });
+          return m ? `กรุณาเลือก Barcode ให้ครบทุกรายการ ${label}: ${m.name}` : null;
+        };
+        const err = check("Shop1 Asset", filledAssets1V, assetBarcodes1) || check("Shop2 Asset", filledAssets2V, assetBarcodes2)
+          || check("Shop3 Asset", filledAssets3V, assetBarcodes3) || check("Shop4 Asset", filledAssets4V, assetBarcodes4)
+          || checkSec("Shop1 Security", filledSec1, securityBarcodes1) || checkSec("Shop2 Security", filledSec2, securityBarcodes2)
+          || checkSec("Shop3 Security", filledSec3, securityBarcodes3) || checkSec("Shop4 Security", filledSec4, securityBarcodes4);
+        if (err) { toast.error(err); setIsSubmitting(false); return; }
       }
-      if (action === "approve" && editId) { const updatePayload = { documentType: "routing4shops", docCode: formData.docNumber, fullName: formData.fullName, company: formData.company, phone: formData.phone, note, status: "submitted", shops: shopsPayload }; const updateRes = await fetch(`/api/document/update/${editId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(updatePayload) }); const updateR = await updateRes.json(); if (!updateR.success) throw new Error(updateR.message); const res = await fetch("/api/document/approve", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ documentId: parseInt(editId), otherActivity }) }); const r = await res.json(); if (!r.success) throw new Error(r.message); toast.success("อนุมัติสำเร็จ!"); router.push("/dashboard/admin-list"); return; }
+      if (action === "approve" && editId) {
+        const filledAssets1P = assets1.filter(a => a.name && a.name.trim() !== "");
+        const filledAssets2P = assets2.filter(a => a.name && a.name.trim() !== "");
+        const filledAssets3P = assets3.filter(a => a.name && a.name.trim() !== "");
+        const filledAssets4P = assets4.filter(a => a.name && a.name.trim() !== "");
+        const sec1P = securitySets1.filter(s => s.qty > 0);
+        const sec2P = securitySets2.filter(s => s.qty > 0);
+        const sec3P = securitySets3.filter(s => s.qty > 0);
+        const sec4P = securitySets4.filter(s => s.qty > 0);
+        const assignedBarcodes = {
+          assetBarcodes: [
+            ...filledAssets1P.map((a, idx) => ({ shopIndex: 0, assetIndex: idx, barcodes: (assetBarcodes1[a.id] || []).slice(0, a.qty) })),
+            ...filledAssets2P.map((a, idx) => ({ shopIndex: 1, assetIndex: idx, barcodes: (assetBarcodes2[a.id] || []).slice(0, a.qty) })),
+            ...filledAssets3P.map((a, idx) => ({ shopIndex: 2, assetIndex: idx, barcodes: (assetBarcodes3[a.id] || []).slice(0, a.qty) })),
+            ...filledAssets4P.map((a, idx) => ({ shopIndex: 3, assetIndex: idx, barcodes: (assetBarcodes4[a.id] || []).slice(0, a.qty) })),
+          ],
+          securityBarcodes: [
+            ...sec1P.map((s, idx) => ({ shopIndex: 0, securityIndex: idx, barcodes: s.name.includes("Security Type C") ? [] : (securityBarcodes1[s.id] || []).slice(0, s.qty) })),
+            ...sec2P.map((s, idx) => ({ shopIndex: 1, securityIndex: idx, barcodes: s.name.includes("Security Type C") ? [] : (securityBarcodes2[s.id] || []).slice(0, s.qty) })),
+            ...sec3P.map((s, idx) => ({ shopIndex: 2, securityIndex: idx, barcodes: s.name.includes("Security Type C") ? [] : (securityBarcodes3[s.id] || []).slice(0, s.qty) })),
+            ...sec4P.map((s, idx) => ({ shopIndex: 3, securityIndex: idx, barcodes: s.name.includes("Security Type C") ? [] : (securityBarcodes4[s.id] || []).slice(0, s.qty) })),
+          ],
+        };
+        const updatePayload = { documentType: "routing4shops", docCode: formData.docNumber, fullName: formData.fullName, company: formData.company, phone: formData.phone, note, status: "submitted", shops: shopsPayload };
+        const updateRes = await fetch(`/api/document/update/${editId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(updatePayload) });
+        const updateR = await updateRes.json();
+        if (!updateR.success) throw new Error(updateR.message);
+        const res = await fetch("/api/document/approve", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ documentId: parseInt(editId), otherActivity, assignedBarcodes }) });
+        const r = await res.json();
+        if (!r.success) throw new Error(r.message);
+        toast.success("อนุมัติสำเร็จ!"); router.push("/dashboard/admin-list"); return;
+      }
       if (action === "reject" && editId) { const res = await fetch(`/api/document/update/${editId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: "rejected", note }) }); const r = await res.json(); if (!r.success) throw new Error(r.message); toast.success("ปฏิเสธสำเร็จ!"); router.push("/dashboard/admin-list"); return; }
       const payload = { documentType: "routing4shops", docCode: formData.docNumber, fullName: formData.fullName, company: formData.company, phone: formData.phone, note, status: "submitted", shops: shopsPayload };
       const res = await fetch(isEdit ? `/api/document/update/${editId}` : "/api/document/create", { method: isEdit ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }); const r = await res.json(); if (!r.success) throw new Error(r.message); toast.success(isEdit ? "แก้ไขสำเร็จ!" : "บันทึกสำเร็จ!"); router.push(mode === "admin" ? "/dashboard/admin-list" : "/dashboard/user-list");
@@ -174,13 +251,17 @@ const FormRouting4Shops = ({ mode = "user" }: { mode?: FormMode }) => {
     const setShowAssetDropdown = shopNum === 1 ? setShowAssetDropdown1 : shopNum === 2 ? setShowAssetDropdown2 : shopNum === 3 ? setShowAssetDropdown3 : setShowAssetDropdown4;
     const debouncedAssetSearch = shopNum === 1 ? debouncedAssetSearch1 : shopNum === 2 ? debouncedAssetSearch2 : shopNum === 3 ? debouncedAssetSearch3 : debouncedAssetSearch4;
     const assetIdCounter = shopNum === 1 ? assetIdCounter1 : shopNum === 2 ? assetIdCounter2 : shopNum === 3 ? assetIdCounter3 : assetIdCounter4;
-    return (<div className="glass-card p-4 sm:p-5"><div className="flex items-center justify-between mb-4"><div className="flex items-center gap-2"><div className="icon-container purple !w-8 !h-8"><Package className="w-4 h-4" /></div><h2 className="font-semibold">Asset Shop ที่ {shopNum}</h2><span className="text-xs text-muted-foreground">({assets.length}/3)</span></div>{assets.length < 3 && <button onClick={() => setAssets([...assets, { id: assetIdCounter.current++, name: "", size: "", kv: "", qty: 1, withdrawFor: "" }])} className="glass-button px-3 py-2 text-sm flex items-center gap-1"><Plus className="w-4 h-4" />เพิ่ม</button>}</div><div className="space-y-3">{assets.map((asset) => (<div key={asset.id} className="p-4 rounded-xl bg-black/2 border border-black/5"><div className="grid grid-cols-1 sm:grid-cols-12 gap-3"><div className="sm:col-span-4 relative"><label className="block text-xs text-muted-foreground mb-1">Asset Name <span className="text-red-500">*</span></label><div className="relative"><Input value={asset.name} onChange={(e) => { if (!asset.isSelected) { setAssets(p => p.map(a => a.id === asset.id ? { ...a, name: e.target.value } : a)); debouncedAssetSearch(e.target.value, asset.id); } }} onFocus={() => !asset.isSelected && assetSearchResults.length > 0 && setShowAssetDropdown(p => ({ ...p, [asset.id]: true }))} onBlur={() => setTimeout(() => setShowAssetDropdown(p => ({ ...p, [asset.id]: false })), 200)} placeholder="พิมพ์ชื่อ Asset..." readOnly={asset.isSelected} className={`glass-input ${asset.isSelected ? "pr-10 bg-gray-50" : ""}`} />{asset.isSelected && (<button type="button" onClick={() => setAssets(p => p.map(a => a.id === asset.id ? { ...a, name: "", size: "", isSelected: false } : a))} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-gray-200 text-gray-400 hover:text-gray-600" title="ล้างเพื่อเลือกใหม่"><X className="w-4 h-4" /></button>)}</div>{showAssetDropdown[asset.id] && assetSearchResults.length > 0 && !asset.isSelected && (<div className="absolute top-full left-0 z-20 mt-1 w-full bg-white border rounded-xl shadow-lg max-h-48 overflow-auto">{assetSearchResults.map(name => (<div key={name} className="px-3 py-2 hover:bg-black/5 cursor-pointer text-sm" onMouseDown={(e) => { e.preventDefault(); setAssets(p => p.map(a => a.id === asset.id ? { ...a, name, isSelected: true } : a)); fetchSizes(name, shopNum, asset.id); setShowAssetDropdown(p => ({ ...p, [asset.id]: false })); }}>{name}</div>))}</div>)}</div><div className="sm:col-span-2"><label className="block text-xs text-muted-foreground mb-1">Size</label><Select value={asset.useCustomSize ? "ไม่มีsize" : asset.size} onValueChange={(v) => { if (v === "ไม่มีsize") { setAssets(p => p.map(a => a.id === asset.id ? { ...a, size: "", useCustomSize: true, customW: "", customD: "", customH: "", customXX: "" } : a)); } else { setAssets(p => p.map(a => a.id === asset.id ? { ...a, size: v, useCustomSize: false, customW: undefined, customD: undefined, customH: undefined, customXX: undefined } : a)); } }}><SelectTrigger className="glass-input"><SelectValue placeholder="เลือก" /></SelectTrigger><SelectContent>{(sizeOptions[asset.id] || []).map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></div>{asset.useCustomSize && isCustomSizeAsset(asset.name) && (<div className="sm:col-span-12 mt-2"><div className="p-3 rounded-lg bg-amber-50 border border-amber-200"><label className="block text-xs text-amber-700 font-medium mb-2">กรอกขนาด (W*D*H(XX))</label><div className="grid grid-cols-4 gap-2"><div><label className="block text-xs text-muted-foreground mb-1">W</label><Input value={asset.customW || ""} onChange={(e) => { const newW = e.target.value; setAssets(p => p.map(a => a.id !== asset.id ? a : { ...a, customW: newW, size: `${newW}*${a.customD || ""}*${a.customH || ""}(${a.customXX || ""})` })); }} placeholder="W" className="glass-input text-center" /></div><div><label className="block text-xs text-muted-foreground mb-1">D</label><Input value={asset.customD || ""} onChange={(e) => { const newD = e.target.value; setAssets(p => p.map(a => a.id !== asset.id ? a : { ...a, customD: newD, size: `${a.customW || ""}*${newD}*${a.customH || ""}(${a.customXX || ""})` })); }} placeholder="D" className="glass-input text-center" /></div><div><label className="block text-xs text-muted-foreground mb-1">H</label><Input value={asset.customH || ""} onChange={(e) => { const newH = e.target.value; setAssets(p => p.map(a => a.id !== asset.id ? a : { ...a, customH: newH, size: `${a.customW || ""}*${a.customD || ""}*${newH}(${a.customXX || ""})` })); }} placeholder="H" className="glass-input text-center" /></div><div><label className="block text-xs text-muted-foreground mb-1">XX</label><Input value={asset.customXX || ""} onChange={(e) => { const newXX = e.target.value; setAssets(p => p.map(a => a.id !== asset.id ? a : { ...a, customXX: newXX, size: `${a.customW || ""}*${a.customD || ""}*${a.customH || ""}(${newXX})` })); }} placeholder="XX" className="glass-input text-center" /></div></div>{asset.customW && asset.customD && asset.customH && (<p className="text-xs text-amber-600 mt-2">ขนาด: <span className="font-medium">{asset.customW}*{asset.customD}*{asset.customH}({asset.customXX || ""})</span></p>)}</div></div>)}<div className="sm:col-span-2"><label className="block text-xs text-muted-foreground mb-1">KV</label><Input value={asset.kv} onChange={(e) => setAssets(p => p.map(a => a.id === asset.id ? { ...a, kv: e.target.value } : a))} placeholder="KV" className="glass-input text-center" /></div><div className="sm:col-span-1"><label className="block text-xs text-muted-foreground mb-1">จำนวน</label><Input type="number" min={1} value={asset.qty} onChange={(e) => setAssets(p => p.map(a => a.id === asset.id ? { ...a, qty: Math.max(1, +e.target.value) } : a))} className="glass-input text-center" /></div>{mode === "admin" && (<div className="sm:col-span-2"><label className="block text-xs text-muted-foreground mb-1">โกดัง</label><Select value={asset.withdrawFor} onValueChange={(v) => setAssets(p => p.map(a => a.id === asset.id ? { ...a, withdrawFor: v } : a))}><SelectTrigger className="glass-input"><SelectValue placeholder="เลือก" /></SelectTrigger><SelectContent>{vendors.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent></Select></div>)}{assets.length > 1 && (<div className="flex items-end"><button onClick={() => setAssets(p => p.filter(a => a.id !== asset.id))} className="p-2 rounded-lg bg-red-50 text-red-500 hover:bg-red-100"><Trash2 className="w-4 h-4" /></button></div>)}</div></div>))}</div></div>);
+    const assetBarcodes = shopNum === 1 ? assetBarcodes1 : shopNum === 2 ? assetBarcodes2 : shopNum === 3 ? assetBarcodes3 : assetBarcodes4;
+    const setAssetBarcodes = shopNum === 1 ? setAssetBarcodes1 : shopNum === 2 ? setAssetBarcodes2 : shopNum === 3 ? setAssetBarcodes3 : setAssetBarcodes4;
+    return (<div className="glass-card p-4 sm:p-5"><div className="flex items-center justify-between mb-4"><div className="flex items-center gap-2"><div className="icon-container purple !w-8 !h-8"><Package className="w-4 h-4" /></div><h2 className="font-semibold">Asset Shop ที่ {shopNum}</h2><span className="text-xs text-muted-foreground">({assets.length}/3)</span></div>{assets.length < 3 && <button onClick={() => setAssets([...assets, { id: assetIdCounter.current++, name: "", size: "", kv: "", qty: 1, withdrawFor: "" }])} className="glass-button px-3 py-2 text-sm flex items-center gap-1"><Plus className="w-4 h-4" />เพิ่ม</button>}</div><div className="space-y-3">{assets.map((asset) => (<div key={asset.id} className="p-4 rounded-xl bg-black/2 border border-black/5"><div className="grid grid-cols-1 sm:grid-cols-12 gap-3"><div className="sm:col-span-4 relative"><label className="block text-xs text-muted-foreground mb-1">Asset Name <span className="text-red-500">*</span></label><div className="relative"><Input value={asset.name} onChange={(e) => { if (!asset.isSelected) { setAssets(p => p.map(a => a.id === asset.id ? { ...a, name: e.target.value } : a)); debouncedAssetSearch(e.target.value, asset.id); } }} onFocus={() => !asset.isSelected && assetSearchResults.length > 0 && setShowAssetDropdown(p => ({ ...p, [asset.id]: true }))} onBlur={() => setTimeout(() => setShowAssetDropdown(p => ({ ...p, [asset.id]: false })), 200)} placeholder="พิมพ์ชื่อ Asset..." readOnly={asset.isSelected} className={`glass-input ${asset.isSelected ? "pr-10 bg-gray-50" : ""}`} />{asset.isSelected && (<button type="button" onClick={() => setAssets(p => p.map(a => a.id === asset.id ? { ...a, name: "", size: "", isSelected: false } : a))} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-gray-200 text-gray-400 hover:text-gray-600" title="ล้างเพื่อเลือกใหม่"><X className="w-4 h-4" /></button>)}</div>{showAssetDropdown[asset.id] && assetSearchResults.length > 0 && !asset.isSelected && (<div className="absolute top-full left-0 z-20 mt-1 w-full bg-white border rounded-xl shadow-lg max-h-48 overflow-auto">{assetSearchResults.map(name => (<div key={name} className="px-3 py-2 hover:bg-black/5 cursor-pointer text-sm" onMouseDown={(e) => { e.preventDefault(); setAssets(p => p.map(a => a.id === asset.id ? { ...a, name, isSelected: true } : a)); fetchSizes(name, shopNum, asset.id); setShowAssetDropdown(p => ({ ...p, [asset.id]: false })); }}>{name}</div>))}</div>)}</div><div className="sm:col-span-2"><label className="block text-xs text-muted-foreground mb-1">Size</label><Select value={asset.useCustomSize ? "ไม่มีsize" : asset.size} onValueChange={(v) => { if (v === "ไม่มีsize") { setAssets(p => p.map(a => a.id === asset.id ? { ...a, size: "", useCustomSize: true, customW: "", customD: "", customH: "", customXX: "" } : a)); } else { setAssets(p => p.map(a => a.id === asset.id ? { ...a, size: v, useCustomSize: false, customW: undefined, customD: undefined, customH: undefined, customXX: undefined } : a)); } }}><SelectTrigger className="glass-input"><SelectValue placeholder="เลือก" /></SelectTrigger><SelectContent>{(sizeOptions[asset.id] || []).map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></div>{asset.useCustomSize && isCustomSizeAsset(asset.name) && (<div className="sm:col-span-12 mt-2"><div className="p-3 rounded-lg bg-amber-50 border border-amber-200"><label className="block text-xs text-amber-700 font-medium mb-2">กรอกขนาด (W*D*H(XX))</label><div className="grid grid-cols-4 gap-2"><div><label className="block text-xs text-muted-foreground mb-1">W</label><Input value={asset.customW || ""} onChange={(e) => { const newW = e.target.value; setAssets(p => p.map(a => a.id !== asset.id ? a : { ...a, customW: newW, size: `${newW}*${a.customD || ""}*${a.customH || ""}(${a.customXX || ""})` })); }} placeholder="W" className="glass-input text-center" /></div><div><label className="block text-xs text-muted-foreground mb-1">D</label><Input value={asset.customD || ""} onChange={(e) => { const newD = e.target.value; setAssets(p => p.map(a => a.id !== asset.id ? a : { ...a, customD: newD, size: `${a.customW || ""}*${newD}*${a.customH || ""}(${a.customXX || ""})` })); }} placeholder="D" className="glass-input text-center" /></div><div><label className="block text-xs text-muted-foreground mb-1">H</label><Input value={asset.customH || ""} onChange={(e) => { const newH = e.target.value; setAssets(p => p.map(a => a.id !== asset.id ? a : { ...a, customH: newH, size: `${a.customW || ""}*${a.customD || ""}*${newH}(${a.customXX || ""})` })); }} placeholder="H" className="glass-input text-center" /></div><div><label className="block text-xs text-muted-foreground mb-1">XX</label><Input value={asset.customXX || ""} onChange={(e) => { const newXX = e.target.value; setAssets(p => p.map(a => a.id !== asset.id ? a : { ...a, customXX: newXX, size: `${a.customW || ""}*${a.customD || ""}*${a.customH || ""}(${newXX})` })); }} placeholder="XX" className="glass-input text-center" /></div></div>{asset.customW && asset.customD && asset.customH && (<p className="text-xs text-amber-600 mt-2">ขนาด: <span className="font-medium">{asset.customW}*{asset.customD}*{asset.customH}({asset.customXX || ""})</span></p>)}</div></div>)}<div className="sm:col-span-2"><label className="block text-xs text-muted-foreground mb-1">KV</label><Input value={asset.kv} onChange={(e) => setAssets(p => p.map(a => a.id === asset.id ? { ...a, kv: e.target.value } : a))} placeholder="KV" className="glass-input text-center" /></div><div className="sm:col-span-1"><label className="block text-xs text-muted-foreground mb-1">จำนวน</label><Input type="number" min={1} value={asset.qty} onChange={(e) => setAssets(p => p.map(a => a.id === asset.id ? { ...a, qty: Math.max(1, +e.target.value) } : a))} className="glass-input text-center" /></div>{mode === "admin" && (<div className="sm:col-span-2"><label className="block text-xs text-muted-foreground mb-1">โกดัง</label><Select value={asset.withdrawFor} onValueChange={(v) => setAssets(p => p.map(a => a.id === asset.id ? { ...a, withdrawFor: v } : a))}><SelectTrigger className="glass-input"><SelectValue placeholder="เลือก" /></SelectTrigger><SelectContent>{vendors.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent></Select></div>)}{assets.length > 1 && (<div className="flex items-end"><button onClick={() => setAssets(p => p.filter(a => a.id !== asset.id))} className="p-2 rounded-lg bg-red-50 text-red-500 hover:bg-red-100"><Trash2 className="w-4 h-4" /></button></div>)}</div>{mode === "admin" && asset.name && (<div className="mt-3 p-3 rounded-lg bg-blue-50/40 border border-blue-200"><label className="block text-xs text-blue-700 font-medium mb-2">เลือก Barcode (qty {asset.qty})</label><BarcodeAssignSelector warehouse={asset.withdrawFor} assetName={asset.name} qty={asset.qty} value={assetBarcodes[asset.id] || []} onChange={(next) => setAssetBarcodes(p => ({ ...p, [asset.id]: next }))} /></div>)}</div>))}</div></div>);
   };
 
   const renderSecuritySetCard = (shopNum: 1 | 2 | 3 | 4) => {
     const securitySets = shopNum === 1 ? securitySets1 : shopNum === 2 ? securitySets2 : shopNum === 3 ? securitySets3 : securitySets4;
     const setSecuritySets = shopNum === 1 ? setSecuritySets1 : shopNum === 2 ? setSecuritySets2 : shopNum === 3 ? setSecuritySets3 : setSecuritySets4;
-    return (<div className="glass-card p-4 sm:p-5"><div className="flex items-center gap-2 mb-4"><div className="icon-container red !w-8 !h-8"><Shield className="w-4 h-4" /></div><h2 className="font-semibold">Security Set Shop ที่ {shopNum}</h2></div><div className="space-y-3">{securitySets.map(set => (<div key={set.id} className="p-4 rounded-xl bg-black/2 border border-black/5 grid grid-cols-1 sm:grid-cols-12 gap-3 items-end"><div className="sm:col-span-6"><label className="block text-xs text-muted-foreground mb-1">ชื่อ Security</label><Input value={set.name} readOnly className="glass-input bg-black/5" /></div><div className="sm:col-span-2"><label className="block text-xs text-muted-foreground mb-1">จำนวน</label><Input type="number" min={0} value={set.qty} onChange={(e) => { const newQty = Math.max(0, +e.target.value); const defaultVendor = vendors.find(v => v === "NEWLOOK") || vendors[0] || ""; setSecuritySets(p => p.map(s => s.id === set.id ? { ...s, qty: newQty, withdrawFor: newQty > 0 && !s.withdrawFor && defaultVendor ? defaultVendor : (newQty === 0 ? "" : s.withdrawFor) } : s)); }} className="glass-input text-center" /></div>{mode === "admin" && (<div className="sm:col-span-4"><label className="block text-xs text-muted-foreground mb-1">โกดัง</label><Select value={set.withdrawFor} onValueChange={(v) => setSecuritySets(p => p.map(s => s.id === set.id ? { ...s, withdrawFor: v } : s))}><SelectTrigger className="glass-input"><SelectValue placeholder="เลือก" /></SelectTrigger><SelectContent>{vendors.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent></Select></div>)}</div>))}</div></div>);
+    const securityBarcodes = shopNum === 1 ? securityBarcodes1 : shopNum === 2 ? securityBarcodes2 : shopNum === 3 ? securityBarcodes3 : securityBarcodes4;
+    const setSecurityBarcodes = shopNum === 1 ? setSecurityBarcodes1 : shopNum === 2 ? setSecurityBarcodes2 : shopNum === 3 ? setSecurityBarcodes3 : setSecurityBarcodes4;
+    return (<div className="glass-card p-4 sm:p-5"><div className="flex items-center gap-2 mb-4"><div className="icon-container red !w-8 !h-8"><Shield className="w-4 h-4" /></div><h2 className="font-semibold">Security Set Shop ที่ {shopNum}</h2></div><div className="space-y-3">{securitySets.map(set => (<div key={set.id} className="p-4 rounded-xl bg-black/2 border border-black/5"><div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end"><div className="sm:col-span-6"><label className="block text-xs text-muted-foreground mb-1">ชื่อ Security</label><Input value={set.name} readOnly className="glass-input bg-black/5" /></div><div className="sm:col-span-2"><label className="block text-xs text-muted-foreground mb-1">จำนวน</label><Input type="number" min={0} value={set.qty} onChange={(e) => { const newQty = Math.max(0, +e.target.value); const defaultVendor = vendors.find(v => v === "NEWLOOK") || vendors[0] || ""; setSecuritySets(p => p.map(s => s.id === set.id ? { ...s, qty: newQty, withdrawFor: newQty > 0 && !s.withdrawFor && defaultVendor ? defaultVendor : (newQty === 0 ? "" : s.withdrawFor) } : s)); }} className="glass-input text-center" /></div>{mode === "admin" && (<div className="sm:col-span-4"><label className="block text-xs text-muted-foreground mb-1">โกดัง</label><Select value={set.withdrawFor} onValueChange={(v) => setSecuritySets(p => p.map(s => s.id === set.id ? { ...s, withdrawFor: v } : s))}><SelectTrigger className="glass-input"><SelectValue placeholder="เลือก" /></SelectTrigger><SelectContent>{vendors.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent></Select></div>)}</div>{mode === "admin" && set.qty > 0 && !set.name.includes("Security Type C") && (<div className="mt-3 p-3 rounded-lg bg-purple-50/40 border border-purple-200"><label className="block text-xs text-purple-700 font-medium mb-2">เลือก Barcode CONTROLBOX (qty {set.qty})</label><BarcodeAssignSelector warehouse={set.withdrawFor} assetName={set.name} qty={set.qty} value={securityBarcodes[set.id] || []} onChange={(next) => setSecurityBarcodes(p => ({ ...p, [set.id]: next }))} isSecuritySet /></div>)}</div>))}</div></div>);
   };
 
   // Prepare shops array for Preview Modal
@@ -237,34 +318,42 @@ const FormRouting4Shops = ({ mode = "user" }: { mode?: FormMode }) => {
           qty: a.qty,
           withdrawFor: a.withdrawFor,
           barcode: "",
+          assignedBarcodes: assetBarcodes1[a.id] || [],
         }))}
         securitySets={currentPreviewShop.securitySets.filter(s => s.qty > 0).map(s => ({
           name: s.name,
           qty: s.qty,
           withdrawFor: s.withdrawFor,
+          assignedBarcodes: s.name.includes("Security Type C") ? [] : (securityBarcodes1[s.id] || []),
         }))}
-        shops={shopsForPreview.map(shop => ({
-          shopCode: shop.shopCode,
-          shopName: shop.shopName,
-          startInstallDate: shop.startDate,
-          endInstallDate: shop.endDate,
-          q7b7: shop.q7b7,
-          shopFocus: shop.focus,
-          assets: shop.assets.filter(a => a.name && a.name.trim() !== "").map(a => ({
-            name: a.name,
-            size: a.size,
-            grade: "",
-            kv: a.kv,
-            qty: a.qty,
-            withdrawFor: a.withdrawFor,
-            barcode: "",
-          })),
-          securitySets: shop.securitySets.filter(s => s.qty > 0).map(s => ({
-            name: s.name,
-            qty: s.qty,
-            withdrawFor: s.withdrawFor,
-          })),
-        }))}
+        shops={shopsForPreview.map((shop, shopIdx) => {
+          const assetBcMap = [assetBarcodes1, assetBarcodes2, assetBarcodes3, assetBarcodes4][shopIdx] || {};
+          const secBcMap = [securityBarcodes1, securityBarcodes2, securityBarcodes3, securityBarcodes4][shopIdx] || {};
+          return {
+            shopCode: shop.shopCode,
+            shopName: shop.shopName,
+            startInstallDate: shop.startDate,
+            endInstallDate: shop.endDate,
+            q7b7: shop.q7b7,
+            shopFocus: shop.focus,
+            assets: shop.assets.filter(a => a.name && a.name.trim() !== "").map(a => ({
+              name: a.name,
+              size: a.size,
+              grade: "",
+              kv: a.kv,
+              qty: a.qty,
+              withdrawFor: a.withdrawFor,
+              barcode: "",
+              assignedBarcodes: assetBcMap[a.id] || [],
+            })),
+            securitySets: shop.securitySets.filter(s => s.qty > 0).map(s => ({
+              name: s.name,
+              qty: s.qty,
+              withdrawFor: s.withdrawFor,
+              assignedBarcodes: s.name.includes("Security Type C") ? [] : (secBcMap[s.id] || []),
+            })),
+          };
+        })}
       />
     </div>
   );

@@ -23,6 +23,9 @@
 # misc
 .DS_Store
 *.pem
+*.dump
+*.sql.gz
+mimi_prod_*
 
 # debug
 npm-debug.log*

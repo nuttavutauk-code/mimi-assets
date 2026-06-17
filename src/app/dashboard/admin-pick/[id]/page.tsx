@@ -18,6 +18,7 @@ interface Asset {
     barcodeImageUrl: string | null;
     assetImageUrl: string | null;
     status: string;
+    warehouse?: string | null;
 }
 
 interface TaskDetail {
@@ -62,7 +63,7 @@ function BarcodeSearchModal({
 }: {
     isOpen: boolean;
     onClose: () => void;
-    asset: Asset | null;
+    asset: (Asset & { warehouse?: string | null }) | null;
     onSave: (pickTaskId: number, newBarcode: string) => Promise<void>;
 }) {
     const [search, setSearch] = useState("");
@@ -97,7 +98,10 @@ function BarcodeSearchModal({
             const params = new URLSearchParams({
                 assetName: asset.assetName,
                 search: searchTerm,
+                excludeAssigned: "true",
+                excludePickTaskId: String(asset.id),
             });
+            if (asset.warehouse) params.append("warehouse", asset.warehouse);
             const res = await fetch(`/api/pick-asset/available-barcodes?${params}`, {
                 signal: controller.signal,
             });
@@ -460,8 +464,8 @@ export default function AdminPickDetailPage() {
                                     <span className="text-sm font-medium">Asset #{idx + 1}</span>
                                     <div className="flex items-center gap-2">
                                         {getStatusBadge(asset.status)}
-                                        {/* ✅ ปุ่มแก้ไข Barcode (เฉพาะ completed และมี barcode) */}
-                                        {asset.status === "completed" && asset.barcode && (
+                                        {/* ✅ ปุ่มแก้ไข Barcode (status picking หรือ completed) */}
+                                        {(asset.status === "completed" || asset.status === "picking") && asset.barcode && (
                                             <Button
                                                 type="button"
                                                 variant="outline"
@@ -547,8 +551,8 @@ export default function AdminPickDetailPage() {
                                         <span className="text-sm font-medium">Security #{idx + 1}</span>
                                         <div className="flex items-center gap-2">
                                             {getStatusBadge(security.status)}
-                                            {/* ✅ ปุ่มแก้ไข Barcode (เฉพาะ completed และมี barcode และไม่ใช่ Security Type C) */}
-                                            {security.status === "completed" && security.barcode && !isSecurityTypeC && (
+                                            {/* ✅ ปุ่มแก้ไข Barcode (status picking/completed, มี barcode, ไม่ใช่ Type C) */}
+                                            {(security.status === "completed" || security.status === "picking") && security.barcode && !isSecurityTypeC && (
                                                 <Button
                                                     type="button"
                                                     variant="outline"
