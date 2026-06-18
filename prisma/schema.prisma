@@ -233,10 +233,7 @@ model AssetTransactionHistory {
   // 4.2 Balance (คำนวณอัตโนมัติ)
   balance Int @default(1) // 1 = มีของอยู่, 0 = ออกไปแล้ว
 
-  // 4.3 Transaction Category (Admin เลือก)
-  transactionCategory String? // "WK OUT-IN", "Borrow-Return", "Discarded", etc.
-
-  // 4.4 คอลัมน์สถิติ (คำนวณจาก In/Out Date) - Format: "2025 WK 23"
+  // 4.3 คอลัมน์สถิติ (คำนวณจาก In/Out Date) - Format: "2025 WK 23"
   wkOut                String? @db.VarChar(20) // WK OUT
   wkIn                 String? @db.VarChar(20) // WK IN
   wkOutForRepair       String? @db.VarChar(20) // WK OUT for Repair
@@ -412,10 +409,7 @@ model SecuritySetTransaction {
   // 4.2 Balance (คำนวณอัตโนมัติ)
   balance Int @default(1) // 1 = มีของอยู่, 0 = ออกไปแล้ว
 
-  // 4.3 Transaction Category (Admin เลือก)
-  transactionCategory String? // "WK OUT-IN", "Borrow-Return", "Discarded", etc.
-
-  // 4.4 คอลัมน์สถิติ (คำนวณจาก In/Out Date) - Format: "2025 WK 23"
+  // 4.3 คอลัมน์สถิติ (คำนวณจาก In/Out Date) - Format: "2025 WK 23"
   wkOut                String? @db.VarChar(20) // WK OUT
   wkIn                 String? @db.VarChar(20) // WK IN
   wkOutForRepair       String? @db.VarChar(20) // WK OUT for Repair

@@ -150,7 +150,6 @@ export async function POST(req: NextRequest) {
                             // ===== Auto by Logic =====
                             assetStatus: "-",
                             balance: 1, // เข้าโกดังปลายทางแล้ว (พร้อมใช้งาน)
-                            transactionCategory: "-",
                             wkInForRepair: getWeekNumber(new Date()),
                         },
                     });

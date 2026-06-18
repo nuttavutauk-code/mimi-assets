@@ -248,8 +248,6 @@ export async function POST(req: Request) {
               // Auto Logic
               assetStatus: safeString(row["Asset Status"]) || "USED",
               balance: safeInt(row["Balance"]) ?? (tx.hasOut ? 0 : 1), // ถ้ามี OUT = 0, ไม่มี = 1
-              transactionCategory: safeString(row["Transaction Category"]),
-
               // WK Columns
               wkOut: safeString(row["WK OUT"]),
               wkIn: safeString(row["WK IN"]),

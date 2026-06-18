@@ -15,7 +15,7 @@
 | Asset info | `barcode`, `assetName`, `startWarranty`, `endWarranty`, `cheilPO`, `budget`, `size`, `grade` |
 | IN leg | `warehouseIn`, `inStockDate`, `unitIn`, `fromVendor`, `mcsCodeIn`, `fromShop`, `remarkIn` |
 | OUT leg | `outDate`, `unitOut`, `toVendor`, `status`, `shopType`, `mcsCodeOut`, `toShop`, `remarkOut` |
-| Auto logic | `assetStatus`, `balance`, `transactionCategory` + 13 WK cols |
+| Auto logic | `assetStatus`, `balance` + 13 WK cols |
 
 ### 1.2 ค่า enum สำคัญ
 
@@ -63,7 +63,7 @@
 `POST /api/document/approve` documentType=`shoptoshop`:
 - `inStockDate` = `outDate` = `sourceShop.startInstallDate`
 - `wkIn` + `wkOut` สัปดาห์เดียวกัน
-- `assetStatus: "-"`, `transactionCategory: "-"`
+- `assetStatus: "-"`
 
 ### 2.3 Legacy import (รองรับทุก field)
 
@@ -150,7 +150,7 @@ DIRECT_TRANSACTION_TYPES = `["return", "returnasset", "shoptoshop", "repair"]`
 
 แก้ได้: `assetName`, `size`, `grade`, `toVendor`, `fromVendor`, `toShop`, `fromShop`, `mcsCodeOut`, `mcsCodeIn`, `remarkIn`, `remarkOut`, `status`, `shopType`, `cheilPO`, `startWarranty`, `endWarranty`, `wkOut`, `wkIn`, `wkOutForRepair`, `wkInForRepair`
 
-**แก้ไม่ได้**: `barcode`, `balance`, `assetStatus`, `transactionCategory`, IN-leg date fields
+**แก้ไม่ได้**: `barcode`, `balance`, `assetStatus`, IN-leg date fields
 
 ค่า `"-"` → ถูกแปลงเป็น `null` อัตโนมัติ
 
@@ -290,7 +290,7 @@ Format: `"2025 WK 23"` (`getWeekNumber()`)
 2. **barcode immutability**: `barcode` แก้ได้เฉพาะผ่าน `asset/update-nobarcode` หรือ `pick-asset/edit-barcode`
 3. **delete = reset, not delete**: `document/delete` ใช้ `SetNull` ไม่ลบ row จริง (รักษา audit trail)
 4. **legacy import row order**: ทุกแถวยกเว้นแถวสุดท้ายต่อ barcode ต้องมี OUT data
-5. **transaction history immutable fields**: `barcode`, `balance`, `assetStatus`, `transactionCategory`, IN-leg dates — ไม่เปิด API ให้แก้
+5. **transaction history immutable fields**: `barcode`, `balance`, `assetStatus`, IN-leg dates — ไม่เปิด API ให้แก้
 6. **Direct vs Picker dispatch**: documentType ต้อง map ตรงกับ DIRECT_TRANSACTION_TYPES หรือ NEEDS_PICK_ASSET_TYPES — ไม่ทับซ้อน
 7. **OUT requires IN**: Picker flow ต้องเจอ row `barcode + balance=1` ก่อนทำ OUT — ถ้าไม่เจอ = error
 8. **TransferReceive ต้องครบ**: `receive-transfer/complete` ทุก task ต้อง decided (received/rejected) ก่อนปิด

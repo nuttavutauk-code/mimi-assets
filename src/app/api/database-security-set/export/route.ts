@@ -90,7 +90,6 @@ export async function GET(req: NextRequest) {
       "Grade": t.grade || "",
       "Remark IN": t.remarkIn || "",
       "Remark OUT": t.remarkOut || "",
-      "Transaction Category": t.transactionCategory || "",
       "WK OUT": t.wkOut || "",
       "WK IN": t.wkIn || "",
       "WK OUT for Repair": t.wkOutForRepair || "",

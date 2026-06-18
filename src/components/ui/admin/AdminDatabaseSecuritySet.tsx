@@ -11,7 +11,7 @@ interface SecuritySetData {
   cheilPO: string; size: string; grade: string; warehouseIn: string; inStockDate: string; unitIn: number | string;
   fromVendor: string; mcsCodeIn: string; fromShop: string; remarkIn: string; outDate: string; unitOut: number | string;
   toVendor: string; status: string; mcsCodeOut: string; toShop: string; remarkOut: string; assetStatus: string;
-  balance: number; transactionCategory: string; wkOut: string; wkIn: string; wkOutForRepair: string; wkInForRepair: string;
+  balance: number; wkOut: string; wkIn: string; wkOutForRepair: string; wkInForRepair: string;
   newInStock: string; refurbishedInStock: string; borrow: string; return: string; repair: string; outToRentalWarehouse: string;
   inToRentalWarehouse: string; discarded: string; adjustError: string;
 }
@@ -23,7 +23,7 @@ const columnGroups = {
   asset: { color: "bg-amber-50", headerColor: "bg-amber-100 text-amber-800", columns: ["Barcode", "Asset Name", "Start Warranty", "End Warranty", "Cheil PO", "Size", "Grade"] },
   in: { color: "bg-blue-50", headerColor: "bg-blue-100 text-blue-800", columns: ["Warehouse", "In stock Date", "Unit In", "From Vendor", "MCS Code (In)", "From Shop", "Remark IN"] },
   out: { color: "bg-rose-50", headerColor: "bg-rose-100 text-rose-800", columns: ["Out Date", "Unit Out", "To Vendor", "Status", "MCS Code (Out)", "To Shop", "Remark OUT"] },
-  auto: { color: "bg-emerald-50", headerColor: "bg-emerald-100 text-emerald-800", columns: ["Asset Status", "Balance", "Transaction Category", "WK OUT", "WK IN", "WK OUT for Repair", "WK IN for Repair", "New In Stock", "Refurbished Instock", "Borrow", "Return", "Repair", "Out to Rental WH", "In to Rental WH", "Discarded", "Adjust Error"] }
+  auto: { color: "bg-emerald-50", headerColor: "bg-emerald-100 text-emerald-800", columns: ["Asset Status", "Balance", "WK OUT", "WK IN", "WK OUT for Repair", "WK IN for Repair", "New In Stock", "Refurbished Instock", "Borrow", "Return", "Repair", "Out to Rental WH", "In to Rental WH", "Discarded", "Adjust Error"] }
 };
 
 const orderedColumns = [
@@ -35,7 +35,7 @@ const orderedColumns = [
   { name: "To Vendor", group: "out" }, { name: "Status", group: "out" }, { name: "MCS Code (Out)", group: "out" },
   { name: "To Shop", group: "out" }, { name: "Balance", group: "auto" }, { name: "Size", group: "asset" },
   { name: "Grade", group: "asset" }, { name: "Remark IN", group: "in" }, { name: "Remark OUT", group: "out" },
-  { name: "Transaction Category", group: "auto" }, { name: "WK OUT", group: "auto" }, { name: "WK IN", group: "auto" },
+  { name: "WK OUT", group: "auto" }, { name: "WK IN", group: "auto" },
   { name: "WK OUT for Repair", group: "auto" }, { name: "WK IN for Repair", group: "auto" }, { name: "New In Stock", group: "auto" },
   { name: "Refurbished Instock", group: "auto" }, { name: "Borrow", group: "auto" }, { name: "Return", group: "auto" },
   { name: "Repair", group: "auto" }, { name: "Out to Rental WH", group: "auto" }, { name: "In to Rental WH", group: "auto" }, { name: "Discarded", group: "auto" },
@@ -59,7 +59,6 @@ const EDITABLE_COLUMNS: Record<string, string> = {
   "MCS Code (Out)": "mcsCodeOut",
   "To Shop": "toShop",
   "Remark OUT": "remarkOut",
-  "Transaction Category": "transactionCategory",
   "WK OUT": "wkOut",
   "WK IN": "wkIn",
   "WK OUT for Repair": "wkOutForRepair",
@@ -247,7 +246,7 @@ export default function AdminDatabaseSecuritySet() {
       "Remark IN": <span className="max-w-[100px] truncate block" title={item.remarkIn}>{item.remarkIn}</span>,
       "Out Date": item.outDate, "Unit Out": item.unitOut, "To Vendor": item.toVendor, "Status": item.status, "MCS Code (Out)": item.mcsCodeOut, "To Shop": item.toShop,
       "Remark OUT": <span className="max-w-[100px] truncate block" title={item.remarkOut}>{item.remarkOut}</span>,
-      "Asset Status": item.assetStatus, "Balance": item.balance, "Transaction Category": item.transactionCategory,
+      "Asset Status": item.assetStatus, "Balance": item.balance,
       "WK OUT": item.wkOut, "WK IN": item.wkIn, "WK OUT for Repair": item.wkOutForRepair, "WK IN for Repair": item.wkInForRepair,
       "New In Stock": item.newInStock, "Refurbished Instock": item.refurbishedInStock, "Borrow": item.borrow, "Return": item.return,
       "Repair": item.repair, "Out to Rental WH": item.outToRentalWarehouse, "In to Rental WH": item.inToRentalWarehouse, "Discarded": item.discarded, "Adjust Error": item.adjustError,

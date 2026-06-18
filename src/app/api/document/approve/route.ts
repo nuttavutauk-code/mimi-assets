@@ -502,7 +502,6 @@ async function createDirectTransactions(documentId: number): Promise<{ created: 
                         remarkIn: "-",
                         assetStatus: "USED",
                         balance: 1,
-                        transactionCategory: "-",
                         ...getWkDataForTransaction(wkColumn, weekNumber, document.otherActivity),
                     },
                 });
@@ -606,7 +605,6 @@ async function createDirectTransactions(documentId: number): Promise<{ created: 
                     // ===== Auto by Logic =====
                     assetStatus: "-",
                     balance: 0, // ย้ายไปร้านอื่นแล้ว
-                    transactionCategory: "-",
                     // ✅ บันทึก WK IN และ WK OUT
                     wkIn: getWeekNumber(sourceShop.startInstallDate || currentDate),
                     wkOut: getWeekNumber(sourceShop.startInstallDate || currentDate),

@@ -152,7 +152,6 @@ export async function GET(req: NextRequest) {
       grade: t.grade || "-",
       remarkIn: t.remarkIn || "-",
       remarkOut: t.remarkOut || "-",
-      transactionCategory: t.transactionCategory || "-",
       wkOut: t.wkOut || "-",
       wkIn: t.wkIn || "-",
       wkOutForRepair: t.wkOutForRepair || "-",

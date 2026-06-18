@@ -27,7 +27,6 @@ const EDITABLE_FIELDS = [
   "wkIn",
   "wkOutForRepair",
   "wkInForRepair",
-  "transactionCategory",
 ];
 
 interface UpdateItem {

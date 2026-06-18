@@ -107,7 +107,6 @@ export async function POST(req: NextRequest) {
                 // ===== Auto by Logic =====
                 assetStatus: "REFURBISH", // ✅ ของที่ซ่อมเสร็จแล้ว
                 balance: 1, // กลับเข้าโกดังแล้ว (พร้อมใช้งาน)
-                transactionCategory: "-",
                 // ✅ บันทึก Refurbished Instock (ซ่อมเสร็จกลับเข้าโกดัง)
                 refurbishedInStock: getWeekNumber(completedDate),
             },

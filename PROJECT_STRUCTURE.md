@@ -191,10 +191,9 @@ Index: `barcode`, `warehouse`
 
 **3) ขา OUT (7 col)**: outDate, unitOut, toVendor, status, shopType, mcsCodeOut, toShop, remarkOut
 
-**4) Auto by Logic (14 col)**:
+**4) Auto by Logic (13 col)**:
 - `assetStatus` — NEW / USED / REFURBISHED (auto)
 - `balance` — 1 = มีของ, 0 = ออกไปแล้ว (auto)
-- `transactionCategory` — WK OUT-IN / Borrow-Return / Discarded ฯลฯ
 - คอลัมน์สถิติรายสัปดาห์ Format `"2025 WK 23"`:
   wkOut, wkIn, wkOutForRepair, wkInForRepair, newInStock, refurbishedInStock,
   borrow, return, repair, outToRentalWarehouse, inToRentalWarehouse, discarded, adjustError

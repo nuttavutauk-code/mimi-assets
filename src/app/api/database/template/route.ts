@@ -32,7 +32,6 @@ export async function GET() {
       "Remark OUT": "",
       "Asset Status": "USED",
       "Balance": 1,
-      "Transaction Category": "",
       "WK OUT": "",
       "WK IN": "",
       "WK OUT for Repair": "",
