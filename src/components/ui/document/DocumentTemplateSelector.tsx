@@ -352,7 +352,7 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
     // Default Security Sets (สำหรับกรณีไม่มีข้อมูล)
     const defaultSecuritySets = [
         { name: "CONTROLBOX 6 PORT (M-60000R) with power cable", qty: 0, withdrawFor: "" },
-        { name: "CONTROLBOX 5 PORT (M-5000LD) with power cable", qty: 0, withdrawFor: "" },
+        { name: "CONTROLBOX 5 PORT (M-50000R) with power cable", qty: 0, withdrawFor: "" },
         { name: "Security Type C Ver.7.1", qty: 0, withdrawFor: "" },
         { name: "Security Type C Ver.7.0", qty: 0, withdrawFor: "" },
     ];

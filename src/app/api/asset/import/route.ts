@@ -11,7 +11,7 @@ const BATCH_SIZE = 500;
 // ✅ รายชื่อ Asset ที่ต้องบันทึกลงตารางรอง (SecuritySetTransaction)
 const SECURITY_SET_NAMES = [
   "CONTROLBOX 6 PORT (M-60000R) with power cable",
-  "CONTROLBOX 5 PORT (M-5000LD) with power cable",
+  "CONTROLBOX 5 PORT (M-50000R) with power cable",
   "Security Type C Ver.7.1",
   "Security Type C Ver.7.0",
 ];
@@ -176,7 +176,15 @@ export async function POST(req: Request) {
         const excelEpoch = new Date(1899, 11, 30);
         date = new Date(excelEpoch.getTime() + value * 86400000);
       } else if (typeof value === "string") {
-        date = new Date(value.trim());
+        const str = value.trim();
+        // DD-MM-YYYY or DD/MM/YYYY (template default format)
+        const ddmmyyyy = str.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})$/);
+        if (ddmmyyyy) {
+          const [, d, m, y] = ddmmyyyy;
+          date = new Date(Number(y), Number(m) - 1, Number(d));
+        } else {
+          date = new Date(str);
+        }
       } else {
         return null;
       }

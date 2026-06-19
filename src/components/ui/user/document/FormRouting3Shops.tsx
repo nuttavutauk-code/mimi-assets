@@ -53,7 +53,7 @@ type FormMode = "user" | "admin";
 
 const defaultSecuritySets = (): SecuritySet[] => [
   { id: 1, name: "CONTROLBOX 6 PORT (M-60000R) with power cable", qty: 0, withdrawFor: "" },
-  { id: 2, name: "CONTROLBOX 5 PORT (M-60000R) with power cable", qty: 0, withdrawFor: "" },
+  { id: 2, name: "CONTROLBOX 5 PORT (M-50000R) with power cable", qty: 0, withdrawFor: "" },
   { id: 3, name: "Security Type C Ver.7.1", qty: 0, withdrawFor: "" },
   { id: 4, name: "Security Type C Ver.7.0", qty: 0, withdrawFor: "" },
 ];

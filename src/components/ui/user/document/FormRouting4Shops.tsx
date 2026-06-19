@@ -22,7 +22,7 @@ type ShopState = { noMcs: boolean; shopCode: string; shopName: string; startDate
 type FormMode = "user" | "admin";
 
 const isCustomSizeAsset = (name: string) => { const lowerName = name.toLowerCase().replace(/\s+/g, ''); return lowerName.includes("lightbox") || lowerName.includes("accwall") || lowerName.includes("wallkv-low") || lowerName.includes("wallkv - low"); };
-const defaultSecuritySets = (): SecuritySet[] => [{ id: 1, name: "CONTROLBOX 6 PORT (M-60000R) with power cable", qty: 0, withdrawFor: "" }, { id: 2, name: "CONTROLBOX 5 PORT (M-60000R) with power cable", qty: 0, withdrawFor: "" }, { id: 3, name: "Security Type C Ver.7.1", qty: 0, withdrawFor: "" }, { id: 4, name: "Security Type C Ver.7.0", qty: 0, withdrawFor: "" }];
+const defaultSecuritySets = (): SecuritySet[] => [{ id: 1, name: "CONTROLBOX 6 PORT (M-60000R) with power cable", qty: 0, withdrawFor: "" }, { id: 2, name: "CONTROLBOX 5 PORT (M-50000R) with power cable", qty: 0, withdrawFor: "" }, { id: 3, name: "Security Type C Ver.7.1", qty: 0, withdrawFor: "" }, { id: 4, name: "Security Type C Ver.7.0", qty: 0, withdrawFor: "" }];
 
 const FormRouting4Shops = ({ mode = "user" }: { mode?: FormMode }) => {
   const { data } = useSession(); const router = useRouter(); const params = useParams();
