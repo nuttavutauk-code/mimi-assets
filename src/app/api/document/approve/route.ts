@@ -808,7 +808,7 @@ export async function POST(req: NextRequest) {
         }
 
         // 5. เช็คว่าเอกสารถูก submit แล้วหรือยัง
-        if (document.status !== "submitted") {
+        if (document.status !== "submitted" && document.status !== "reviewing") {
             return NextResponse.json(
                 { success: false, message: "Document must be submitted first" },
                 { status: 400 }

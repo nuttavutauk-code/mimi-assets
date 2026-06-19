@@ -160,6 +160,11 @@ const FormRouting2Shops = ({ mode = "user" }: { mode?: FormMode }) => {
               };
             });
             setAssets1(loadedAssets1);
+            if (doc.status === "reviewing") {
+              const draftB1: Record<number, string[]> = {};
+              loadedAssets1.forEach((asset: any, idx: number) => { const raw = s.assets[idx]?.barcode; if (raw) { try { draftB1[asset.id] = JSON.parse(raw); } catch {} } });
+              setAssetBarcodes1(draftB1);
+            }
             loadedAssets1.forEach(async (asset: any) => {
               if (asset.name) {
                 try {
@@ -170,7 +175,14 @@ const FormRouting2Shops = ({ mode = "user" }: { mode?: FormMode }) => {
               }
             });
           }
-          if (s.securitySets?.length) setSecuritySets1(defaultSecuritySets().map(def => { const f = s.securitySets.find((x: any) => x.name === def.name); return f ? { ...def, qty: f.qty || 0, withdrawFor: f.withdrawFor || "" } : def; }));
+          if (s.securitySets?.length) {
+            setSecuritySets1(defaultSecuritySets().map(def => { const f = s.securitySets.find((x: any) => x.name === def.name); return f ? { ...def, qty: f.qty || 0, withdrawFor: f.withdrawFor || "" } : def; }));
+            if (doc.status === "reviewing") {
+              const draftS1: Record<number, string[]> = {};
+              defaultSecuritySets().forEach(def => { const f = s.securitySets.find((x: any) => x.name === def.name); if (f?.barcode) { try { draftS1[def.id] = JSON.parse(f.barcode); } catch {} } });
+              setSecurityBarcodes1(draftS1);
+            }
+          }
         }
         if (shops[1]) {
           const s = shops[1];
@@ -202,6 +214,11 @@ const FormRouting2Shops = ({ mode = "user" }: { mode?: FormMode }) => {
               };
             });
             setAssets2(loadedAssets2);
+            if (doc.status === "reviewing") {
+              const draftB2: Record<number, string[]> = {};
+              loadedAssets2.forEach((asset: any, idx: number) => { const raw = s.assets[idx]?.barcode; if (raw) { try { draftB2[asset.id] = JSON.parse(raw); } catch {} } });
+              setAssetBarcodes2(draftB2);
+            }
             loadedAssets2.forEach(async (asset: any) => {
               if (asset.name) {
                 try {
@@ -212,7 +229,14 @@ const FormRouting2Shops = ({ mode = "user" }: { mode?: FormMode }) => {
               }
             });
           }
-          if (s.securitySets?.length) setSecuritySets2(defaultSecuritySets().map(def => { const f = s.securitySets.find((x: any) => x.name === def.name); return f ? { ...def, qty: f.qty || 0, withdrawFor: f.withdrawFor || "" } : def; }));
+          if (s.securitySets?.length) {
+            setSecuritySets2(defaultSecuritySets().map(def => { const f = s.securitySets.find((x: any) => x.name === def.name); return f ? { ...def, qty: f.qty || 0, withdrawFor: f.withdrawFor || "" } : def; }));
+            if (doc.status === "reviewing") {
+              const draftS2: Record<number, string[]> = {};
+              defaultSecuritySets().forEach(def => { const f = s.securitySets.find((x: any) => x.name === def.name); if (f?.barcode) { try { draftS2[def.id] = JSON.parse(f.barcode); } catch {} } });
+              setSecurityBarcodes2(draftS2);
+            }
+          }
         }
         setNote(doc.note || "");
       }
@@ -467,6 +491,26 @@ const FormRouting2Shops = ({ mode = "user" }: { mode?: FormMode }) => {
       toast.success(isEdit ? "แก้ไขสำเร็จ!" : "บันทึกสำเร็จ!");
       router.push(mode === "admin" ? "/dashboard/admin-list" : "/dashboard/user-list");
     } catch (e) { toast.error("เกิดข้อผิดพลาด"); console.error(e); }
+    finally { setIsSubmitting(false); }
+  };
+
+  const handleDraftSave = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const payload = {
+        documentType: "routing2shops", docCode: formData.docNumber, fullName: formData.fullName, company: formData.company, phone: formData.phone, note, status: "reviewing", transactionStatus: transactionStatus || null,
+        shops: [
+          { shopCode: shop1.shopCode, shopName: shop1.shopName, startInstallDate: shop1.startDate, endInstallDate: shop1.endDate, q7b7: shop1.q7b7, shopFocus: shop1.focus, assets: assets1.map(a => ({ name: a.name, size: a.size, kv: a.kv, qty: a.qty, withdrawFor: a.withdrawFor, barcode: JSON.stringify(assetBarcodes1[a.id] || []) })), securitySets: securitySets1.filter(s => s.qty > 0).map(s => ({ name: s.name, qty: s.qty, withdrawFor: s.withdrawFor, barcode: JSON.stringify(s.name.includes("Security Type C") ? [] : (securityBarcodes1[s.id] || [])) })) },
+          { shopCode: shop2.shopCode, shopName: shop2.shopName, startInstallDate: shop2.startDate, endInstallDate: shop2.endDate, q7b7: shop2.q7b7, shopFocus: shop2.focus, assets: assets2.map(a => ({ name: a.name, size: a.size, kv: a.kv, qty: a.qty, withdrawFor: a.withdrawFor, barcode: JSON.stringify(assetBarcodes2[a.id] || []) })), securitySets: securitySets2.filter(s => s.qty > 0).map(s => ({ name: s.name, qty: s.qty, withdrawFor: s.withdrawFor, barcode: JSON.stringify(s.name.includes("Security Type C") ? [] : (securityBarcodes2[s.id] || [])) })) },
+        ],
+      };
+      const res = await fetch(`/api/document/update/${editId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      const result = await res.json();
+      if (!result.success) throw new Error(result.message);
+      toast.success("บันทึก Draft สำเร็จ!");
+      setDocStatus("reviewing");
+    } catch (err) { console.error(err); toast.error("เกิดข้อผิดพลาดในการบันทึก Draft"); }
     finally { setIsSubmitting(false); }
   };
 
@@ -872,6 +916,9 @@ const FormRouting2Shops = ({ mode = "user" }: { mode?: FormMode }) => {
         <div className="flex flex-col sm:flex-row justify-center gap-3 pt-4">
           {mode === "admin" ? (
             <>
+              <button disabled={isSubmitting} onClick={handleDraftSave} className="px-8 py-3 rounded-xl bg-purple-500/10 text-purple-600 border border-purple-200 text-sm font-medium flex items-center justify-center gap-2 hover:bg-purple-500/20 transition-colors disabled:opacity-50">
+                <Save className="w-4 h-4" />{isSubmitting ? "กำลังบันทึก..." : "บันทึก Draft"}
+              </button>
               <button disabled={isSubmitting} onClick={handleOpenPreview} className="gradient-button px-8 py-3 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50">
                 <CheckCircle className="w-4 h-4" />{isSubmitting ? "กำลังดำเนินการ..." : "อนุมัติ"}
               </button>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { SimplePagination } from "@/components/ui/SimplePagination";
 import { Search, Plus, Edit2, Trash2, X, Users, Loader2, ToggleLeft, ToggleRight } from "lucide-react";
@@ -32,6 +32,7 @@ export default function AdminUserManage() {
   const [isModalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<User | null>(null);
+  const overlayMouseDown = useRef(false);
   const [formData, setFormData] = useState({
     username: "", email: "", password: "", firstName: "", lastName: "",
     vendor: "", initials: "", company: "", phone: "", role: "USER",
@@ -282,7 +283,7 @@ export default function AdminUserManage() {
 
       {/* Add/Edit Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm" onClick={() => setModalOpen(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm" onMouseDown={(e) => { overlayMouseDown.current = e.target === e.currentTarget; }} onClick={() => { if (overlayMouseDown.current) setModalOpen(false); }}>
           <div className="glass-card w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-semibold text-foreground">{editingUser ? "แก้ไขผู้ใช้" : "เพิ่มผู้ใช้ใหม่"}</h2>

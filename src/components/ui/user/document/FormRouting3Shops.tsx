@@ -141,9 +141,13 @@ const FormRouting3Shops = ({ mode = "user" }: { mode?: FormMode }) => {
               return { id: assetIdCounter1.current++, name: a.name || "", size: sizeStr, kv: a.kv || "", qty: a.qty || 1, withdrawFor: a.withdrawFor || "", autoWarehouse: !!a.withdrawFor, useCustomSize: isCustom, customW: isCustom ? customMatch[1] : undefined, customD: isCustom ? customMatch[2] : undefined, customH: isCustom ? customMatch[3] : undefined, customXX: isCustom ? customMatch[4] : undefined, isSelected: !!(a.name) };
             });
             setAssets1(loadedAssets);
+            if (doc.status === "reviewing") { const dB: Record<number, string[]> = {}; loadedAssets.forEach((a: any, i: number) => { const r = s.assets[i]?.barcode; if (r) { try { dB[a.id] = JSON.parse(r); } catch {} } }); setAssetBarcodes1(dB); }
             loadedAssets.forEach(async (asset: any) => { if (asset.name) { try { const res = await fetch(`/api/asset/sizes?name=${encodeURIComponent(asset.name)}`); const sizeJson = await res.json(); setSizeOptions1(p => ({ ...p, [asset.id]: sizeJson.sizes || [] })); } catch (err) { console.error(err); } } });
           }
-          if (s.securitySets?.length) setSecuritySets1(defaultSecuritySets().map(def => { const f = s.securitySets.find((x: any) => x.name === def.name); return f ? { ...def, qty: f.qty || 0, withdrawFor: f.withdrawFor || "" } : def; }));
+          if (s.securitySets?.length) {
+            setSecuritySets1(defaultSecuritySets().map(def => { const f = s.securitySets.find((x: any) => x.name === def.name); return f ? { ...def, qty: f.qty || 0, withdrawFor: f.withdrawFor || "" } : def; }));
+            if (doc.status === "reviewing") { const dS: Record<number, string[]> = {}; defaultSecuritySets().forEach(def => { const f = s.securitySets.find((x: any) => x.name === def.name); if (f?.barcode) { try { dS[def.id] = JSON.parse(f.barcode); } catch {} } }); setSecurityBarcodes1(dS); }
+          }
         }
 
         if (shops[1]) {
@@ -155,9 +159,13 @@ const FormRouting3Shops = ({ mode = "user" }: { mode?: FormMode }) => {
               return { id: assetIdCounter2.current++, name: a.name || "", size: sizeStr, kv: a.kv || "", qty: a.qty || 1, withdrawFor: a.withdrawFor || "", autoWarehouse: !!a.withdrawFor, useCustomSize: isCustom, customW: isCustom ? customMatch[1] : undefined, customD: isCustom ? customMatch[2] : undefined, customH: isCustom ? customMatch[3] : undefined, customXX: isCustom ? customMatch[4] : undefined, isSelected: !!(a.name) };
             });
             setAssets2(loadedAssets);
+            if (doc.status === "reviewing") { const dB: Record<number, string[]> = {}; loadedAssets.forEach((a: any, i: number) => { const r = s.assets[i]?.barcode; if (r) { try { dB[a.id] = JSON.parse(r); } catch {} } }); setAssetBarcodes2(dB); }
             loadedAssets.forEach(async (asset: any) => { if (asset.name) { try { const res = await fetch(`/api/asset/sizes?name=${encodeURIComponent(asset.name)}`); const sizeJson = await res.json(); setSizeOptions2(p => ({ ...p, [asset.id]: sizeJson.sizes || [] })); } catch (err) { console.error(err); } } });
           }
-          if (s.securitySets?.length) setSecuritySets2(defaultSecuritySets().map(def => { const f = s.securitySets.find((x: any) => x.name === def.name); return f ? { ...def, qty: f.qty || 0, withdrawFor: f.withdrawFor || "" } : def; }));
+          if (s.securitySets?.length) {
+            setSecuritySets2(defaultSecuritySets().map(def => { const f = s.securitySets.find((x: any) => x.name === def.name); return f ? { ...def, qty: f.qty || 0, withdrawFor: f.withdrawFor || "" } : def; }));
+            if (doc.status === "reviewing") { const dS: Record<number, string[]> = {}; defaultSecuritySets().forEach(def => { const f = s.securitySets.find((x: any) => x.name === def.name); if (f?.barcode) { try { dS[def.id] = JSON.parse(f.barcode); } catch {} } }); setSecurityBarcodes2(dS); }
+          }
         }
 
         if (shops[2]) {
@@ -169,9 +177,13 @@ const FormRouting3Shops = ({ mode = "user" }: { mode?: FormMode }) => {
               return { id: assetIdCounter3.current++, name: a.name || "", size: sizeStr, kv: a.kv || "", qty: a.qty || 1, withdrawFor: a.withdrawFor || "", autoWarehouse: !!a.withdrawFor, useCustomSize: isCustom, customW: isCustom ? customMatch[1] : undefined, customD: isCustom ? customMatch[2] : undefined, customH: isCustom ? customMatch[3] : undefined, customXX: isCustom ? customMatch[4] : undefined, isSelected: !!(a.name) };
             });
             setAssets3(loadedAssets);
+            if (doc.status === "reviewing") { const dB: Record<number, string[]> = {}; loadedAssets.forEach((a: any, i: number) => { const r = s.assets[i]?.barcode; if (r) { try { dB[a.id] = JSON.parse(r); } catch {} } }); setAssetBarcodes3(dB); }
             loadedAssets.forEach(async (asset: any) => { if (asset.name) { try { const res = await fetch(`/api/asset/sizes?name=${encodeURIComponent(asset.name)}`); const sizeJson = await res.json(); setSizeOptions3(p => ({ ...p, [asset.id]: sizeJson.sizes || [] })); } catch (err) { console.error(err); } } });
           }
-          if (s.securitySets?.length) setSecuritySets3(defaultSecuritySets().map(def => { const f = s.securitySets.find((x: any) => x.name === def.name); return f ? { ...def, qty: f.qty || 0, withdrawFor: f.withdrawFor || "" } : def; }));
+          if (s.securitySets?.length) {
+            setSecuritySets3(defaultSecuritySets().map(def => { const f = s.securitySets.find((x: any) => x.name === def.name); return f ? { ...def, qty: f.qty || 0, withdrawFor: f.withdrawFor || "" } : def; }));
+            if (doc.status === "reviewing") { const dS: Record<number, string[]> = {}; defaultSecuritySets().forEach(def => { const f = s.securitySets.find((x: any) => x.name === def.name); if (f?.barcode) { try { dS[def.id] = JSON.parse(f.barcode); } catch {} } }); setSecurityBarcodes3(dS); }
+          }
         }
 
         setNote(doc.note || "");
@@ -352,6 +364,25 @@ const FormRouting3Shops = ({ mode = "user" }: { mode?: FormMode }) => {
     finally { setIsSubmitting(false); }
   };
 
+  const handleDraftSave = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const shopsPayload = [
+        { shopCode: shop1.shopCode, shopName: shop1.shopName, startInstallDate: shop1.startDate, endInstallDate: shop1.endDate, q7b7: shop1.q7b7, shopFocus: shop1.focus, assets: assets1.map(a => ({ name: a.name, size: a.size, kv: a.kv, qty: a.qty, withdrawFor: a.withdrawFor, barcode: JSON.stringify(assetBarcodes1[a.id] || []) })), securitySets: securitySets1.filter(s => s.qty > 0).map(s => ({ name: s.name, qty: s.qty, withdrawFor: s.withdrawFor, barcode: JSON.stringify(s.name.includes("Security Type C") ? [] : (securityBarcodes1[s.id] || [])) })) },
+        { shopCode: shop2.shopCode, shopName: shop2.shopName, startInstallDate: shop2.startDate, endInstallDate: shop2.endDate, q7b7: shop2.q7b7, shopFocus: shop2.focus, assets: assets2.map(a => ({ name: a.name, size: a.size, kv: a.kv, qty: a.qty, withdrawFor: a.withdrawFor, barcode: JSON.stringify(assetBarcodes2[a.id] || []) })), securitySets: securitySets2.filter(s => s.qty > 0).map(s => ({ name: s.name, qty: s.qty, withdrawFor: s.withdrawFor, barcode: JSON.stringify(s.name.includes("Security Type C") ? [] : (securityBarcodes2[s.id] || [])) })) },
+        { shopCode: shop3.shopCode, shopName: shop3.shopName, startInstallDate: shop3.startDate, endInstallDate: shop3.endDate, q7b7: shop3.q7b7, shopFocus: shop3.focus, assets: assets3.map(a => ({ name: a.name, size: a.size, kv: a.kv, qty: a.qty, withdrawFor: a.withdrawFor, barcode: JSON.stringify(assetBarcodes3[a.id] || []) })), securitySets: securitySets3.filter(s => s.qty > 0).map(s => ({ name: s.name, qty: s.qty, withdrawFor: s.withdrawFor, barcode: JSON.stringify(s.name.includes("Security Type C") ? [] : (securityBarcodes3[s.id] || [])) })) },
+      ];
+      const payload = { documentType: "routing3shops", docCode: formData.docNumber, fullName: formData.fullName, company: formData.company, phone: formData.phone, note, status: "reviewing", transactionStatus: transactionStatus || null, shops: shopsPayload };
+      const res = await fetch(`/api/document/update/${editId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      const result = await res.json();
+      if (!result.success) throw new Error(result.message);
+      toast.success("บันทึก Draft สำเร็จ!");
+      setDocStatus("reviewing");
+    } catch (err) { console.error(err); toast.error("เกิดข้อผิดพลาดในการบันทึก Draft"); }
+    finally { setIsSubmitting(false); }
+  };
+
   if (loading && isEdit) return <div className="flex items-center justify-center min-h-[400px]"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
 
   const isReadOnly = docStatus === "approved" || docStatus === "rejected";
@@ -507,7 +538,7 @@ const FormRouting3Shops = ({ mode = "user" }: { mode?: FormMode }) => {
       <div className="glass-card p-4 sm:p-5"><div className="flex items-center gap-2 mb-4"><div className="icon-container gray !w-8 !h-8"><FileText className="w-4 h-4" /></div><h2 className="font-semibold">หมายเหตุ</h2></div><Input placeholder="หมายเหตุ (ถ้ามี)" value={note} onChange={(e) => setNote(e.target.value)} className="glass-input" /></div>
       {mode === "admin" && <OtherActivitiesSelect value={otherActivity} onChange={setOtherActivity} />}
       {mode === "admin" && <StatusSelect value={transactionStatus} onChange={setTransactionStatus} />}
-      {!isReadOnly && (<div className="flex flex-col sm:flex-row justify-center gap-3 pt-4">{mode === "admin" ? (<><button disabled={isSubmitting} onClick={handleOpenPreview} className="gradient-button px-8 py-3 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50"><CheckCircle className="w-4 h-4" />{isSubmitting ? "กำลังดำเนินการ..." : "อนุมัติ"}</button><button disabled={isSubmitting} onClick={() => handleSubmit("reject")} className="px-8 py-3 rounded-xl bg-red-500 text-white text-sm font-medium flex items-center justify-center gap-2 hover:bg-red-600 disabled:opacity-50"><XCircle className="w-4 h-4" />ปฏิเสธ</button></>) : (<button disabled={isSubmitting} onClick={() => handleSubmit("save")} className="gradient-button px-10 py-3 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50"><Save className="w-4 h-4" />{isSubmitting ? "กำลังบันทึก..." : (isEdit ? "บันทึกการแก้ไข" : "บันทึก")}</button>)}</div>)}
+      {!isReadOnly && (<div className="flex flex-col sm:flex-row justify-center gap-3 pt-4">{mode === "admin" ? (<><button disabled={isSubmitting} onClick={handleDraftSave} className="px-8 py-3 rounded-xl bg-purple-500/10 text-purple-600 border border-purple-200 text-sm font-medium flex items-center justify-center gap-2 hover:bg-purple-500/20 transition-colors disabled:opacity-50"><Save className="w-4 h-4" />{isSubmitting ? "กำลังบันทึก..." : "บันทึก Draft"}</button><button disabled={isSubmitting} onClick={handleOpenPreview} className="gradient-button px-8 py-3 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50"><CheckCircle className="w-4 h-4" />{isSubmitting ? "กำลังดำเนินการ..." : "อนุมัติ"}</button><button disabled={isSubmitting} onClick={() => handleSubmit("reject")} className="px-8 py-3 rounded-xl bg-red-500 text-white text-sm font-medium flex items-center justify-center gap-2 hover:bg-red-600 disabled:opacity-50"><XCircle className="w-4 h-4" />ปฏิเสธ</button></>) : (<button disabled={isSubmitting} onClick={() => handleSubmit("save")} className="gradient-button px-10 py-3 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50"><Save className="w-4 h-4" />{isSubmitting ? "กำลังบันทึก..." : (isEdit ? "บันทึกการแก้ไข" : "บันทึก")}</button>)}</div>)}
 
       <PreviewApproveModal
         isOpen={showPreviewModal}

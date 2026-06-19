@@ -171,6 +171,23 @@ const FormRepair = ({ mode = "user" }: { mode?: FormMode }) => {
     finally { setIsSubmitting(false); }
   };
 
+  const handleDraftSave = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const payload = {
+        documentType: "repair", docCode: formData.docNumber, fullName: formData.fullName, company: formData.company, phone: formData.phone, note, status: "reviewing",
+        shops: [{ shopCode: "", shopName: "", startInstallDate: repairDate, assets: assets.map(a => ({ barcode: a.barcode, name: a.name, size: a.size || null, grade: a.grade || null, qty: a.qty })) }],
+      };
+      const res = await fetch(`/api/document/update/${editId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      const result = await res.json();
+      if (!result.success) throw new Error(result.message);
+      toast.success("บันทึก Draft สำเร็จ!");
+      setDocStatus("reviewing");
+    } catch (err) { console.error(err); toast.error("เกิดข้อผิดพลาดในการบันทึก Draft"); }
+    finally { setIsSubmitting(false); }
+  };
+
   if (loading && isEdit) return <div className="flex items-center justify-center min-h-[400px]"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
 
   const isReadOnly = docStatus === "approved" || docStatus === "rejected";
@@ -247,6 +264,7 @@ const FormRepair = ({ mode = "user" }: { mode?: FormMode }) => {
         <div className="flex flex-col sm:flex-row justify-center gap-3 pt-4">
           {mode === "admin" ? (
             <>
+              <button disabled={isSubmitting} onClick={handleDraftSave} className="px-8 py-3 rounded-xl bg-purple-500/10 text-purple-600 border border-purple-200 text-sm font-medium flex items-center justify-center gap-2 hover:bg-purple-500/20 transition-colors disabled:opacity-50"><Save className="w-4 h-4" />{isSubmitting ? "กำลังบันทึก..." : "บันทึก Draft"}</button>
               <button disabled={isSubmitting} onClick={handleOpenPreview} className="gradient-button px-8 py-3 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50"><CheckCircle className="w-4 h-4" />{isSubmitting ? "กำลังดำเนินการ..." : "อนุมัติ"}</button>
               <button disabled={isSubmitting} onClick={() => handleSubmit("reject")} className="px-8 py-3 rounded-xl bg-red-500 text-white text-sm font-medium flex items-center justify-center gap-2 hover:bg-red-600 transition-colors disabled:opacity-50"><XCircle className="w-4 h-4" />ปฏิเสธ</button>
             </>

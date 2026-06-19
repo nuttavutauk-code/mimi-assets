@@ -75,15 +75,15 @@ const FormRouting4Shops = ({ mode = "user" }: { mode?: FormMode }) => {
         const doc = json.document; setDocStatus(doc.status || ""); setFormData({ docNumber: doc.docCode, fullName: doc.fullName || "", company: doc.company || "", phone: doc.phone || "" });
         setUserVendor(doc.createdBy?.vendor || "");
         const shops = doc.shops || [];
-        const loadShop = (s: any, setShop: any, setAssets: any, setSecuritySets: any, assetIdCounter: any, setSizeOptions: any) => {
+        const loadShop = (s: any, setShop: any, setAssets: any, setSecuritySets: any, assetIdCounter: any, setSizeOptions: any, setAssetBarcodes: any, setSecurityBarcodes: any) => {
           setShop({ noMcs: !s.shopCode, shopCode: s.shopCode || "", shopName: s.shopName || "", startDate: s.startInstallDate ? new Date(s.startInstallDate).toISOString().split('T')[0] : "", endDate: s.endInstallDate ? new Date(s.endInstallDate).toISOString().split('T')[0] : "", q7b7: s.q7b7 || "", focus: s.shopFocus || "", searchResults: [], showDropdown: false });
-          if (s.assets?.length) { const loadedAssets = s.assets.map((a: any) => { const sizeStr = a.size || ""; const customMatch = sizeStr.match(/^([^*]*)\*([^*]*)\*([^(]*)\(([^)]*)\)$/); const isCustom = isCustomSizeAsset(a.name || "") && customMatch; return { id: assetIdCounter.current++, name: a.name || "", size: sizeStr, kv: a.kv || "", qty: a.qty || 1, withdrawFor: a.withdrawFor || "", autoWarehouse: !!a.withdrawFor, useCustomSize: isCustom, customW: isCustom ? customMatch[1] : undefined, customD: isCustom ? customMatch[2] : undefined, customH: isCustom ? customMatch[3] : undefined, customXX: isCustom ? customMatch[4] : undefined, isSelected: !!(a.name) }; }); setAssets(loadedAssets); loadedAssets.forEach(async (asset: any) => { if (asset.name) { try { const res = await fetch(`/api/asset/sizes?name=${encodeURIComponent(asset.name)}`); const sizeJson = await res.json(); setSizeOptions((p: any) => ({ ...p, [asset.id]: sizeJson.sizes || [] })); } catch (err) { console.error(err); } } }); }
-          if (s.securitySets?.length) setSecuritySets(defaultSecuritySets().map(def => { const f = s.securitySets.find((x: any) => x.name === def.name); return f ? { ...def, qty: f.qty || 0, withdrawFor: f.withdrawFor || "" } : def; }));
+          if (s.assets?.length) { const loadedAssets = s.assets.map((a: any) => { const sizeStr = a.size || ""; const customMatch = sizeStr.match(/^([^*]*)\*([^*]*)\*([^(]*)\(([^)]*)\)$/); const isCustom = isCustomSizeAsset(a.name || "") && customMatch; return { id: assetIdCounter.current++, name: a.name || "", size: sizeStr, kv: a.kv || "", qty: a.qty || 1, withdrawFor: a.withdrawFor || "", autoWarehouse: !!a.withdrawFor, useCustomSize: isCustom, customW: isCustom ? customMatch[1] : undefined, customD: isCustom ? customMatch[2] : undefined, customH: isCustom ? customMatch[3] : undefined, customXX: isCustom ? customMatch[4] : undefined, isSelected: !!(a.name) }; }); setAssets(loadedAssets); loadedAssets.forEach(async (asset: any) => { if (asset.name) { try { const res = await fetch(`/api/asset/sizes?name=${encodeURIComponent(asset.name)}`); const sizeJson = await res.json(); setSizeOptions((p: any) => ({ ...p, [asset.id]: sizeJson.sizes || [] })); } catch (err) { console.error(err); } } }); if (doc.status === "reviewing") { const draftAssetBarcodes: Record<number, string[]> = {}; loadedAssets.forEach((asset: any, idx: number) => { const raw = s.assets[idx]?.barcode; if (raw) { try { draftAssetBarcodes[asset.id] = JSON.parse(raw); } catch {} } }); setAssetBarcodes(draftAssetBarcodes); } }
+          if (s.securitySets?.length) { setSecuritySets(defaultSecuritySets().map(def => { const f = s.securitySets.find((x: any) => x.name === def.name); return f ? { ...def, qty: f.qty || 0, withdrawFor: f.withdrawFor || "" } : def; })); if (doc.status === "reviewing") { const draftSecBarcodes: Record<number, string[]> = {}; defaultSecuritySets().forEach(def => { const found = s.securitySets.find((x: any) => x.name === def.name); if (found?.barcode) { try { draftSecBarcodes[def.id] = JSON.parse(found.barcode); } catch {} } }); setSecurityBarcodes(draftSecBarcodes); } }
         };
-        if (shops[0]) loadShop(shops[0], setShop1, setAssets1, setSecuritySets1, assetIdCounter1, setSizeOptions1);
-        if (shops[1]) loadShop(shops[1], setShop2, setAssets2, setSecuritySets2, assetIdCounter2, setSizeOptions2);
-        if (shops[2]) loadShop(shops[2], setShop3, setAssets3, setSecuritySets3, assetIdCounter3, setSizeOptions3);
-        if (shops[3]) loadShop(shops[3], setShop4, setAssets4, setSecuritySets4, assetIdCounter4, setSizeOptions4);
+        if (shops[0]) loadShop(shops[0], setShop1, setAssets1, setSecuritySets1, assetIdCounter1, setSizeOptions1, setAssetBarcodes1, setSecurityBarcodes1);
+        if (shops[1]) loadShop(shops[1], setShop2, setAssets2, setSecuritySets2, assetIdCounter2, setSizeOptions2, setAssetBarcodes2, setSecurityBarcodes2);
+        if (shops[2]) loadShop(shops[2], setShop3, setAssets3, setSecuritySets3, assetIdCounter3, setSizeOptions3, setAssetBarcodes3, setSecurityBarcodes3);
+        if (shops[3]) loadShop(shops[3], setShop4, setAssets4, setSecuritySets4, assetIdCounter4, setSizeOptions4, setAssetBarcodes4, setSecurityBarcodes4);
         setNote(doc.note || "");
       } setDataLoaded(true);
     }).finally(() => setLoading(false));
@@ -231,6 +231,34 @@ const FormRouting4Shops = ({ mode = "user" }: { mode?: FormMode }) => {
     finally { setIsSubmitting(false); }
   };
 
+  const handleDraftSave = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const makeShopPayload = (shop: ShopState, assets: AssetRow[], securitySets: SecuritySet[], assetBarcodes: Record<number, string[]>, securityBarcodes: Record<number, string[]>) => ({
+        shopCode: shop.shopCode, shopName: shop.shopName, startInstallDate: shop.startDate, endInstallDate: shop.endDate, q7b7: shop.q7b7, shopFocus: shop.focus,
+        assets: assets.filter(a => a.name && a.name.trim() !== "").map(a => ({ name: a.name, size: a.size || null, kv: a.kv || null, qty: a.qty, withdrawFor: a.withdrawFor, barcode: JSON.stringify(assetBarcodes[a.id] || []) })),
+        securitySets: securitySets.filter(s => s.qty > 0).map(s => ({ name: s.name, qty: s.qty, withdrawFor: s.withdrawFor, barcode: JSON.stringify(s.name.includes("Security Type C") ? [] : (securityBarcodes[s.id] || [])) })),
+      });
+      const payload = {
+        documentType: "routing4shops", docCode: formData.docNumber, fullName: formData.fullName, company: formData.company, phone: formData.phone, note,
+        status: "reviewing", transactionStatus: transactionStatus || null,
+        shops: [
+          makeShopPayload(shop1, assets1, securitySets1, assetBarcodes1, securityBarcodes1),
+          makeShopPayload(shop2, assets2, securitySets2, assetBarcodes2, securityBarcodes2),
+          makeShopPayload(shop3, assets3, securitySets3, assetBarcodes3, securityBarcodes3),
+          makeShopPayload(shop4, assets4, securitySets4, assetBarcodes4, securityBarcodes4),
+        ],
+      };
+      const res = await fetch(`/api/document/update/${editId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      const result = await res.json();
+      if (!result.success) throw new Error(result.message);
+      toast.success("บันทึก Draft สำเร็จ!");
+      setDocStatus("reviewing");
+    } catch (err) { console.error(err); toast.error("เกิดข้อผิดพลาดในการบันทึก Draft"); }
+    finally { setIsSubmitting(false); }
+  };
+
   if (loading && isEdit) return <div className="flex items-center justify-center min-h-[400px]"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
   const isReadOnly = docStatus === "approved" || docStatus === "rejected";
 
@@ -286,7 +314,7 @@ const FormRouting4Shops = ({ mode = "user" }: { mode?: FormMode }) => {
       <div className="glass-card p-4 sm:p-5"><div className="flex items-center gap-2 mb-4"><div className="icon-container gray !w-8 !h-8"><FileText className="w-4 h-4" /></div><h2 className="font-semibold">หมายเหตุ</h2></div><Input placeholder="หมายเหตุ (ถ้ามี)" value={note} onChange={(e) => setNote(e.target.value)} className="glass-input" /></div>
       {mode === "admin" && <OtherActivitiesSelect value={otherActivity} onChange={setOtherActivity} />}
       {mode === "admin" && <StatusSelect value={transactionStatus} onChange={setTransactionStatus} />}
-      {!isReadOnly && (<div className="flex flex-col sm:flex-row justify-center gap-3 pt-4">{mode === "admin" ? (<><button disabled={isSubmitting} onClick={handleOpenPreview} className="gradient-button px-8 py-3 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50"><CheckCircle className="w-4 h-4" />{isSubmitting ? "กำลังดำเนินการ..." : "อนุมัติ"}</button><button disabled={isSubmitting} onClick={() => handleSubmit("reject")} className="px-8 py-3 rounded-xl bg-red-500 text-white text-sm font-medium flex items-center justify-center gap-2 hover:bg-red-600 disabled:opacity-50"><XCircle className="w-4 h-4" />ปฏิเสธ</button></>) : (<button disabled={isSubmitting} onClick={() => handleSubmit("save")} className="gradient-button px-10 py-3 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50"><Save className="w-4 h-4" />{isSubmitting ? "กำลังบันทึก..." : (isEdit ? "บันทึกการแก้ไข" : "บันทึก")}</button>)}</div>)}
+      {!isReadOnly && (<div className="flex flex-col sm:flex-row justify-center gap-3 pt-4">{mode === "admin" ? (<><button disabled={isSubmitting} onClick={handleDraftSave} className="px-8 py-3 rounded-xl bg-purple-500/10 text-purple-600 border border-purple-200 text-sm font-medium flex items-center justify-center gap-2 hover:bg-purple-500/20 transition-colors disabled:opacity-50"><Save className="w-4 h-4" />{isSubmitting ? "กำลังบันทึก..." : "บันทึก Draft"}</button><button disabled={isSubmitting} onClick={handleOpenPreview} className="gradient-button px-8 py-3 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50"><CheckCircle className="w-4 h-4" />{isSubmitting ? "กำลังดำเนินการ..." : "อนุมัติ"}</button><button disabled={isSubmitting} onClick={() => handleSubmit("reject")} className="px-8 py-3 rounded-xl bg-red-500 text-white text-sm font-medium flex items-center justify-center gap-2 hover:bg-red-600 disabled:opacity-50"><XCircle className="w-4 h-4" />ปฏิเสธ</button></>) : (<button disabled={isSubmitting} onClick={() => handleSubmit("save")} className="gradient-button px-10 py-3 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50"><Save className="w-4 h-4" />{isSubmitting ? "กำลังบันทึก..." : (isEdit ? "บันทึกการแก้ไข" : "บันทึก")}</button>)}</div>)}
 
       <PreviewApproveModal
         isOpen={showPreviewModal}

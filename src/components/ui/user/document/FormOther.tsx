@@ -102,6 +102,14 @@ const FormOther = ({ mode = "user" }: { mode?: FormMode }) => {
           if (shop.assets?.length > 0) {
             const loadedAssets = shop.assets.map((a: any, idx: number) => ({ id: idx + 1, name: a.name || "", size: a.size || "", grade: a.grade || "", qty: a.qty || 1, withdrawFor: a.withdrawFor || "", isSelected: !!(a.name) }));
             setAssets(loadedAssets);
+            if (doc.status === "reviewing") {
+              const draftAssetBarcodes: Record<number, string[]> = {};
+              loadedAssets.forEach((asset: any, idx: number) => {
+                const raw = shop.assets[idx]?.barcode;
+                if (raw) { try { draftAssetBarcodes[asset.id] = JSON.parse(raw); } catch {} }
+              });
+              setAssetBarcodes(draftAssetBarcodes);
+            }
             loadedAssets.forEach(async (asset: any) => {
               if (asset.name) {
                 try {
@@ -112,7 +120,17 @@ const FormOther = ({ mode = "user" }: { mode?: FormMode }) => {
               }
             });
           }
-          if (shop.securitySets?.length > 0) setSecuritySets(defaultSecuritySets.map(def => { const found = shop.securitySets.find((s: any) => s.name === def.name); return found ? { ...def, qty: found.qty || 0, withdrawFor: found.withdrawFor || "" } : def; }));
+          if (shop.securitySets?.length > 0) {
+            setSecuritySets(defaultSecuritySets.map(def => { const found = shop.securitySets.find((s: any) => s.name === def.name); return found ? { ...def, qty: found.qty || 0, withdrawFor: found.withdrawFor || "" } : def; }));
+            if (doc.status === "reviewing") {
+              const draftSecBarcodes: Record<number, string[]> = {};
+              defaultSecuritySets.forEach(def => {
+                const found = shop.securitySets.find((s: any) => s.name === def.name);
+                if (found?.barcode) { try { draftSecBarcodes[def.id] = JSON.parse(found.barcode); } catch {} }
+              });
+              setSecurityBarcodes(draftSecBarcodes);
+            }
+          }
         }
         setNote(doc.note || "");
         setUserVendor(doc.createdBy?.vendor || "");
@@ -271,6 +289,24 @@ const FormOther = ({ mode = "user" }: { mode?: FormMode }) => {
     finally { setIsSubmitting(false); }
   };
 
+  const handleDraftSave = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const filledAssets = assets.filter(a => a.name && a.name.trim() !== "");
+      const payload = {
+        documentType: "other", docCode: formData.docNumber, fullName: formData.fullName, company: formData.company, phone: formData.phone, note, status: "reviewing", transactionStatus: transactionStatus || null,
+        shops: [{ shopCode, shopName, startInstallDate: startDate, endInstallDate: endDate, q7b7, shopFocus, assets: filledAssets.map(a => ({ name: a.name, size: a.size, grade: a.grade, qty: a.qty, withdrawFor: a.withdrawFor, barcode: JSON.stringify(assetBarcodes[a.id] || []) })), securitySets: securitySets.filter(s => s.qty > 0).map(s => ({ name: s.name, qty: s.qty, withdrawFor: s.withdrawFor, barcode: JSON.stringify(s.name.includes("Security Type C") ? [] : (securityBarcodes[s.id] || [])) })) }],
+      };
+      const res = await fetch(`/api/document/update/${editId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      const result = await res.json();
+      if (!result.success) throw new Error(result.message);
+      toast.success("บันทึก Draft สำเร็จ!");
+      setDocStatus("reviewing");
+    } catch (err) { console.error(err); toast.error("เกิดข้อผิดพลาดในการบันทึก Draft"); }
+    finally { setIsSubmitting(false); }
+  };
+
   if (loading && isEdit) return <div className="flex items-center justify-center min-h-[400px]"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
 
   const isReadOnly = docStatus === "approved" || docStatus === "rejected";
@@ -390,7 +426,7 @@ const FormOther = ({ mode = "user" }: { mode?: FormMode }) => {
       {!isReadOnly && (
         <div className="flex flex-col sm:flex-row justify-center gap-3 pt-4">
           {mode === "admin" ? (
-            <><button disabled={isSubmitting} onClick={handleOpenPreview} className="gradient-button px-8 py-3 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50"><CheckCircle className="w-4 h-4" />{isSubmitting ? "กำลังดำเนินการ..." : "อนุมัติ"}</button><button disabled={isSubmitting} onClick={() => handleSubmit("reject")} className="px-8 py-3 rounded-xl bg-red-500 text-white text-sm font-medium flex items-center justify-center gap-2 hover:bg-red-600 disabled:opacity-50"><XCircle className="w-4 h-4" />ปฏิเสธ</button></>
+            <><button disabled={isSubmitting} onClick={handleDraftSave} className="px-8 py-3 rounded-xl bg-purple-500/10 text-purple-600 border border-purple-200 text-sm font-medium flex items-center justify-center gap-2 hover:bg-purple-500/20 transition-colors disabled:opacity-50"><Save className="w-4 h-4" />{isSubmitting ? "กำลังบันทึก..." : "บันทึก Draft"}</button><button disabled={isSubmitting} onClick={handleOpenPreview} className="gradient-button px-8 py-3 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50"><CheckCircle className="w-4 h-4" />{isSubmitting ? "กำลังดำเนินการ..." : "อนุมัติ"}</button><button disabled={isSubmitting} onClick={() => handleSubmit("reject")} className="px-8 py-3 rounded-xl bg-red-500 text-white text-sm font-medium flex items-center justify-center gap-2 hover:bg-red-600 disabled:opacity-50"><XCircle className="w-4 h-4" />ปฏิเสธ</button></>
           ) : (
             <button disabled={isSubmitting} onClick={() => handleSubmit("save")} className="gradient-button px-10 py-3 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50"><Save className="w-4 h-4" />{isSubmitting ? "กำลังบันทึก..." : (isEdit ? "บันทึกการแก้ไข" : "บันทึก")}</button>
           )}

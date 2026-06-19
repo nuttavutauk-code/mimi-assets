@@ -109,6 +109,7 @@ export default function AdminList() {
 
   const statusConfig: Record<string, { text: string; className: string }> = {
     submitted: { text: "รออนุมัติ", className: "status-badge pending" },
+    reviewing: { text: "กำลังดำเนินการ", className: "status-badge reviewing" },
     approved: { text: "อนุมัติแล้ว", className: "status-badge approved" },
     rejected: { text: "รอแก้ไข", className: "status-badge rejected" },
   };
@@ -192,6 +193,7 @@ export default function AdminList() {
             <SelectTrigger className="glass-input"><SelectValue placeholder="สถานะ" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="submitted">รออนุมัติ</SelectItem>
+              <SelectItem value="reviewing">กำลังดำเนินการ</SelectItem>
               <SelectItem value="approved">อนุมัติแล้ว</SelectItem>
               <SelectItem value="rejected">รอแก้ไข</SelectItem>
             </SelectContent>
@@ -219,6 +221,7 @@ export default function AdminList() {
             <SelectTrigger className="glass-input"><SelectValue placeholder="สถานะ" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="submitted">รออนุมัติ</SelectItem>
+              <SelectItem value="reviewing">กำลังดำเนินการ</SelectItem>
               <SelectItem value="approved">อนุมัติแล้ว</SelectItem>
               <SelectItem value="rejected">รอแก้ไข</SelectItem>
             </SelectContent>

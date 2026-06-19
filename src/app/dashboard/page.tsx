@@ -102,6 +102,7 @@ export default function DashboardHome() {
 
   const statusConfig: Record<string, { text: string; className: string }> = {
     submitted: { text: "รออนุมัติ", className: "status-badge pending" },
+    reviewing: { text: "กำลังดำเนินการ", className: "status-badge reviewing" },
     approved: { text: "อนุมัติแล้ว", className: "status-badge approved" },
     rejected: { text: "รอแก้ไข", className: "status-badge rejected" },
   };

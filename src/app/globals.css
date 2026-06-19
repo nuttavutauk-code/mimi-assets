@@ -355,6 +355,7 @@
 .status-badge.pending { background: rgba(245, 158, 11, 0.1); color: var(--accent-orange); }
 .status-badge.rejected { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
 .status-badge.completed { background: rgba(59, 130, 246, 0.1); color: var(--accent-blue); }
+.status-badge.reviewing { background: rgba(168, 85, 247, 0.1); color: #a855f7; }
 
 /* Icon Containers */
 .icon-container {
