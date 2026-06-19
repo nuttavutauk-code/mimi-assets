@@ -285,9 +285,7 @@ function expandSecurityRows(securitySets: any[]) {
         if (qty <= 0) return;
         const isTypeC = (sec.name || "").includes("Security Type C");
         if (isTypeC) {
-            for (let i = 0; i < qty; i++) {
-                rows.push({ ...sec, barcode: "", _firstOfGroup: i === 0, _groupSize: qty, _secIdx: secIdx, _isTypeC: true });
-            }
+            rows.push({ ...sec, barcode: "", _firstOfGroup: true, _groupSize: qty, _secIdx: secIdx, _isTypeC: true });
             return;
         }
         const provided = Array.isArray(sec.assignedBarcodes) && sec.assignedBarcodes.length > 0
