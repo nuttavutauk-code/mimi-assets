@@ -69,12 +69,17 @@ export async function GET(
         }
 
         // map กลับ assets/securitySets ของแต่ละ shop → ใส่ assignedBarcodes
+        // ใช้ index pointer แจก barcode ตามลำดับ ป้องกัน barcode ซ้ำเมื่อมีหลาย record ชื่อเดียวกัน
+        const barcodeIndexByKey: Record<string, number> = {};
         const enrichedShops = doc.shops.map((s) => ({
             ...s,
-            assets: s.assets.map((a) => ({
-                ...a,
-                assignedBarcodes: barcodesByKey[`a|${a.name}|${s.shopCode || ""}`] || [],
-            })),
+            assets: s.assets.map((a) => {
+                const key = `a|${a.name}|${s.shopCode || ""}`;
+                const all = barcodesByKey[key] || [];
+                const idx = barcodeIndexByKey[key] || 0;
+                barcodeIndexByKey[key] = idx + a.qty;
+                return { ...a, assignedBarcodes: all.slice(idx, idx + a.qty) };
+            }),
             securitySets: s.securitySets.map((sec) => ({
                 ...sec,
                 assignedBarcodes: barcodesByKey[`s|${sec.name}|${s.shopCode || ""}`] || [],
