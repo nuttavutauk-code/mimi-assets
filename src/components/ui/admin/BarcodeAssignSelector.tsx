@@ -132,11 +132,22 @@ const BarcodeSlot = ({
     [warehouse, assetName, isSecuritySet]
   );
 
-  const debouncedFetch = useRef(debounce(fetchOptions, 250)).current;
+  // Keep ref current so debounce always calls the latest fetchOptions (avoids stale closure)
+  const fetchOptionsRef = useRef(fetchOptions);
+  useEffect(() => {
+    fetchOptionsRef.current = fetchOptions;
+  }, [fetchOptions]);
+
+  const debouncedFetch = useRef(debounce((query: string) => fetchOptionsRef.current(query), 250)).current;
 
   useEffect(() => {
     return () => debouncedFetch.cancel?.();
   }, [debouncedFetch]);
+
+  // Clear stale options when warehouse changes
+  useEffect(() => {
+    setOptions([]);
+  }, [warehouse]);
 
   const handleFocus = () => {
     setOpen(true);
