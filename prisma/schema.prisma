@@ -115,7 +115,9 @@ model Document {
   borrowType String? // "EVENT" | "TEMP SHOP"
 
   // 🔹 เงื่อนไขการเก็บกลับ (สำหรับใบเก็บ Asset กลับ)
-  returnCondition String? // "normal" = เก็บกลับปกติ, "from_borrow" = เก็บกลับจากการยืม
+  returnCondition      String? // "normal" = เก็บกลับปกติ, "from_borrow" = เก็บกลับจากการยืม, "from_borrow_security" = เก็บกลับจากการยืม + Security
+  borrowDocNumber      String? // เลขที่เอกสารใบยืมที่อ้างอิง (สำหรับ from_borrow/from_borrow_security)
+  destinationWarehouse String? // โกดังปลายทาง (สำหรับ from_borrow/from_borrow_security)
 
   // 🔹 Other Activities (Admin เลือกตอนอนุมัติ)
   otherActivity String? // "outToRentalWarehouse" | "inToRentalWarehouse" | "discarded" | "adjustError"

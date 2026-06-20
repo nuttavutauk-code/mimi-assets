@@ -855,7 +855,7 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
         const assetRows = expandAssetRows(assets);
         const transferTypes = ["เปิดร้านใหม่", "ย้ายทรัพย์สิน", "ปรับลด", "อื่นๆ"];
         const selectedType = doc.transferType || "ย้ายทรัพย์สิน";
-        const cap: PageCapacities = { first: 6, rest: 10, last: 4 };
+        const cap: PageCapacities = { first: 18, rest: 24, last: 14 };
         const pages = chunkRowsToPages(assetRows, cap, true);
 
         const transferCheckboxes = (
@@ -863,8 +863,8 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
                 <div style={{ display: "flex", gap: "25px", fontSize: "11px" }}>
                     {transferTypes.map((type) => (
                         <label key={type} style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer" }}>
-                            <div style={{ width: "14px", height: "14px", border: `2px solid ${colors.primary}`, borderRadius: "3px", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: selectedType === type ? colors.primary : colors.white }}>
-                                {selectedType === type && <span style={{ color: colors.white, fontSize: "10px", fontWeight: "bold", position: "relative", top: "-2px" }}>✓</span>}
+                            <div style={{ width: "14px", height: "14px", border: `2px solid ${colors.primary}`, borderRadius: "3px", position: "relative", backgroundColor: selectedType === type ? colors.primary : colors.white }}>
+                                {selectedType === type && <span style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -110%)", color: colors.white, fontSize: "10px", fontWeight: "bold", lineHeight: 1 }}>✓</span>}
                             </div>
                             <span style={{ position: "relative", top: "-3px" }}>{type}</span>
                         </label>
@@ -875,14 +875,13 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
 
         const assetThead = (
             <thead>
-                <tr><th colSpan={8} style={headerStyle}><span style={{ position: "relative", top: textOffset }}>📦 รายละเอียด Asset</span></th></tr>
+                <tr><th colSpan={6} style={headerStyle}><span style={{ position: "relative", top: textOffset }}>📦 รายละเอียด Asset</span></th></tr>
                 <tr>
                     <th style={{ ...thStyle, width: "30px" }}><span style={{ position: "relative", top: textOffset }}>No.</span></th>
+                    <th style={{ ...thStyle, width: "130px" }}><span style={{ position: "relative", top: textOffset }}>Barcode</span></th>
                     <th style={thStyle}><span style={{ position: "relative", top: textOffset }}>Asset Name</span></th>
-                    <th style={{ ...thStyle, width: "85px" }}><span style={{ position: "relative", top: textOffset }}>รูปภาพ</span></th>
                     <th style={{ ...thStyle, width: "55px" }}><span style={{ position: "relative", top: textOffset }}>Size</span></th>
                     <th style={{ ...thStyle, width: "40px" }}><span style={{ position: "relative", top: textOffset }}>เกรด</span></th>
-                    <th style={{ ...thStyle, width: "130px" }}><span style={{ position: "relative", top: textOffset }}>Barcode</span></th>
                     <th style={{ ...thStyle, width: "75px" }}><span style={{ position: "relative", top: textOffset }}>โกดัง</span></th>
                 </tr>
             </thead>
@@ -899,19 +898,12 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
                             const globalIdx = pages.slice(0, pageIdx).reduce((s, p) => s + p.rows.length, 0) + idx;
                             return (
                                 <tr key={idx}>
-                                    <Cell width="30px" center isAlt={globalIdx % 2 === 1} hasImage>{globalIdx + 1}</Cell>
-                                    <Cell isAlt={globalIdx % 2 === 1} hasImage>{row.name}</Cell>
-                                    <td style={{ width: "85px", border: `1px solid ${colors.border}`, padding: "4px", backgroundColor: globalIdx % 2 === 1 ? colors.rowAlt : colors.white, textAlign: "center", verticalAlign: "middle" }}>
-                                        {assetImages[row.name] ? (
-                                            <img src={`${assetImages[row.name]}?t=${Date.now()}`} alt="Asset" style={{ maxHeight: "80px", maxWidth: "75px", objectFit: "contain" }} />
-                                        ) : (
-                                            <span style={{ fontSize: "9px", color: "#999" }}>No Image</span>
-                                        )}
-                                    </td>
-                                    <Cell width="55px" center isAlt={globalIdx % 2 === 1} hasImage>{row.size || "-"}</Cell>
-                                    <Cell width="40px" center isAlt={globalIdx % 2 === 1} hasImage>{row.grade || "-"}</Cell>
+                                    <Cell width="30px" center isAlt={globalIdx % 2 === 1}>{globalIdx + 1}</Cell>
                                     <Cell width="130px" center isAlt={globalIdx % 2 === 1}>{row.barcode || "-"}</Cell>
-                                    <Cell width="75px" center isAlt={globalIdx % 2 === 1} hasImage>{row.withdrawFor || "-"}</Cell>
+                                    <Cell isAlt={globalIdx % 2 === 1}>{row.name}</Cell>
+                                    <Cell width="55px" center isAlt={globalIdx % 2 === 1}>{row.size || "-"}</Cell>
+                                    <Cell width="40px" center isAlt={globalIdx % 2 === 1}>{row.grade || "-"}</Cell>
+                                    <Cell width="75px" center isAlt={globalIdx % 2 === 1}>{row.withdrawFor || "-"}</Cell>
                                 </tr>
                             );
                         })}
@@ -1180,7 +1172,8 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
     const renderReturn = (): React.ReactNode[] => {
         const returnConditions = [
             { value: "normal", label: "เก็บกลับปกติ" },
-            { value: "from_borrow", label: "เก็บจากการยืม" },
+            { value: "from_borrow", label: "เก็บกลับจากการยืม" },
+            { value: "from_borrow_security", label: "เก็บกลับจากการยืม + Security" },
         ];
         const selectedCondition = doc.returnCondition || "normal";
         const cap: PageCapacities = { first: 14, rest: 22, last: 10 };
@@ -1217,6 +1210,21 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
             </div>
         );
 
+        const borrowInfoBox = (selectedCondition === "from_borrow" || selectedCondition === "from_borrow_security") && (doc.borrowDocNumber || doc.destinationWarehouse) ? (
+            <div style={{ display: "flex", gap: "32px", marginBottom: "8px", padding: "6px 12px", backgroundColor: colors.rowAlt, borderRadius: "6px", border: `1px solid ${colors.border}`, fontSize: "11px", alignItems: "center" }}>
+                {doc.borrowDocNumber && (
+                    <div style={{ position: "relative", top: "-5px" }}>
+                        <strong>เลขที่เอกสารใบยืม:</strong> {doc.borrowDocNumber}
+                    </div>
+                )}
+                {doc.destinationWarehouse && (
+                    <div style={{ position: "relative", top: "-5px" }}>
+                        <strong>โกดังปลายทาง:</strong> {doc.destinationWarehouse}
+                    </div>
+                )}
+            </div>
+        ) : null;
+
         const requesterInfo = (
             <div style={{ display: "flex", gap: "12px", marginBottom: "8px" }}>
                 <div style={{ backgroundColor: colors.rowAlt, borderRadius: "8px", padding: "8px 12px", border: `1px solid ${colors.border}` }}>
@@ -1248,7 +1256,7 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
         if (allPages.length === 0) {
             return [(
                 <>
-                    {renderHeader()}{requesterInfo}{conditionBox}
+                    {renderHeader()}{requesterInfo}{conditionBox}{borrowInfoBox}
                     {renderNote()}
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", paddingTop: "0px", marginTop: "auto" }}>
                         <SignatureBlock title="Approved by Cheil" showImage={true} date={formatDateThai(doc.approvedAt)} width="220px" />
@@ -1270,7 +1278,7 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
 
             return (
                 <>
-                    {isDocFirst ? <>{renderHeader()}{requesterInfo}{conditionBox}</> : renderCompactHeader()}
+                    {isDocFirst ? <>{renderHeader()}{requesterInfo}{conditionBox}{borrowInfoBox}</> : renderCompactHeader()}
 
                     {page.shopIsFirst && (
                         <div style={{ backgroundColor: colors.primary, color: colors.white, padding: "6px 12px", borderRadius: "6px 6px 0 0", fontSize: "11px", fontWeight: 600, marginTop: isDocFirst ? "0" : "8px" }}>
@@ -1306,8 +1314,8 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
                                 <tr><th colSpan={5} style={headerStyle}><span style={{ position: "relative", top: textOffset }}>🔐 รายละเอียด Security Set ที่เก็บกลับ</span></th></tr>
                                 <tr>
                                     <th style={{ ...thStyle, width: "30px" }}><span style={{ position: "relative", top: textOffset }}>No.</span></th>
-                                    <th style={thStyle}><span style={{ position: "relative", top: textOffset }}>Asset Name</span></th>
                                     <th style={{ ...thStyle, width: "100px" }}><span style={{ position: "relative", top: textOffset }}>Barcode</span></th>
+                                    <th style={thStyle}><span style={{ position: "relative", top: textOffset }}>Asset Name</span></th>
                                     <th style={{ ...thStyle, width: "50px" }}><span style={{ position: "relative", top: textOffset }}>จำนวน</span></th>
                                     <th style={{ ...thStyle, width: "80px" }}><span style={{ position: "relative", top: textOffset }}>เก็บที่โกดัง</span></th>
                                 </tr>
@@ -1316,8 +1324,8 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
                                 {shopFilledSec.map((security: any, idx: number) => (
                                     <tr key={idx}>
                                         <Cell width="30px" center isAlt={idx % 2 === 1}>{idx + 1}</Cell>
-                                        <Cell isAlt={idx % 2 === 1}>{security.name}</Cell>
                                         <Cell width="100px" center isAlt={idx % 2 === 1}>{security.barcode || "-"}</Cell>
+                                        <Cell isAlt={idx % 2 === 1}>{security.name}</Cell>
                                         <Cell width="50px" center bold isAlt={idx % 2 === 1}>{security.qty > 0 ? security.qty : ""}</Cell>
                                         <Cell width="80px" center isAlt={idx % 2 === 1}>{security.qty > 0 ? vendorName : ""}</Cell>
                                     </tr>

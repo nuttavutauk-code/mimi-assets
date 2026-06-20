@@ -25,6 +25,8 @@ export async function POST(req: Request): Promise<Response> {
       otherDetail,
       returnCondition, // ✅ เพิ่มเงื่อนไขการเก็บกลับ
       borrowType, // ✅ ประเภทการยืม
+      borrowDocNumber, // ✅ เลขที่เอกสารใบยืมที่อ้างอิง
+      destinationWarehouse, // ✅ โกดังปลายทาง
     } = data;
 
     const user = await prisma.user.findFirst({
@@ -51,6 +53,8 @@ export async function POST(req: Request): Promise<Response> {
         otherDetail: otherDetail || null,
         returnCondition: returnCondition || null, // ✅ เพิ่มเงื่อนไขการเก็บกลับ
         borrowType: borrowType || null, // ✅ ประเภทการยืม
+        borrowDocNumber: borrowDocNumber || null, // ✅ เลขที่เอกสารใบยืม
+        destinationWarehouse: destinationWarehouse || null, // ✅ โกดังปลายทาง
 
         shops: {
           create: shops.map((shop: any) => ({

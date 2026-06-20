@@ -20,6 +20,16 @@ type ShopItem = { mcsCode: string; shopName: string };
 type AssetRow = { id: number; barcode: string; name: string; size: string; grade: string; qty: number; noBarcode?: boolean; isSelected?: boolean };
 type ControlboxRow = { id: number; barcode: string; name: string };
 type SecurityTypeCRow = { id: number; name: string; qty: number };
+type BorrowDocData = {
+  id: number;
+  docCode: string;
+  shops: Array<{
+    shopCode: string | null;
+    shopName: string | null;
+    assets: Array<{ id: number; name: string; barcode: string | null; assignedBarcodes?: string[]; size: string | null; grade: string | null; qty: number }>;
+    securitySets: Array<{ id: number; name: string; barcode: string | null; assignedBarcodes?: string[]; qty: number }>;
+  }>;
+};
 type FormMode = "user" | "admin";
 
 interface ShopEntry {
@@ -85,13 +95,19 @@ const FormReturnAsset = ({ mode = "user" }: { mode?: FormMode }) => {
   const [loading, setLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({ docNumber: "", fullName: "", company: "", phone: "" });
-  const [returnCondition, setReturnCondition] = useState<"normal" | "from_borrow" | "">("");
+  const [returnCondition, setReturnCondition] = useState<"normal" | "from_borrow" | "from_borrow_security" | "">("");
   const [note, setNote] = useState("");
   const [otherActivity, setOtherActivity] = useState<OtherActivity>("");
   const [transactionStatus, setTransactionStatus] = useState<StatusOption>("");
   const [assetNames, setAssetNames] = useState<string[]>([]);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [userVendor, setUserVendor] = useState("");
+  const [borrowDocNumber, setBorrowDocNumber] = useState("");
+  const [borrowDocData, setBorrowDocData] = useState<BorrowDocData | null>(null);
+  const [borrowDocLoading, setBorrowDocLoading] = useState(false);
+  const [borrowDocError, setBorrowDocError] = useState("");
+  const [destinationWarehouse, setDestinationWarehouse] = useState("");
+  const [vendorList, setVendorList] = useState<string[]>([]);
 
   const updateShop = useCallback((shopId: number, partial: Partial<ShopEntry>) => {
     setShops(prev => prev.map(s => s.id === shopId ? { ...s, ...partial } : s));
@@ -230,6 +246,53 @@ const FormReturnAsset = ({ mode = "user" }: { mode?: FormMode }) => {
     return assetNames.filter(name => name.toLowerCase().includes(search.toLowerCase())).slice(0, 50);
   }, [assetNames]);
 
+  const fetchBorrowDoc = useCallback(async (docNum: string, condition: string) => {
+    if (!docNum.trim()) {
+      setBorrowDocData(null);
+      setBorrowDocError("");
+      return;
+    }
+    const docType = condition === "from_borrow_security" ? "borrowsecurity" : "borrow";
+    setBorrowDocLoading(true);
+    setBorrowDocError("");
+    setBorrowDocData(null);
+    try {
+      const listEndpoint = mode === "admin" ? "/api/document/list-all" : "/api/document/list";
+      const listRes = await fetch(`${listEndpoint}?docCode=${encodeURIComponent(docNum.trim())}&documentType=${docType}&limit=20`);
+      const listJson = await listRes.json();
+      const found = (listJson.documents || []).find((d: any) => d.docCode === docNum.trim());
+      if (!found) {
+        setBorrowDocError("ไม่พบเอกสาร");
+        return;
+      }
+      const detailRes = await fetch(`/api/document/detail/${found.id}`);
+      const detailJson = await detailRes.json();
+      if (detailJson.success) {
+        setBorrowDocData({
+          id: detailJson.document.id,
+          docCode: detailJson.document.docCode,
+          shops: detailJson.document.shops,
+        });
+      } else {
+        setBorrowDocError("ไม่สามารถดึงข้อมูลเอกสารได้");
+      }
+    } catch {
+      setBorrowDocError("เกิดข้อผิดพลาดในการดึงข้อมูล");
+    } finally {
+      setBorrowDocLoading(false);
+    }
+  }, [mode]);
+
+  const debouncedFetchBorrowDoc = useMemo(() => debounce(fetchBorrowDoc, 600), [fetchBorrowDoc]);
+
+  const handleReturnConditionChange = useCallback((v: string) => {
+    setReturnCondition(v as "normal" | "from_borrow" | "from_borrow_security" | "");
+    setBorrowDocNumber("");
+    setBorrowDocData(null);
+    setBorrowDocError("");
+    setDestinationWarehouse("");
+  }, []);
+
   useEffect(() => {
     if (!editIdFromUrl || dataLoaded) return;
     setLoading(true);
@@ -240,6 +303,9 @@ const FormReturnAsset = ({ mode = "user" }: { mode?: FormMode }) => {
         setFormData({ docNumber: doc.docCode, fullName: doc.fullName || "", company: doc.company || "", phone: doc.phone || "" });
         setNote(doc.note || "");
         if (doc.returnCondition) setReturnCondition(doc.returnCondition);
+        if (doc.borrowDocNumber) setBorrowDocNumber(doc.borrowDocNumber);
+        if (doc.destinationWarehouse) setDestinationWarehouse(doc.destinationWarehouse);
+        if (doc.borrowDocNumber && doc.returnCondition) fetchBorrowDoc(doc.borrowDocNumber, doc.returnCondition);
         setUserVendor(doc.createdBy?.vendor || "");
 
         if (doc.shops?.length > 0) {
@@ -285,11 +351,14 @@ const FormReturnAsset = ({ mode = "user" }: { mode?: FormMode }) => {
       }
       setDataLoaded(true);
     }).finally(() => setLoading(false));
-  }, [editIdFromUrl, dataLoaded]);
+  }, [editIdFromUrl, dataLoaded, fetchBorrowDoc]);
 
   useEffect(() => {
     fetch("/api/asset/names").then(r => r.json()).then(json => {
       if (json.success) setAssetNames(json.names || []);
+    });
+    fetch("/api/vendor/list").then(r => r.json()).then(json => {
+      setVendorList(json.vendors || []);
     });
   }, []);
 
@@ -308,20 +377,55 @@ const FormReturnAsset = ({ mode = "user" }: { mode?: FormMode }) => {
     });
   }, [dataLoaded, isEdit]);
 
-  const buildShopsPayload = () => shops.map(s => ({
-    shopCode: s.shopCode,
-    shopName: s.shopName,
-    startInstallDate: s.returnDate,
-    assets: s.assets.map(a => ({ barcode: a.barcode, name: a.name, size: a.size, grade: a.grade, qty: a.qty })),
-    securitySets: [
-      ...s.controlboxRows.filter(r => r.barcode.trim() !== "").map(r => ({ name: r.name, qty: 1, barcode: r.barcode })),
-      ...s.securityTypeC.filter(r => r.qty > 0).map(r => ({ name: r.name, qty: r.qty })),
-    ],
-  }));
+  const buildShopsPayload = () => {
+    if ((returnCondition === "from_borrow" || returnCondition === "from_borrow_security") && borrowDocData) {
+      return borrowDocData.shops.map(s => ({
+        shopCode: s.shopCode,
+        shopName: s.shopName,
+        startInstallDate: null,
+        assets: s.assets.flatMap(a => {
+          const barcodes = a.assignedBarcodes && a.assignedBarcodes.length > 0
+            ? a.assignedBarcodes
+            : a.barcode ? [a.barcode] : [];
+          if (barcodes.length > 0) {
+            return barcodes.map(bc => ({ barcode: bc, name: a.name, size: a.size, grade: a.grade, qty: 1 }));
+          }
+          return [{ barcode: a.barcode, name: a.name, size: a.size, grade: a.grade, qty: a.qty }];
+        }),
+        securitySets: (s.securitySets || []).filter(sec => sec.qty > 0 || sec.barcode).flatMap(sec => {
+          const barcodes = sec.assignedBarcodes && sec.assignedBarcodes.length > 0
+            ? sec.assignedBarcodes
+            : sec.barcode ? [sec.barcode] : [];
+          if (barcodes.length > 0) {
+            return barcodes.map(bc => ({ name: sec.name, qty: 1, barcode: bc }));
+          }
+          return [{ name: sec.name, qty: sec.qty, barcode: sec.barcode }];
+        }),
+      }));
+    }
+    return shops.map(s => ({
+      shopCode: s.shopCode,
+      shopName: s.shopName,
+      startInstallDate: s.returnDate,
+      assets: s.assets.map(a => ({ barcode: a.barcode, name: a.name, size: a.size, grade: a.grade, qty: a.qty })),
+      securitySets: [
+        ...s.controlboxRows.filter(r => r.barcode.trim() !== "").map(r => ({ name: r.name, qty: 1, barcode: r.barcode })),
+        ...s.securityTypeC.filter(r => r.qty > 0).map(r => ({ name: r.name, qty: r.qty })),
+      ],
+    }));
+  };
 
   const handleOpenPreview = () => {
     if (!returnCondition) {
       toast.error("กรุณาเลือกเงื่อนไขการเก็บกลับ");
+      return;
+    }
+    if ((returnCondition === "from_borrow" || returnCondition === "from_borrow_security") && !borrowDocData) {
+      toast.error("กรุณาระบุเลขที่เอกสารใบยืมและรอโหลดข้อมูล");
+      return;
+    }
+    if ((returnCondition === "from_borrow" || returnCondition === "from_borrow_security") && !destinationWarehouse) {
+      toast.error("กรุณาเลือกโกดังปลายทาง");
       return;
     }
     setShowPreviewModal(true);
@@ -340,6 +444,15 @@ const FormReturnAsset = ({ mode = "user" }: { mode?: FormMode }) => {
         toast.error("กรุณาเลือกเงื่อนไขการเก็บกลับ");
         return;
       }
+      if ((returnCondition === "from_borrow" || returnCondition === "from_borrow_security") && !borrowDocData) {
+        toast.error("กรุณาระบุเลขที่เอกสารใบยืมและรอโหลดข้อมูล");
+        return;
+      }
+      if ((returnCondition === "from_borrow" || returnCondition === "from_borrow_security") && !destinationWarehouse) {
+        toast.error("กรุณาเลือกโกดังปลายทาง");
+        return;
+      }
+      const isBorrowReturn = returnCondition === "from_borrow" || returnCondition === "from_borrow_security";
       const basePayload = {
         documentType: "return",
         docCode: formData.docNumber,
@@ -348,6 +461,8 @@ const FormReturnAsset = ({ mode = "user" }: { mode?: FormMode }) => {
         phone: formData.phone,
         note,
         returnCondition,
+        borrowDocNumber: isBorrowReturn ? borrowDocNumber : undefined,
+        destinationWarehouse: isBorrowReturn ? destinationWarehouse : undefined,
         status: "submitted",
         shops: buildShopsPayload(),
       };
@@ -405,7 +520,8 @@ const FormReturnAsset = ({ mode = "user" }: { mode?: FormMode }) => {
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
-      const payload = { documentType: "return", docCode: formData.docNumber, fullName: formData.fullName, company: formData.company, phone: formData.phone, note, returnCondition, status: "reviewing", transactionStatus: transactionStatus || null, shops: buildShopsPayload() };
+      const isBorrowReturn = returnCondition === "from_borrow" || returnCondition === "from_borrow_security";
+      const payload = { documentType: "return", docCode: formData.docNumber, fullName: formData.fullName, company: formData.company, phone: formData.phone, note, returnCondition, borrowDocNumber: isBorrowReturn ? borrowDocNumber : undefined, destinationWarehouse: isBorrowReturn ? destinationWarehouse : undefined, status: "reviewing", transactionStatus: transactionStatus || null, shops: buildShopsPayload() };
       const res = await fetch(`/api/document/update/${editId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const result = await res.json();
       if (!result.success) throw new Error(result.message);
@@ -462,7 +578,7 @@ const FormReturnAsset = ({ mode = "user" }: { mode?: FormMode }) => {
           <div className="icon-container purple !w-8 !h-8"><ClipboardList className="w-4 h-4" /></div>
           <h2 className="font-semibold">เงื่อนไขการเก็บกลับ</h2>
         </div>
-        <RadioGroup value={returnCondition} onValueChange={(v: "normal" | "from_borrow") => setReturnCondition(v)} className="flex gap-6" disabled={isReadOnly}>
+        <RadioGroup value={returnCondition} onValueChange={handleReturnConditionChange} className="flex flex-wrap gap-6" disabled={isReadOnly}>
           <div className="flex items-center space-x-2">
             <RadioGroupItem value="normal" id="return-normal" disabled={isReadOnly} />
             <Label htmlFor="return-normal" className="cursor-pointer">เก็บกลับปกติ</Label>
@@ -471,11 +587,148 @@ const FormReturnAsset = ({ mode = "user" }: { mode?: FormMode }) => {
             <RadioGroupItem value="from_borrow" id="return-from-borrow" disabled={isReadOnly} />
             <Label htmlFor="return-from-borrow" className="cursor-pointer">เก็บกลับจากการยืม</Label>
           </div>
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem value="from_borrow_security" id="return-from-borrow-security" disabled={isReadOnly} />
+            <Label htmlFor="return-from-borrow-security" className="cursor-pointer">เก็บกลับจากการยืม + Security</Label>
+          </div>
         </RadioGroup>
       </div>
 
+      {/* Borrow document info section */}
+      {(returnCondition === "from_borrow" || returnCondition === "from_borrow_security") && (
+        <div className="glass-card p-4 sm:p-5 space-y-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="icon-container orange !w-8 !h-8"><FileText className="w-4 h-4" /></div>
+            <h2 className="font-semibold">ข้อมูลใบยืม</h2>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs text-muted-foreground mb-1">
+                เลขที่เอกสาร{returnCondition === "from_borrow_security" ? "ใบยืม + Security" : "ใบยืม"}
+              </label>
+              <div className="relative">
+                <Input
+                  value={borrowDocNumber}
+                  onChange={(e) => {
+                    setBorrowDocNumber(e.target.value);
+                    debouncedFetchBorrowDoc(e.target.value, returnCondition);
+                  }}
+                  placeholder={returnCondition === "from_borrow_security" ? "เช่น BOS25011701" : "เช่น BOR25011701"}
+                  disabled={isReadOnly}
+                  className="glass-input"
+                />
+                {borrowDocLoading && (
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                    <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                  </div>
+                )}
+              </div>
+              {borrowDocError && <p className="text-xs text-red-500 mt-1">{borrowDocError}</p>}
+              {borrowDocData && !borrowDocError && (
+                <p className="text-xs text-green-600 mt-1">พบเอกสาร: {borrowDocData.docCode}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-xs text-muted-foreground mb-1">โกดังปลายทาง</label>
+              <Select value={destinationWarehouse} onValueChange={setDestinationWarehouse} disabled={isReadOnly}>
+                <SelectTrigger className="glass-input">
+                  <SelectValue placeholder="เลือกโกดัง" />
+                </SelectTrigger>
+                <SelectContent>
+                  {vendorList.filter(v => v && v.trim() !== "").map(v => (
+                    <SelectItem key={v} value={v}>{v}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {borrowDocData && (
+            <div className="mt-2 space-y-3">
+              <h3 className="text-sm font-semibold text-muted-foreground border-t border-border pt-3">
+                รายละเอียดจากเอกสาร {borrowDocData.docCode}
+              </h3>
+              {borrowDocData.shops.map((shop, idx) => (
+                <div key={idx} className="border border-border rounded-lg p-3 space-y-2 bg-black/2">
+                  <p className="text-sm font-medium">
+                    ร้านที่ {idx + 1}{shop.shopCode ? `: ${shop.shopCode}` : ""}{shop.shopName ? ` — ${shop.shopName}` : ""}
+                  </p>
+
+                  {shop.assets && shop.assets.length > 0 && (
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1 font-medium">Asset:</p>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs table-fixed">
+                          <colgroup>
+                            <col className="w-[35%]" />
+                            <col className="w-[35%]" />
+                            <col className="w-[15%]" />
+                            <col className="w-[15%]" />
+                          </colgroup>
+                          <thead>
+                            <tr className="text-muted-foreground border-b border-border/40">
+                              <th className="text-left py-1.5 pr-3 font-medium">Barcode</th>
+                              <th className="text-left py-1.5 pr-3 font-medium">ชื่อ</th>
+                              <th className="text-left py-1.5 pr-3 font-medium">ขนาด</th>
+                              <th className="text-left py-1.5 font-medium">จำนวน</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {shop.assets.map((a, aIdx) => (
+                              <tr key={aIdx} className="border-t border-border/40">
+                                <td className="py-1.5 pr-3 font-mono truncate">{a.barcode || (a.assignedBarcodes && a.assignedBarcodes.length > 0 ? a.assignedBarcodes.join(", ") : "—")}</td>
+                                <td className="py-1.5 pr-3 truncate">{a.name}</td>
+                                <td className="py-1.5 pr-3">{a.size || "—"}</td>
+                                <td className="py-1.5">{a.qty}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {shop.securitySets && shop.securitySets.filter(s => s.qty > 0 || s.barcode).length > 0 && (
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1 font-medium">Security Set:</p>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs table-fixed">
+                          <colgroup>
+                            <col className="w-[35%]" />
+                            <col className="w-[50%]" />
+                            <col className="w-[15%]" />
+                          </colgroup>
+                          <thead>
+                            <tr className="text-muted-foreground border-b border-border/40">
+                              <th className="text-left py-1.5 pr-3 font-medium">Barcode</th>
+                              <th className="text-left py-1.5 pr-3 font-medium">ชื่อ</th>
+                              <th className="text-left py-1.5 font-medium">จำนวน</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {shop.securitySets.filter(s => s.qty > 0 || s.barcode).map((s, sIdx) => (
+                              <tr key={sIdx} className="border-t border-border/40">
+                                <td className="py-1.5 pr-3 font-mono truncate">{s.barcode || (s.assignedBarcodes && s.assignedBarcodes.length > 0 ? s.assignedBarcodes.join(", ") : "—")}</td>
+                                <td className="py-1.5 pr-3 truncate">{s.name}</td>
+                                <td className="py-1.5">{s.qty}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Dynamic shops */}
-      {shops.map((shop, shopIdx) => (
+      {returnCondition !== "from_borrow" && returnCondition !== "from_borrow_security" && shops.map((shop, shopIdx) => (
         <div key={shop.id} className="space-y-3">
           {/* Shop section header */}
           <div className="flex items-center justify-between px-1">
@@ -882,7 +1135,7 @@ const FormReturnAsset = ({ mode = "user" }: { mode?: FormMode }) => {
       ))}
 
       {/* Add shop button */}
-      {!isReadOnly && (
+      {!isReadOnly && returnCondition !== "from_borrow" && returnCondition !== "from_borrow_security" && (
         <button
           onClick={addShop}
           className="glass-button px-4 py-3 text-sm flex items-center gap-2 w-full justify-center border-dashed"

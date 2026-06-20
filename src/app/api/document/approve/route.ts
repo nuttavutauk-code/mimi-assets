@@ -478,6 +478,10 @@ async function createDirectTransactions(documentId: number): Promise<{ created: 
     // For return/returnasset: iterate ALL shops (multi-shop support)
     if (document.documentType === "returnasset" || document.documentType === "return") {
         const wkColumn = getWkColumnForDocumentType(document.documentType, document.returnCondition);
+        const isBorrowReturn = document.returnCondition === "from_borrow" || document.returnCondition === "from_borrow_security";
+        const effectiveWarehouseIn = isBorrowReturn && document.destinationWarehouse
+            ? document.destinationWarehouse
+            : documentCreator?.vendor || null;
         for (const returnShop of document.shops) {
             for (const asset of returnShop.assets) {
                 if (!asset.barcode) continue;
@@ -493,7 +497,7 @@ async function createDirectTransactions(documentId: number): Promise<{ created: 
                         startWarranty: assetData?.startWarranty || null,
                         endWarranty: assetData?.endWarranty || null,
                         cheilPO: assetData?.cheilPO || null,
-                        warehouseIn: documentCreator?.vendor || null,
+                        warehouseIn: effectiveWarehouseIn,
                         inStockDate: returnShop.startInstallDate || currentDate,
                         unitIn: 1,
                         fromVendor: documentCreator?.vendor || null,

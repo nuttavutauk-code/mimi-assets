@@ -41,6 +41,8 @@ export async function PUT(
             otherDetail, // ✅ รายละเอียดอื่นๆ (Transfer)
             borrowType, // ✅ ประเภทการยืม (Borrow)
             transactionStatus, // ✅ Status ที่ Admin เลือก (18 ค่า)
+            borrowDocNumber, // ✅ เลขที่เอกสารใบยืมที่อ้างอิง
+            destinationWarehouse, // ✅ โกดังปลายทาง
         } = body;
 
         console.log("📝 Updating document:", documentId);
@@ -67,6 +69,8 @@ export async function PUT(
                 otherDetail: otherDetail || null, // ✅ รายละเอียดอื่นๆ
                 borrowType: borrowType || null, // ✅ ประเภทการยืม
                 transactionStatus: transactionStatus || null, // ✅ Status ที่ Admin เลือก
+                borrowDocNumber: borrowDocNumber || null, // ✅ เลขที่เอกสารใบยืม
+                destinationWarehouse: destinationWarehouse || null, // ✅ โกดังปลายทาง
 
                 shops: {
                     create: shops.map((shop: any) => ({

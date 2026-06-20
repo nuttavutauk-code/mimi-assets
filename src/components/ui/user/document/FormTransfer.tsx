@@ -349,8 +349,8 @@ const FormTransfer = ({ mode = "user" }: { mode?: FormMode }) => {
 
       <div className="glass-card p-4 sm:p-5">
         <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2"><div className="icon-container orange !w-8 !h-8"><Package className="w-4 h-4" /></div><h2 className="font-semibold">Asset</h2><span className="text-xs text-muted-foreground">({assets.length}/4)</span></div>
-          {!isReadOnly && assets.length < 4 && <button onClick={() => setAssets([...assets, { id: assetIdCounter.current++, barcode: "", name: "", size: "", grade: "", qty: 1, withdrawFor: "" }])} className="glass-button px-3 py-2 text-sm flex items-center gap-1"><Plus className="w-4 h-4" />เพิ่ม</button>}
+          <div className="flex items-center gap-2"><div className="icon-container orange !w-8 !h-8"><Package className="w-4 h-4" /></div><h2 className="font-semibold">Asset</h2><span className="text-xs text-muted-foreground">({assets.length} รายการ)</span></div>
+          {!isReadOnly && <button onClick={() => setAssets([...assets, { id: assetIdCounter.current++, barcode: "", name: "", size: "", grade: "", qty: 1, withdrawFor: "" }])} className="glass-button px-3 py-2 text-sm flex items-center gap-1"><Plus className="w-4 h-4" />เพิ่ม</button>}
         </div>
         <div className="space-y-3">
           {assets.map((asset) => (
