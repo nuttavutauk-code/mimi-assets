@@ -41,9 +41,21 @@ export async function GET(req: Request) {
     const limit = parseInt(searchParams.get("limit") || "10", 10);
     const skip = (page - 1) * limit;
 
+    // ✅ หา users ที่มี vendor เดียวกัน (ถ้า user มี vendor)
+    let createdByFilter: Prisma.DocumentWhereInput["createdById"];
+    if (user.vendor) {
+      const vendorUsers = await prisma.user.findMany({
+        where: { vendor: user.vendor },
+        select: { id: true },
+      });
+      createdByFilter = { in: vendorUsers.map((u) => u.id) };
+    } else {
+      createdByFilter = user.id;
+    }
+
     // ✅ กำหนด where เงื่อนไข
     const where: Prisma.DocumentWhereInput = {
-      createdById: user.id,
+      createdById: createdByFilter,
       AND: [
         docCode ? { docCode: { contains: docCode, mode: Prisma.QueryMode.insensitive } } : {},
         vendor ? { company: { contains: vendor, mode: Prisma.QueryMode.insensitive } } : {},
