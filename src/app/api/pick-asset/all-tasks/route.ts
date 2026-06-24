@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
 
         const searchParams = request.nextUrl.searchParams;
         const page = parseInt(searchParams.get("page") || "1");
-        const limit = 20;
+        const limit = parseInt(searchParams.get("limit") || "10");
         const statusFilter = searchParams.get("status"); // pending, picking, completed, all
         const searchQuery = searchParams.get("search") || ""; // ค้นหา docCode, shopCode, shopName
 

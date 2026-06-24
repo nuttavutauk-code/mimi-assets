@@ -642,34 +642,7 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
     const renderRouting = (): React.ReactNode[] => {
         const shopCount = documentType === "routing4shops" ? 4 : documentType === "routing3shops" ? 3 : 2;
         const cap: PageCapacities = { first: 14, rest: 22, last: 10 };
-
-        // Build flat page list across all shops
-        type RoutingPage = {
-            shopIdx: number;
-            shopItem: any;
-            chunk: PageChunk<any>;
-            shopAssetRows: any[];
-            shopIsFirst: boolean;
-            shopIsLast: boolean;
-        };
-        const allPages: RoutingPage[] = [];
         const shopList = shops.slice(0, shopCount);
-        shopList.forEach((shopItem: any, shopIdx: number) => {
-            const shopAssetRows = expandAssetRows(shopItem.assets || []);
-            const isLastShop = shopIdx === shopList.length - 1;
-            // last shop hasSignature; others don't (so capacity.last only applies to last shop)
-            const pages = chunkRowsToPages(shopAssetRows, cap, isLastShop);
-            pages.forEach((chunk) => {
-                allPages.push({
-                    shopIdx,
-                    shopItem,
-                    chunk,
-                    shopAssetRows,
-                    shopIsFirst: chunk.isFirst,
-                    shopIsLast: chunk.isLast,
-                });
-            });
-        });
 
         const assetThead = (
             <thead>
@@ -683,78 +656,142 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
             </thead>
         );
 
-        return allPages.map((page, pageIdx) => {
-            const isDocFirst = pageIdx === 0;
-            const isDocLast = pageIdx === allPages.length - 1;
-            const shopSecurity = page.shopItem.securitySets || defaultSecuritySets;
-            // Row offset within shop for striping
-            const prevShopRowCount = allPages
-                .slice(0, pageIdx)
-                .filter(p => p.shopIdx === page.shopIdx)
-                .reduce((s, p) => s + p.chunk.rows.length, 0);
-
-            return (
-                <>
-                    {isDocFirst ? renderHeader() : renderCompactHeader()}
-
-                    {/* Shop banner (only on first page of each shop section) */}
-                    {page.shopIsFirst && (
-                        <div style={{ backgroundColor: colors.primary, color: colors.white, padding: "6px 12px", borderRadius: "6px 6px 0 0", fontSize: "11px", fontWeight: 600, marginTop: isDocFirst ? "0" : "8px" }}>
-                            <span style={{ position: "relative", top: textOffset }}>
-                                🏪 ร้านที่ {page.shopIdx + 1}: {page.shopItem.shopName || "-"} | MCS: {page.shopItem.shopCode || "-"} |
-                                วันติดตั้ง: {formatDate(page.shopItem.startInstallDate)} - {formatDate(page.shopItem.endInstallDate)}
-                            </span>
-                        </div>
-                    )}
-
-                    <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "5px" }}>
-                        {assetThead}
-                        <tbody>
-                            {page.chunk.rows.map((row: any, idx: number) => {
-                                const globalIdx = prevShopRowCount + idx;
-                                return (
-                                    <tr key={idx}>
-                                        <Cell width="30px" center isAlt={globalIdx % 2 === 1}>{globalIdx + 1}</Cell>
-                                        <Cell isAlt={globalIdx % 2 === 1}>{row.name}</Cell>
-                                        <Cell width="45px" center isAlt={globalIdx % 2 === 1}>{row.kv || "-"}</Cell>
-                                        <Cell width="130px" center isAlt={globalIdx % 2 === 1}>{row.barcode || "-"}</Cell>
-                                        <Cell width="75px" center isAlt={globalIdx % 2 === 1}>{row.withdrawFor || "-"}</Cell>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-
-                    {/* Security table at last page of each shop section */}
-                    {page.shopIsLast && (
-                        <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "8px" }}>
-                            <tbody>
-                                {shopSecurity.slice(0, 3).map((sec: any, idx: number) => (
-                                    <tr key={idx}>
-                                        <Cell width="30px" center isAlt={idx % 2 === 1}>{idx + 1}</Cell>
-                                        <Cell isAlt={idx % 2 === 1}>{sec.name}</Cell>
-                                        <Cell width="40px" center bold isAlt={idx % 2 === 1}>{sec.qty > 0 ? sec.qty : ""}</Cell>
-                                        <Cell width="75px" center isAlt={idx % 2 === 1}>{sec.withdrawFor || ""}</Cell>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    )}
-
-                    {/* Signatures on doc's last page */}
-                    {isDocLast && (
-                        <>
-                            {renderNote()}
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", paddingTop: "10px", marginTop: "auto" }}>
-                                <SignatureBlock title="Approved by Cheil" showImage={true} date={formatDateThai(doc.approvedAt)} width="220px" />
-                                <SignatureBlock title="ลงชื่อผู้ส่งของ" width="220px" />
-                                <SignatureBlock title="ลงชื่อผู้รับของ" width="220px" />
-                            </div>
-                        </>
-                    )}
-                </>
-            );
+        // 1. Collect all rows from all shops tagged with shopIdx
+        type TaggedRow = { row: any; shopIdx: number };
+        const allTaggedRows: TaggedRow[] = [];
+        const shopTotals: number[] = [];
+        shopList.forEach((shopItem: any, shopIdx: number) => {
+            const rows = expandAssetRows(shopItem.assets || []);
+            shopTotals.push(rows.length);
+            rows.forEach((row: any) => allTaggedRows.push({ row, shopIdx }));
         });
+
+        // 2. Single pagination pass across all shops
+        const taggedChunks = allTaggedRows.length > 0
+            ? chunkRowsToPages(allTaggedRows, cap, true)
+            : [{ rows: [] as TaggedRow[], isFirst: true, isLast: true, pageNumber: 1 }];
+
+        // 3. Build page layouts grouping rows by shop sections
+        type PageSection = {
+            shopIdx: number;
+            rows: any[];
+            isShopFirst: boolean;
+            isShopLast: boolean;
+            shopRowOffset: number;
+        };
+
+        const shopRowCountsPlaced = new Array(shopCount).fill(0);
+
+        const pageLayouts = taggedChunks.map((chunk, pageIdx) => {
+            const sections: PageSection[] = [];
+            let currentShopIdx = -1;
+            let currentSection: PageSection | null = null;
+
+            (chunk.rows as TaggedRow[]).forEach((tagged: TaggedRow) => {
+                if (tagged.shopIdx !== currentShopIdx) {
+                    if (currentSection) sections.push(currentSection);
+                    currentSection = {
+                        shopIdx: tagged.shopIdx,
+                        rows: [],
+                        isShopFirst: shopRowCountsPlaced[tagged.shopIdx] === 0,
+                        isShopLast: false,
+                        shopRowOffset: shopRowCountsPlaced[tagged.shopIdx],
+                    };
+                    currentShopIdx = tagged.shopIdx;
+                }
+                currentSection!.rows.push(tagged.row);
+                shopRowCountsPlaced[tagged.shopIdx]++;
+            });
+            if (currentSection) sections.push(currentSection);
+
+            sections.forEach((section) => {
+                section.isShopLast = shopRowCountsPlaced[section.shopIdx] === shopTotals[section.shopIdx];
+            });
+
+            // Shops with 0 assets render their banner+security on the first page
+            if (pageIdx === 0) {
+                shopList.forEach((_: any, shopIdx: number) => {
+                    if (shopTotals[shopIdx] === 0 && !sections.find((s) => s.shopIdx === shopIdx)) {
+                        sections.push({ shopIdx, rows: [], isShopFirst: true, isShopLast: true, shopRowOffset: 0 });
+                    }
+                });
+            }
+
+            return {
+                isDocFirst: pageIdx === 0,
+                isDocLast: pageIdx === taggedChunks.length - 1,
+                sections,
+            };
+        });
+
+        // 4. Render JSX pages
+        return pageLayouts.map(({ isDocFirst, isDocLast, sections }, pageIdx) => (
+            <>
+                {isDocFirst ? renderHeader() : renderCompactHeader()}
+
+                {sections.map((section, sectionIdx) => {
+                    const shopItem = shopList[section.shopIdx];
+                    const shopSecurity = shopItem.securitySets || defaultSecuritySets;
+
+                    return (
+                        <React.Fragment key={sectionIdx}>
+                            {section.isShopFirst && (
+                                <div style={{ backgroundColor: colors.primary, color: colors.white, padding: "6px 12px", borderRadius: "6px 6px 0 0", fontSize: "11px", fontWeight: 600, marginTop: isDocFirst && sectionIdx === 0 ? "0" : "8px" }}>
+                                    <span style={{ position: "relative", top: textOffset }}>
+                                        🏪 ร้านที่ {section.shopIdx + 1}: {shopItem.shopName || "-"} | MCS: {shopItem.shopCode || "-"} |
+                                        วันติดตั้ง: {formatDate(shopItem.startInstallDate)} - {formatDate(shopItem.endInstallDate)}
+                                    </span>
+                                </div>
+                            )}
+
+                            <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "5px" }}>
+                                {assetThead}
+                                <tbody>
+                                    {section.rows.map((row: any, idx: number) => {
+                                        const globalIdx = section.shopRowOffset + idx;
+                                        return (
+                                            <tr key={idx}>
+                                                <Cell width="30px" center isAlt={globalIdx % 2 === 1}>{globalIdx + 1}</Cell>
+                                                <Cell isAlt={globalIdx % 2 === 1}>{row.name}</Cell>
+                                                <Cell width="45px" center isAlt={globalIdx % 2 === 1}>{row.kv || "-"}</Cell>
+                                                <Cell width="130px" center isAlt={globalIdx % 2 === 1}>{row.barcode || "-"}</Cell>
+                                                <Cell width="75px" center isAlt={globalIdx % 2 === 1}>{row.withdrawFor || "-"}</Cell>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+
+                            {section.isShopLast && (
+                                <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "8px" }}>
+                                    <tbody>
+                                        {shopSecurity.slice(0, 3).map((sec: any, idx: number) => (
+                                            <tr key={idx}>
+                                                <Cell width="30px" center isAlt={idx % 2 === 1}>{idx + 1}</Cell>
+                                                <Cell isAlt={idx % 2 === 1}>{sec.name}</Cell>
+                                                <Cell width="40px" center bold isAlt={idx % 2 === 1}>{sec.qty > 0 ? sec.qty : ""}</Cell>
+                                                <Cell width="75px" center isAlt={idx % 2 === 1}>{sec.withdrawFor || ""}</Cell>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
+                        </React.Fragment>
+                    );
+                })}
+
+                {isDocLast && (
+                    <>
+                        {renderNote()}
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", paddingTop: "10px", marginTop: "auto" }}>
+                            <SignatureBlock title="Approved by Cheil" showImage={true} date={formatDateThai(doc.approvedAt)} width="220px" />
+                            <SignatureBlock title="ลงชื่อผู้ส่งของ" width="220px" />
+                            <SignatureBlock title="ลงชื่อผู้รับของ" width="220px" />
+                        </div>
+                    </>
+                )}
+            </>
+        ));
     };
 
     // ============ OTHER Template (with images) ============

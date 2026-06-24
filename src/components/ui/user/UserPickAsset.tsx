@@ -31,10 +31,13 @@ export default function UserPickAsset() {
     fetchPickTasks();
   }, [currentPage]);
 
-  const fetchPickTasks = async () => {
+  const fetchPickTasks = async (pageNum?: number) => {
+    const page = pageNum ?? currentPage;
     try {
       setLoading(true);
-      const res = await fetch(`/api/pick-asset/my-tasks?page=${currentPage}`);
+      const res = await fetch(
+        `/api/pick-asset/my-tasks?page=${page}&limit=10&search=${encodeURIComponent(search)}`
+      );
       const data = await res.json();
 
       if (data.success) {
@@ -48,12 +51,10 @@ export default function UserPickAsset() {
     }
   };
 
-  const filteredData = tasks.filter(
-    (item) =>
-      item.docCode.toLowerCase().includes(search.toLowerCase()) ||
-      item.warehouse.toLowerCase().includes(search.toLowerCase()) ||
-      item.shopName.toLowerCase().includes(search.toLowerCase())
-  );
+  const handleSearch = () => {
+    setCurrentPage(1);
+    fetchPickTasks(1);
+  };
 
   const statusConfig: Record<string, { text: string; className: string }> = {
     pending: { text: "รอดำเนินการ", className: "status-badge pending" },
@@ -96,7 +97,7 @@ export default function UserPickAsset() {
               className="pl-10 glass-input"
             />
           </div>
-          <button onClick={fetchPickTasks} className="gradient-button px-6 py-2.5 text-sm font-medium flex items-center justify-center gap-2">
+          <button onClick={handleSearch} className="gradient-button px-6 py-2.5 text-sm font-medium flex items-center justify-center gap-2">
             <Search className="w-4 h-4" />
             ค้นหา
           </button>
@@ -110,7 +111,7 @@ export default function UserPickAsset() {
             <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
             กำลังโหลดข้อมูล...
           </div>
-        ) : filteredData.length === 0 ? (
+        ) : tasks.length === 0 ? (
           <div className="p-12 text-center text-muted-foreground">
             <Package className="w-12 h-12 mx-auto mb-3 opacity-30" />
             ไม่พบรายการ Pick Asset
@@ -131,7 +132,7 @@ export default function UserPickAsset() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredData.map((item) => {
+                  {tasks.map((item) => {
                     const statusInfo = statusConfig[item.status] || { text: item.status, className: "status-badge" };
                     const progress = item.totalItems > 0 ? Math.round((item.pickedItems / item.totalItems) * 100) : 0;
                     return (
@@ -178,7 +179,7 @@ export default function UserPickAsset() {
             {/* Pagination */}
             <div className="flex justify-between items-center p-4 border-t border-black/5">
               <span className="text-sm text-muted-foreground">
-                แสดง {filteredData.length} จาก {tasks.length} รายการ
+                แสดง {tasks.length} รายการ
               </span>
               <SimplePagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
             </div>
@@ -193,14 +194,14 @@ export default function UserPickAsset() {
             <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />
             กำลังโหลด...
           </div>
-        ) : filteredData.length === 0 ? (
+        ) : tasks.length === 0 ? (
           <div className="glass-card p-8 text-center text-muted-foreground">
             <Package className="w-10 h-10 mx-auto mb-2 opacity-30" />
             ไม่พบรายการ
           </div>
         ) : (
           <>
-            {filteredData.map((item) => {
+            {tasks.map((item) => {
               const statusInfo = statusConfig[item.status] || { text: item.status, className: "status-badge" };
               const progress = item.totalItems > 0 ? Math.round((item.pickedItems / item.totalItems) * 100) : 0;
               return (
