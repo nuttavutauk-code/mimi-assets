@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useLayoutEffect } from "react";
+import { useState, useEffect, useRef, useLayoutEffect, Fragment } from "react";
 
 interface DocumentTemplateSelectorProps {
     document: any;
@@ -734,7 +734,7 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
                     const shopSecurity = shopItem.securitySets || defaultSecuritySets;
 
                     return (
-                        <React.Fragment key={sectionIdx}>
+                        <Fragment key={sectionIdx}>
                             {section.isShopFirst && (
                                 <div style={{ backgroundColor: colors.primary, color: colors.white, padding: "6px 12px", borderRadius: "6px 6px 0 0", fontSize: "11px", fontWeight: 600, marginTop: isDocFirst && sectionIdx === 0 ? "0" : "8px" }}>
                                     <span style={{ position: "relative", top: textOffset }}>
@@ -776,7 +776,7 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
                                     </tbody>
                                 </table>
                             )}
-                        </React.Fragment>
+                        </Fragment>
                     );
                 })}
 
