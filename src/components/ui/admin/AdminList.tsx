@@ -13,7 +13,7 @@ import {
 import { Edit, Trash2, Download, Loader2, Search, Filter, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
-import { downloadAsImage } from "@/lib/downloadDocument";
+import { downloadDocumentPages } from "@/lib/downloadDocument";
 import DocumentTemplateSelector from "@/components/ui/document/DocumentTemplateSelector";
 
 export default function AdminList() {
@@ -141,8 +141,8 @@ export default function AdminList() {
       }
       setDocumentToDownload(json.document);
       await new Promise((resolve) => setTimeout(resolve, 200));
-      const success = await downloadAsImage("document-to-print", item.docCode);
-      if (success) toast.success("ดาวน์โหลดเอกสารสำเร็จ");
+      const result = await downloadDocumentPages("document-to-print", item.docCode);
+      if (result.success) toast.success("ดาวน์โหลดเอกสารสำเร็จ");
       else toast.error("ไม่สามารถสร้างรูปภาพได้");
     } catch (err) {
       toast.error("เกิดข้อผิดพลาดในการดาวน์โหลด");
