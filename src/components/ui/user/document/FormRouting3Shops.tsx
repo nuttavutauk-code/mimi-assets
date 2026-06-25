@@ -482,6 +482,7 @@ const FormRouting3Shops = ({ mode = "user" }: { mode?: FormMode }) => {
     const setSecuritySets = shopNum === 1 ? setSecuritySets1 : shopNum === 2 ? setSecuritySets2 : setSecuritySets3;
     const securityBarcodes = shopNum === 1 ? securityBarcodes1 : shopNum === 2 ? securityBarcodes2 : securityBarcodes3;
     const setSecurityBarcodes = shopNum === 1 ? setSecurityBarcodes1 : shopNum === 2 ? setSecurityBarcodes2 : setSecurityBarcodes3;
+    const otherBarcodesAll = [shopNum !== 1 ? securityBarcodes1 : null, shopNum !== 2 ? securityBarcodes2 : null, shopNum !== 3 ? securityBarcodes3 : null].filter((b): b is Record<number, string[]> => b !== null);
 
     return (
       <div className="glass-card p-4 sm:p-5">
@@ -498,7 +499,8 @@ const FormRouting3Shops = ({ mode = "user" }: { mode?: FormMode }) => {
                 <div className="mt-3 p-3 rounded-lg bg-blue-50/40 border border-blue-200">
                   <label className="block text-xs text-blue-700 font-medium mb-2">เลือก Barcode (qty {set.qty})</label>
                   <BarcodeAssignSelector warehouse={set.withdrawFor} assetName={set.name} qty={set.qty}
-                    value={securityBarcodes[set.id] || []} onChange={(next) => setSecurityBarcodes(p => ({ ...p, [set.id]: next }))} />
+                    value={securityBarcodes[set.id] || []} onChange={(next) => setSecurityBarcodes(p => ({ ...p, [set.id]: next }))}
+                    additionalExclude={otherBarcodesAll.flatMap(b => (b[set.id] || []).filter(Boolean))} />
                 </div>
               )}
             </div>

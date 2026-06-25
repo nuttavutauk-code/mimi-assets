@@ -762,20 +762,34 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
                                 </tbody>
                             </table>
 
-                            {section.isShopLast && (
-                                <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "8px" }}>
-                                    <tbody>
-                                        {shopSecurity.slice(0, 3).map((sec: any, idx: number) => (
-                                            <tr key={idx}>
-                                                <Cell width="30px" center isAlt={idx % 2 === 1}>{idx + 1}</Cell>
-                                                <Cell isAlt={idx % 2 === 1}>{sec.name}</Cell>
-                                                <Cell width="40px" center bold isAlt={idx % 2 === 1}>{sec.qty > 0 ? sec.qty : ""}</Cell>
-                                                <Cell width="75px" center isAlt={idx % 2 === 1}>{sec.withdrawFor || ""}</Cell>
+                            {section.isShopLast && (() => {
+                                const secRows = expandSecurityRows(shopSecurity);
+                                if (secRows.length === 0) return null;
+                                return (
+                                    <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "8px" }}>
+                                        <thead>
+                                            <tr>
+                                                <th style={{ ...thStyle, width: "30px" }}><span style={{ position: "relative", top: textOffset }}>No.</span></th>
+                                                <th style={thStyle}><span style={{ position: "relative", top: textOffset }}>Asset Name</span></th>
+                                                <th style={{ ...thStyle, width: "40px" }}><span style={{ position: "relative", top: textOffset }}>จำนวน</span></th>
+                                                <th style={{ ...thStyle, width: "130px" }}><span style={{ position: "relative", top: textOffset }}>Barcode</span></th>
+                                                <th style={{ ...thStyle, width: "75px" }}><span style={{ position: "relative", top: textOffset }}>โกดัง</span></th>
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            )}
+                                        </thead>
+                                        <tbody>
+                                            {secRows.map((row: any, idx: number) => (
+                                                <tr key={idx}>
+                                                    <Cell width="30px" center isAlt={idx % 2 === 1}>{idx + 1}</Cell>
+                                                    <Cell isAlt={idx % 2 === 1}>{row.name}</Cell>
+                                                    <Cell width="40px" center bold isAlt={idx % 2 === 1}>{row._isTypeC ? row._groupSize : 1}</Cell>
+                                                    <Cell width="130px" center isAlt={idx % 2 === 1}>{row._isTypeC ? "-" : (row.barcode || "-")}</Cell>
+                                                    <Cell width="75px" center isAlt={idx % 2 === 1}>{row.withdrawFor || ""}</Cell>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                );
+                            })()}
                         </Fragment>
                     );
                 })}

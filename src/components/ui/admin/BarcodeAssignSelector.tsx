@@ -19,6 +19,7 @@ interface BarcodeAssignSelectorProps {
   onChange: (next: string[]) => void;
   isSecuritySet?: boolean;
   disabled?: boolean;
+  additionalExclude?: string[];
 }
 
 const BarcodeAssignSelector = ({
@@ -29,6 +30,7 @@ const BarcodeAssignSelector = ({
   onChange,
   isSecuritySet = false,
   disabled = false,
+  additionalExclude = [],
 }: BarcodeAssignSelectorProps) => {
   // Ensure value array length === qty
   useEffect(() => {
@@ -62,6 +64,7 @@ const BarcodeAssignSelector = ({
           isSecuritySet={isSecuritySet}
           value={value[idx] || ""}
           excludeBarcodes={value.filter((b, i) => i !== idx && b)}
+          additionalExclude={additionalExclude}
           onChange={(bc) => handleSlotChange(idx, bc)}
           disabled={disabled}
         />
@@ -77,6 +80,7 @@ interface BarcodeSlotProps {
   isSecuritySet: boolean;
   value: string;
   excludeBarcodes: string[];
+  additionalExclude?: string[];
   onChange: (barcode: string) => void;
   disabled?: boolean;
 }
@@ -88,6 +92,7 @@ const BarcodeSlot = ({
   isSecuritySet,
   value,
   excludeBarcodes,
+  additionalExclude = [],
   onChange,
   disabled,
 }: BarcodeSlotProps) => {
@@ -174,7 +179,7 @@ const BarcodeSlot = ({
     }, 200);
   };
 
-  const filtered = options.filter((o) => !excludeBarcodes.includes(o.barcode));
+  const filtered = options.filter((o) => !excludeBarcodes.includes(o.barcode) && !additionalExclude.includes(o.barcode));
 
   return (
     <div className="relative">

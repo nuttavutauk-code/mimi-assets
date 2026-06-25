@@ -802,6 +802,7 @@ const FormRouting2Shops = ({ mode = "user" }: { mode?: FormMode }) => {
     const setSecuritySets = shopNum === 1 ? setSecuritySets1 : setSecuritySets2;
     const securityBarcodes = shopNum === 1 ? securityBarcodes1 : securityBarcodes2;
     const setSecurityBarcodes = shopNum === 1 ? setSecurityBarcodes1 : setSecurityBarcodes2;
+    const otherBarcodes = shopNum === 1 ? securityBarcodes2 : securityBarcodes1;
 
     return (
       <div className="glass-card p-4 sm:p-5">
@@ -835,7 +836,8 @@ const FormRouting2Shops = ({ mode = "user" }: { mode?: FormMode }) => {
                 <div className="mt-3 p-3 rounded-lg bg-purple-50/40 border border-purple-200">
                   <label className="block text-xs text-purple-700 font-medium mb-2">เลือก Barcode CONTROLBOX (qty {set.qty})</label>
                   <BarcodeAssignSelector warehouse={set.withdrawFor} assetName={set.name} qty={set.qty}
-                    value={securityBarcodes[set.id] || []} onChange={(next) => setSecurityBarcodes(p => ({ ...p, [set.id]: next }))} isSecuritySet />
+                    value={securityBarcodes[set.id] || []} onChange={(next) => setSecurityBarcodes(p => ({ ...p, [set.id]: next }))} isSecuritySet
+                    additionalExclude={(otherBarcodes[set.id] || []).filter(Boolean)} />
                 </div>
               )}
             </div>
