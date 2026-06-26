@@ -52,10 +52,10 @@ function chunkRowsToPages<T>(rows: T[], cap: PageCapacities, hasSignature: boole
             isLast = true;
         } else if (pageNum === 1) {
             take = cap.first;
-            isLast = false;
+            isLast = remaining <= cap.first;
         } else {
             take = cap.rest;
-            isLast = false;
+            isLast = remaining <= cap.rest;
         }
         pages.push({
             rows: rows.slice(i, i + take),
