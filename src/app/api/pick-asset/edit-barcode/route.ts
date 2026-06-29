@@ -61,27 +61,96 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        if (pickTask.status !== "completed" && pickTask.status !== "picking") {
+        if (pickTask.status !== "completed" && pickTask.status !== "picking" && pickTask.status !== "pending") {
             return NextResponse.json(
-                { success: false, message: "สามารถแก้ไขได้เฉพาะรายการที่ picking หรือ completed เท่านั้น" },
+                { success: false, message: "สามารถแก้ไขได้เฉพาะรายการที่ pending, picking หรือ completed เท่านั้น" },
                 { status: 400 }
             );
         }
 
         const oldBarcode = pickTask.barcode;
 
-        if (!oldBarcode) {
-            return NextResponse.json(
-                { success: false, message: "ไม่พบ Barcode เดิมใน PickAssetTask" },
-                { status: 400 }
-            );
+        if (pickTask.status !== "pending") {
+            if (!oldBarcode) {
+                return NextResponse.json(
+                    { success: false, message: "ไม่พบ Barcode เดิมใน PickAssetTask" },
+                    { status: 400 }
+                );
+            }
+
+            if (oldBarcode === newBarcode) {
+                return NextResponse.json(
+                    { success: false, message: "Barcode ใหม่ต้องไม่เหมือนกับ Barcode เดิม" },
+                    { status: 400 }
+                );
+            }
         }
 
-        if (oldBarcode === newBarcode) {
-            return NextResponse.json(
-                { success: false, message: "Barcode ใหม่ต้องไม่เหมือนกับ Barcode เดิม" },
-                { status: 400 }
-            );
+        // Branch: pending → assign barcode ครั้งแรก (ไม่มี barcode เดิม)
+        if (pickTask.status === "pending") {
+            const isControlbox = pickTask.assetName.includes("CONTROLBOX");
+
+            if (isControlbox) {
+                const latest = await prisma.securitySetTransaction.findFirst({
+                    where: { barcode: newBarcode },
+                    orderBy: { id: "desc" },
+                    select: { balance: true, warehouseIn: true, assetName: true },
+                });
+                if (!latest) {
+                    return NextResponse.json({ success: false, message: "ไม่พบ Security Barcode ใหม่" }, { status: 400 });
+                }
+                if (latest.balance !== 1) {
+                    return NextResponse.json({ success: false, message: "Barcode ใหม่ไม่พร้อมใช้งาน" }, { status: 400 });
+                }
+                if (latest.warehouseIn !== pickTask.warehouse) {
+                    return NextResponse.json({ success: false, message: `Barcode ไม่ได้อยู่ในโกดัง ${pickTask.warehouse}` }, { status: 400 });
+                }
+                if (latest.assetName !== pickTask.assetName) {
+                    return NextResponse.json({ success: false, message: "Barcode ไม่ตรงประเภท Security" }, { status: 400 });
+                }
+            } else {
+                const latest = await prisma.assetTransactionHistory.findFirst({
+                    where: { barcode: newBarcode },
+                    orderBy: { id: "desc" },
+                    select: { balance: true, warehouseIn: true, assetName: true },
+                });
+                if (!latest) {
+                    return NextResponse.json({ success: false, message: "ไม่พบ Barcode ใหม่ในระบบ" }, { status: 400 });
+                }
+                if (latest.balance !== 1) {
+                    return NextResponse.json({ success: false, message: "Barcode ใหม่ไม่พร้อมใช้งาน (ออกไปแล้ว)" }, { status: 400 });
+                }
+                if (latest.warehouseIn !== pickTask.warehouse) {
+                    return NextResponse.json({ success: false, message: `Barcode ไม่ได้อยู่ในโกดัง ${pickTask.warehouse}` }, { status: 400 });
+                }
+                if (latest.assetName !== pickTask.assetName) {
+                    return NextResponse.json({ success: false, message: `Barcode เป็นของ ${latest.assetName} ไม่ตรงกับ ${pickTask.assetName}` }, { status: 400 });
+                }
+            }
+
+            const conflict = await prisma.pickAssetTask.findFirst({
+                where: {
+                    barcode: newBarcode,
+                    status: { notIn: ["completed", "cancelled"] },
+                    id: { not: Number(pickTaskId) },
+                },
+                select: { id: true },
+            });
+            if (conflict) {
+                return NextResponse.json({ success: false, message: "Barcode ถูกใช้งานอยู่ใน task อื่น" }, { status: 400 });
+            }
+
+            await prisma.pickAssetTask.update({
+                where: { id: Number(pickTaskId) },
+                data: { barcode: newBarcode, status: "picking" },
+            });
+
+            return NextResponse.json({
+                success: true,
+                message: `กำหนด Barcode สำเร็จ: ${newBarcode}`,
+                oldBarcode: null,
+                newBarcode,
+            });
         }
 
         const isControlbox = pickTask.assetName.includes("CONTROLBOX");

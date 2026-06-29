@@ -465,7 +465,7 @@ export default function AdminPickDetailPage() {
                                     <div className="flex items-center gap-2">
                                         {getStatusBadge(asset.status)}
                                         {/* ✅ ปุ่มแก้ไข Barcode (status picking หรือ completed) */}
-                                        {(asset.status === "completed" || asset.status === "picking") && asset.barcode && (
+                                        {(asset.status === "completed" || asset.status === "picking" || asset.status === "pending") && (
                                             <Button
                                                 type="button"
                                                 variant="outline"
@@ -552,7 +552,7 @@ export default function AdminPickDetailPage() {
                                         <div className="flex items-center gap-2">
                                             {getStatusBadge(security.status)}
                                             {/* ✅ ปุ่มแก้ไข Barcode (status picking/completed, มี barcode, ไม่ใช่ Type C) */}
-                                            {(security.status === "completed" || security.status === "picking") && security.barcode && !isSecurityTypeC && (
+                                            {(security.status === "completed" || security.status === "picking" || security.status === "pending") && !isSecurityTypeC && (
                                                 <Button
                                                     type="button"
                                                     variant="outline"
