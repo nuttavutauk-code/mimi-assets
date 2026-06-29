@@ -999,7 +999,18 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
         const hasSecurity = documentType === "borrowSecurity" || documentType === "borrowsecurity";
         const assetRows = expandAssetRows(assets);
         const cap: PageCapacities = { first: 6, rest: 10, last: hasSecurity ? 2 : 3 };
-        const pages = chunkRowsToPages(assetRows, cap, true);
+        let pages = chunkRowsToPages(assetRows, cap, true);
+
+        // chunkRowsToPages marks a single page as isFirst+isLast when rows.length <= cap.first,
+        // even if rows.length > cap.last. The borrow footer is large (security table + warning +
+        // 5 signatures), so split: first page(s) for asset rows, last page for the footer.
+        if (pages.length === 1 && pages[0].rows.length > cap.last) {
+            const splitAt = Math.max(1, pages[0].rows.length - cap.last);
+            pages = [
+                { rows: assetRows.slice(0, splitAt), isFirst: true, isLast: false, pageNumber: 1 },
+                { rows: assetRows.slice(splitAt), isFirst: false, isLast: true, pageNumber: 2 },
+            ];
+        }
 
         const assetThead = (
             <thead>
@@ -1051,148 +1062,52 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
             <>
 
                 {/* Security Table (only for borrowSecurity) */}
-                {hasSecurity && (
-                    <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "6px", borderRadius: "8px", overflow: "hidden" }}>
-                        <thead>
-                            <tr><th colSpan={5} style={headerStyle}><span style={{ position: "relative", top: textOffset }}>🔐 รายละเอียด Security Set</span></th></tr>
-                            <tr>
-                                <th style={{ ...thStyle, width: "35px" }}><span style={{ position: "relative", top: textOffset }}>No.</span></th>
-                                <th style={thStyle}><span style={{ position: "relative", top: textOffset }}>Asset Name</span></th>
-                                <th style={{ ...thStyle, width: "80px" }}><span style={{ position: "relative", top: textOffset }}>รูปภาพ</span></th>
-                                <th style={{ ...thStyle, width: "50px" }}><span style={{ position: "relative", top: textOffset }}>จำนวน</span></th>
-                                <th style={{ ...thStyle, width: "85px" }}><span style={{ position: "relative", top: textOffset }}>เบิกที่โกดัง</span></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {/* Security Set Row 1 */}
-                            <tr>
-                                <Cell width="35px" center>{1}</Cell>
-                                <Cell>{displaySecuritySets[0]?.name || "-"}</Cell>
-                                <td
-                                    style={{
-                                        width: "80px",
-                                        border: `1px solid ${colors.border}`,
-                                        height: "70px",
-                                        padding: "4px",
-                                        backgroundColor: colors.white,
-                                        textAlign: "center",
-                                        verticalAlign: "middle",
-                                    }}
-                                >
-                                    {displaySecuritySets[0]?.name?.includes("CONTROLBOX") ? (
-                                        <img
-                                            src="/images/controlbox.png"
-                                            alt="CONTROLBOX"
-                                            style={{ maxHeight: "60px", maxWidth: "70px", objectFit: "contain" }}
-                                            onError={(e) => {
-                                                (e.target as HTMLImageElement).style.display = 'none';
-                                                (e.target as HTMLImageElement).parentElement!.innerHTML = '<span style="font-size: 9px; color: #999;">-</span>';
-                                            }}
-                                        />
-                                    ) : displaySecuritySets[0]?.name?.includes("Security Type C") ? (
-                                        <img
-                                            src="/images/security-type-c.png"
-                                            alt="Security Type C"
-                                            style={{ maxHeight: "60px", maxWidth: "70px", objectFit: "contain" }}
-                                            onError={(e) => {
-                                                (e.target as HTMLImageElement).style.display = 'none';
-                                                (e.target as HTMLImageElement).parentElement!.innerHTML = '<span style="font-size: 9px; color: #999;">-</span>';
-                                            }}
-                                        />
-                                    ) : (
-                                        <span style={{ fontSize: "9px", color: "#999" }}>-</span>
-                                    )}
-                                </td>
-                                <Cell width="50px" center bold>{displaySecuritySets[0]?.qty > 0 ? displaySecuritySets[0]?.qty : ""}</Cell>
-                                <Cell width="85px" center>{displaySecuritySets[0]?.withdrawFor || ""}</Cell>
-                            </tr>
-                            {/* Security Set Row 2 */}
-                            <tr>
-                                <Cell width="35px" center isAlt>{2}</Cell>
-                                <Cell isAlt>{displaySecuritySets[1]?.name || "-"}</Cell>
-                                <td
-                                    style={{
-                                        width: "80px",
-                                        border: `1px solid ${colors.border}`,
-                                        height: "70px",
-                                        padding: "4px",
-                                        backgroundColor: colors.rowAlt,
-                                        textAlign: "center",
-                                        verticalAlign: "middle",
-                                    }}
-                                >
-                                    {displaySecuritySets[1]?.name?.includes("CONTROLBOX") ? (
-                                        <img
-                                            src="/images/controlbox.png"
-                                            alt="CONTROLBOX"
-                                            style={{ maxHeight: "60px", maxWidth: "70px", objectFit: "contain" }}
-                                            onError={(e) => {
-                                                (e.target as HTMLImageElement).style.display = 'none';
-                                                (e.target as HTMLImageElement).parentElement!.innerHTML = '<span style="font-size: 9px; color: #999;">-</span>';
-                                            }}
-                                        />
-                                    ) : displaySecuritySets[1]?.name?.includes("Security Type C") ? (
-                                        <img
-                                            src="/images/security-type-c.png"
-                                            alt="Security Type C"
-                                            style={{ maxHeight: "60px", maxWidth: "70px", objectFit: "contain" }}
-                                            onError={(e) => {
-                                                (e.target as HTMLImageElement).style.display = 'none';
-                                                (e.target as HTMLImageElement).parentElement!.innerHTML = '<span style="font-size: 9px; color: #999;">-</span>';
-                                            }}
-                                        />
-                                    ) : (
-                                        <span style={{ fontSize: "9px", color: "#999" }}>-</span>
-                                    )}
-                                </td>
-                                <Cell width="50px" center bold isAlt>{displaySecuritySets[1]?.qty > 0 ? displaySecuritySets[1]?.qty : ""}</Cell>
-                                <Cell width="85px" center isAlt>{displaySecuritySets[1]?.withdrawFor || ""}</Cell>
-                            </tr>
-                            {/* Security Set Row 3 */}
-                            <tr>
-                                <Cell width="35px" center>{3}</Cell>
-                                <Cell>{displaySecuritySets[2]?.name || "-"}</Cell>
-                                <td
-                                    style={{
-                                        width: "80px",
-                                        border: `1px solid ${colors.border}`,
-                                        height: "70px",
-                                        padding: "4px",
-                                        backgroundColor: colors.white,
-                                        textAlign: "center",
-                                        verticalAlign: "middle",
-                                    }}
-                                >
-                                    {displaySecuritySets[2]?.name?.includes("CONTROLBOX") ? (
-                                        <img
-                                            src="/images/controlbox.png"
-                                            alt="CONTROLBOX"
-                                            style={{ maxHeight: "60px", maxWidth: "70px", objectFit: "contain" }}
-                                            onError={(e) => {
-                                                (e.target as HTMLImageElement).style.display = 'none';
-                                                (e.target as HTMLImageElement).parentElement!.innerHTML = '<span style="font-size: 9px; color: #999;">-</span>';
-                                            }}
-                                        />
-                                    ) : displaySecuritySets[2]?.name?.includes("Security Type C") ? (
-                                        <img
-                                            src="/images/security-type-c.png"
-                                            alt="Security Type C"
-                                            style={{ maxHeight: "60px", maxWidth: "70px", objectFit: "contain" }}
-                                            onError={(e) => {
-                                                (e.target as HTMLImageElement).style.display = 'none';
-                                                (e.target as HTMLImageElement).parentElement!.innerHTML = '<span style="font-size: 9px; color: #999;">-</span>';
-                                            }}
-                                        />
-                                    ) : (
-                                        <span style={{ fontSize: "9px", color: "#999" }}>-</span>
-                                    )}
-                                </td>
-                                <Cell width="50px" center bold>{displaySecuritySets[2]?.qty > 0 ? displaySecuritySets[2]?.qty : ""}</Cell>
-                                <Cell width="85px" center>{displaySecuritySets[2]?.withdrawFor || ""}</Cell>
-                            </tr>
-                        </tbody>
-                    </table>
-                )}
+                {hasSecurity && (() => {
+                    const borrowSecRows = expandSecurityRows(securitySets.filter((s: any) => s.qty > 0));
+                    return (
+                        <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "6px", borderRadius: "8px", overflow: "hidden" }}>
+                            <thead>
+                                <tr><th colSpan={5} style={headerStyle}><span style={{ position: "relative", top: textOffset }}>🔐 รายละเอียด Security Set</span></th></tr>
+                                <tr>
+                                    <th style={{ ...thStyle, width: "35px" }}><span style={{ position: "relative", top: textOffset }}>No.</span></th>
+                                    <th style={thStyle}><span style={{ position: "relative", top: textOffset }}>Asset Name</span></th>
+                                    <th style={{ ...thStyle, width: "80px" }}><span style={{ position: "relative", top: textOffset }}>รูปภาพ</span></th>
+                                    <th style={{ ...thStyle, width: "140px" }}><span style={{ position: "relative", top: textOffset }}>Barcode</span></th>
+                                    <th style={{ ...thStyle, width: "85px" }}><span style={{ position: "relative", top: textOffset }}>เบิกที่โกดัง</span></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {borrowSecRows.map((row: any, idx: number) => (
+                                    <tr key={idx}>
+                                        <Cell width="35px" center isAlt={idx % 2 === 1}>{idx + 1}</Cell>
+                                        <Cell isAlt={idx % 2 === 1}>{row.name || "-"}</Cell>
+                                        <td style={{
+                                            width: "80px",
+                                            border: `1px solid ${colors.border}`,
+                                            height: "70px",
+                                            padding: "4px",
+                                            backgroundColor: idx % 2 === 1 ? colors.rowAlt : colors.white,
+                                            textAlign: "center",
+                                            verticalAlign: "middle",
+                                        }}>
+                                            {row.name?.includes("CONTROLBOX") ? (
+                                                <img src="/images/controlbox.png" alt="CONTROLBOX" style={{ maxHeight: "60px", maxWidth: "70px", objectFit: "contain" }}
+                                                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).parentElement!.innerHTML = '<span style="font-size: 9px; color: #999;">-</span>'; }} />
+                                            ) : row.name?.includes("Security Type C") ? (
+                                                <img src="/images/security-type-c.png" alt="Security Type C" style={{ maxHeight: "60px", maxWidth: "70px", objectFit: "contain" }}
+                                                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).parentElement!.innerHTML = '<span style="font-size: 9px; color: #999;">-</span>'; }} />
+                                            ) : (
+                                                <span style={{ fontSize: "9px", color: "#999" }}>-</span>
+                                            )}
+                                        </td>
+                                        <Cell width="140px" center isAlt={idx % 2 === 1}>{row._isTypeC ? `จำนวน ${row._groupSize}` : (row.barcode || "-")}</Cell>
+                                        <Cell width="85px" center isAlt={idx % 2 === 1}>{row.withdrawFor || ""}</Cell>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    );
+                })()}
 
                 {renderNote()}
 
