@@ -551,7 +551,21 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
         const secRows = expandSecurityRows(securitySets);
 
         const cap: PageCapacities = { first: 28, rest: 33, last: 22 };
-        const pages = chunkRowsToPages(assetRows, cap, true);
+        let pages = chunkRowsToPages(assetRows, cap, true);
+
+        // If last page's asset rows + security rows would push signature off the bottom,
+        // demote last page to non-final and add a new overflow page for secTable + signature.
+        // Threshold 18 = cap.last(22) minus ~4 rows overhead for sec header + note.
+        const lastPage = pages[pages.length - 1];
+        const needsOverflowPage =
+            secRows.length > 0 && lastPage.rows.length + secRows.length > 18;
+        if (needsOverflowPage) {
+            pages = [
+                ...pages.slice(0, -1),
+                { ...lastPage, isLast: false },
+                { rows: [] as typeof assetRows, isFirst: false, isLast: true, pageNumber: pages.length + 1 },
+            ];
+        }
 
         const assetThead = (
             <thead>
@@ -592,49 +606,54 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
             </table>
         );
 
-        return pages.map((chunk, pageIdx) => (
-            <>
-                {chunk.isFirst ? <>{renderHeader()}{renderInfoCards()}</> : renderCompactHeader()}
+        return pages.map((chunk, pageIdx) => {
+            const isOverflowPage = needsOverflowPage && pageIdx === pages.length - 1;
+            return (
+                <>
+                    {chunk.isFirst ? <>{renderHeader()}{renderInfoCards()}</> : renderCompactHeader()}
 
-                <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "10px", borderRadius: "8px", overflow: "hidden" }}>
-                    {assetThead}
-                    <tbody>
-                        {chunk.rows.length === 0 ? (
-                            <tr>
-                                <Cell width="35px" center>{" "}</Cell><Cell>{" "}</Cell>
-                                <Cell width="50px" /><Cell width="150px" /><Cell width="85px" />
-                            </tr>
-                        ) : (
-                            chunk.rows.map((row: any, idx: number) => {
-                                const globalIdx = pages.slice(0, pageIdx).reduce((s, p) => s + p.rows.length, 0) + idx;
-                                return (
-                                    <tr key={idx}>
-                                        <Cell width="35px" center isAlt={globalIdx % 2 === 1}>{globalIdx + 1}</Cell>
-                                        <Cell isAlt={globalIdx % 2 === 1}>
-                                            {row.name}{row.size ? ` (${row.size})` : ""}{row.grade ? ` [${row.grade}]` : ""}
-                                        </Cell>
-                                        <Cell width="50px" center isAlt={globalIdx % 2 === 1}>{row.kv || "-"}</Cell>
-                                        <Cell width="150px" center isAlt={globalIdx % 2 === 1}>{row.barcode || "-"}</Cell>
-                                        <Cell width="85px" center isAlt={globalIdx % 2 === 1}>{row.withdrawFor || "-"}</Cell>
+                    {!isOverflowPage && (
+                        <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "10px", borderRadius: "8px", overflow: "hidden" }}>
+                            {assetThead}
+                            <tbody>
+                                {chunk.rows.length === 0 ? (
+                                    <tr>
+                                        <Cell width="35px" center>{" "}</Cell><Cell>{" "}</Cell>
+                                        <Cell width="50px" /><Cell width="150px" /><Cell width="85px" />
                                     </tr>
-                                );
-                            })
-                        )}
-                    </tbody>
-                </table>
+                                ) : (
+                                    chunk.rows.map((row: any, idx: number) => {
+                                        const globalIdx = pages.slice(0, pageIdx).reduce((s, p) => s + p.rows.length, 0) + idx;
+                                        return (
+                                            <tr key={idx}>
+                                                <Cell width="35px" center isAlt={globalIdx % 2 === 1}>{globalIdx + 1}</Cell>
+                                                <Cell isAlt={globalIdx % 2 === 1}>
+                                                    {row.name}{row.size ? ` (${row.size})` : ""}{row.grade ? ` [${row.grade}]` : ""}
+                                                </Cell>
+                                                <Cell width="50px" center isAlt={globalIdx % 2 === 1}>{row.kv || "-"}</Cell>
+                                                <Cell width="150px" center isAlt={globalIdx % 2 === 1}>{row.barcode || "-"}</Cell>
+                                                <Cell width="85px" center isAlt={globalIdx % 2 === 1}>{row.withdrawFor || "-"}</Cell>
+                                            </tr>
+                                        );
+                                    })
+                                )}
+                            </tbody>
+                        </table>
+                    )}
 
-                {chunk.isLast && (
-                    <>
-                        {secTable}
-                        {renderNote()}
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", paddingTop: "15px", marginTop: "auto" }}>
-                            <SignatureBlock title="Approved by Cheil" showImage={true} date={formatDateThai(doc.approvedAt)} width="280px" />
-                            <SignatureBlock title="ลงชื่อผู้รับของ" width="280px" />
-                        </div>
-                    </>
-                )}
-            </>
-        ));
+                    {chunk.isLast && (
+                        <>
+                            {secTable}
+                            {renderNote()}
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", paddingTop: "15px", marginTop: "auto" }}>
+                                <SignatureBlock title="Approved by Cheil" showImage={true} date={formatDateThai(doc.approvedAt)} width="280px" />
+                                <SignatureBlock title="ลงชื่อผู้รับของ" width="280px" />
+                            </div>
+                        </>
+                    )}
+                </>
+            );
+        });
     };
 
 
