@@ -68,6 +68,33 @@ function chunkRowsToPages<T>(rows: T[], cap: PageCapacities, hasSignature: boole
     return pages;
 }
 
+function chunkByHeight<T>(
+    rows: T[],
+    getH: (r: T) => number,
+    firstAvail: number,
+    otherAvail: number,
+): T[][] {
+    if (rows.length === 0) return [[]];
+    const pages: T[][] = [];
+    let page: T[] = [];
+    let used = 0;
+    let avail = firstAvail;
+    for (const row of rows) {
+        const h = getH(row);
+        if (page.length > 0 && used + h > avail) {
+            pages.push(page);
+            page = [row];
+            used = h;
+            avail = otherAvail;
+        } else {
+            page.push(row);
+            used += h;
+        }
+    }
+    pages.push(page);
+    return pages;
+}
+
 // ============ Shared Utilities ============
 
 const formatDate = (date?: string | Date): string => {
@@ -829,14 +856,42 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
 
     // ============ OTHER Template (with images) ============
     const renderOther = (): React.ReactNode[] => {
-        const assetRows = expandAssetRows(assets);
-        const secRows = expandSecurityRows(securitySets);
-        const cap: PageCapacities = { first: 7, rest: 10, last: 5 };
-        const pages = chunkRowsToPages(assetRows, cap, true);
+        const FIRST_OVERHEAD = 427;
+        const COMPACT_OVERHEAD = 103;
+        const AVAIL = 1013;
+        const ASSET_ROW_H = 90;
+        const SEC_HEADER_H = 60;
+        const SEC_ROW_H = 26;
+        const FOOTER_H = 156;
+
+        type OtherRow =
+            | { kind: 'asset'; data: any }
+            | { kind: 'sec-header' }
+            | { kind: 'security'; data: any };
+
+        const rowH = (r: OtherRow): number =>
+            r.kind === 'asset' ? ASSET_ROW_H : r.kind === 'sec-header' ? SEC_HEADER_H : SEC_ROW_H;
+
+        const assetRowsExpanded = expandAssetRows(assets);
+        const secRowsExpanded = expandSecurityRows(securitySets);
+
+        const combinedRows: OtherRow[] = [
+            ...assetRowsExpanded.map((r: any) => ({ kind: 'asset' as const, data: r })),
+            ...(secRowsExpanded.length > 0 ? [{ kind: 'sec-header' as const }] : []),
+            ...secRowsExpanded.map((r: any) => ({ kind: 'security' as const, data: r })),
+        ];
+
+        let pages = chunkByHeight(combinedRows, rowH, AVAIL - FIRST_OVERHEAD, AVAIL - COMPACT_OVERHEAD);
+
+        const lastUsed = pages[pages.length - 1].reduce((s, r) => s + rowH(r), 0);
+        const lastOverhead = pages.length === 1 ? FIRST_OVERHEAD : COMPACT_OVERHEAD;
+        if (lastUsed + lastOverhead + FOOTER_H > AVAIL) {
+            pages = [...pages, []];
+        }
 
         const assetThead = (
             <thead>
-                <tr><th colSpan={8} style={headerStyle}><span style={{ position: "relative", top: textOffset }}>📦 รายละเอียด Asset</span></th></tr>
+                <tr><th colSpan={7} style={headerStyle}><span style={{ position: "relative", top: textOffset }}>📦 รายละเอียด Asset</span></th></tr>
                 <tr>
                     <th style={{ ...thStyle, width: "30px" }}><span style={{ position: "relative", top: textOffset }}>No.</span></th>
                     <th style={thStyle}><span style={{ position: "relative", top: textOffset }}>Asset Name</span></th>
@@ -849,75 +904,98 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
             </thead>
         );
 
-        const secTable = secRows.length > 0 && (
-            <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "15px", borderRadius: "8px", overflow: "hidden" }}>
-                <thead>
-                    <tr><th colSpan={5} style={headerStyle}><span style={{ position: "relative", top: textOffset }}>🔐 รายละเอียด Security Set</span></th></tr>
-                    <tr>
-                        <th style={{ ...thStyle, width: "35px" }}><span style={{ position: "relative", top: textOffset }}>No.</span></th>
-                        <th style={thStyle}><span style={{ position: "relative", top: textOffset }}>Asset Name</span></th>
-                        <th style={{ ...thStyle, width: "50px" }}><span style={{ position: "relative", top: textOffset }}>จำนวน</span></th>
-                        <th style={{ ...thStyle, width: "130px" }}><span style={{ position: "relative", top: textOffset }}>Barcode</span></th>
-                        <th style={{ ...thStyle, width: "85px" }}><span style={{ position: "relative", top: textOffset }}>เบิกที่โกดัง</span></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {secRows.map((row: any, idx: number) => (
-                        <tr key={idx}>
-                            <Cell width="35px" center isAlt={idx % 2 === 1}>{idx + 1}</Cell>
-                            <Cell isAlt={idx % 2 === 1}>{row.name}</Cell>
-                            <Cell width="50px" center bold isAlt={idx % 2 === 1}>{row._isTypeC ? row._groupSize : 1}</Cell>
-                            <Cell width="130px" center isAlt={idx % 2 === 1}>{row._isTypeC ? "-" : (row.barcode || "-")}</Cell>
-                            <Cell width="85px" center isAlt={idx % 2 === 1}>{row.withdrawFor || ""}</Cell>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
+        const secThead = (
+            <thead>
+                <tr><th colSpan={5} style={headerStyle}><span style={{ position: "relative", top: textOffset }}>🔐 รายละเอียด Security Set</span></th></tr>
+                <tr>
+                    <th style={{ ...thStyle, width: "35px" }}><span style={{ position: "relative", top: textOffset }}>No.</span></th>
+                    <th style={thStyle}><span style={{ position: "relative", top: textOffset }}>Asset Name</span></th>
+                    <th style={{ ...thStyle, width: "50px" }}><span style={{ position: "relative", top: textOffset }}>จำนวน</span></th>
+                    <th style={{ ...thStyle, width: "130px" }}><span style={{ position: "relative", top: textOffset }}>Barcode</span></th>
+                    <th style={{ ...thStyle, width: "85px" }}><span style={{ position: "relative", top: textOffset }}>เบิกที่โกดัง</span></th>
+                </tr>
+            </thead>
         );
 
-        return pages.map((chunk, pageIdx) => (
-            <>
-                {chunk.isFirst ? <>{renderHeader()}{renderInfoCards()}</> : renderCompactHeader()}
+        return pages.map((pageRows, pageIdx) => {
+            const isFirst = pageIdx === 0;
+            const isLast = pageIdx === pages.length - 1;
 
-                <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "10px", borderRadius: "8px", overflow: "hidden" }}>
-                    {assetThead}
-                    <tbody>
-                        {chunk.rows.map((row: any, idx: number) => {
-                            const globalIdx = pages.slice(0, pageIdx).reduce((s, p) => s + p.rows.length, 0) + idx;
-                            return (
-                                <tr key={idx}>
-                                    <Cell width="30px" center isAlt={globalIdx % 2 === 1} hasImage>{globalIdx + 1}</Cell>
-                                    <Cell isAlt={globalIdx % 2 === 1} hasImage>{row.name}</Cell>
-                                    <td style={{ width: "85px", border: `1px solid ${colors.border}`, padding: "4px", backgroundColor: globalIdx % 2 === 1 ? colors.rowAlt : colors.white, textAlign: "center", verticalAlign: "middle" }}>
-                                        {assetImages[row.name] ? (
-                                            <img src={`${assetImages[row.name]}?t=${Date.now()}`} alt="Asset" style={{ maxHeight: "80px", maxWidth: "75px", objectFit: "contain" }} />
-                                        ) : (
-                                            <span style={{ fontSize: "9px", color: "#999" }}>No Image</span>
-                                        )}
-                                    </td>
-                                    <Cell width="55px" center isAlt={globalIdx % 2 === 1} hasImage>{row.size || "-"}</Cell>
-                                    <Cell width="40px" center isAlt={globalIdx % 2 === 1} hasImage>{row.grade || "-"}</Cell>
-                                    <Cell width="130px" center isAlt={globalIdx % 2 === 1}>{row.barcode || "-"}</Cell>
-                                    <Cell width="75px" center isAlt={globalIdx % 2 === 1} hasImage>{row.withdrawFor || "-"}</Cell>
-                                </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
+            const assetDataRows = pageRows.filter((r): r is Extract<OtherRow, { kind: 'asset' }> => r.kind === 'asset');
+            const secDataRows = pageRows.filter((r): r is Extract<OtherRow, { kind: 'security' }> => r.kind === 'security');
+            const hasSecHeader = pageRows.some(r => r.kind === 'sec-header');
 
-                {chunk.isLast && (
-                    <>
-                        {secTable}
-                        {renderNote()}
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", paddingTop: "15px", marginTop: "auto" }}>
-                            <SignatureBlock title="Approved by Cheil" showImage={true} date={formatDateThai(doc.approvedAt)} width="220px" />
-                            <SignatureBlock title="ลงชื่อผู้ส่งของ" width="220px" />
-                            <SignatureBlock title="ลงชื่อผู้รับของ" width="220px" />
-                        </div>
-                    </>
-                )}
-            </>
-        ));
+            let assetOffset = 0, secOffset = 0;
+            for (let i = 0; i < pageIdx; i++) {
+                assetOffset += pages[i].filter(r => r.kind === 'asset').length;
+                secOffset += pages[i].filter(r => r.kind === 'security').length;
+            }
+
+            return (
+                <>
+                    {isFirst ? <>{renderHeader()}{renderInfoCards()}</> : renderCompactHeader()}
+
+                    {assetDataRows.length > 0 && (
+                        <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "10px", borderRadius: "8px", overflow: "hidden" }}>
+                            {assetThead}
+                            <tbody>
+                                {assetDataRows.map((row, idx) => {
+                                    const g = assetOffset + idx;
+                                    return (
+                                        <tr key={idx}>
+                                            <Cell width="30px" center isAlt={g % 2 === 1} hasImage>{g + 1}</Cell>
+                                            <Cell isAlt={g % 2 === 1} hasImage>{row.data.name}</Cell>
+                                            <td style={{ width: "85px", border: `1px solid ${colors.border}`, padding: "4px", backgroundColor: g % 2 === 1 ? colors.rowAlt : colors.white, textAlign: "center", verticalAlign: "middle" }}>
+                                                {assetImages[row.data.name] ? (
+                                                    <img src={`${assetImages[row.data.name]}?t=${Date.now()}`} alt="Asset" style={{ maxHeight: "80px", maxWidth: "75px", objectFit: "contain" }} />
+                                                ) : (
+                                                    <span style={{ fontSize: "9px", color: "#999" }}>No Image</span>
+                                                )}
+                                            </td>
+                                            <Cell width="55px" center isAlt={g % 2 === 1} hasImage>{row.data.size || "-"}</Cell>
+                                            <Cell width="40px" center isAlt={g % 2 === 1} hasImage>{row.data.grade || "-"}</Cell>
+                                            <Cell width="130px" center isAlt={g % 2 === 1}>{row.data.barcode || "-"}</Cell>
+                                            <Cell width="75px" center isAlt={g % 2 === 1} hasImage>{row.data.withdrawFor || "-"}</Cell>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    )}
+
+                    {(hasSecHeader || secDataRows.length > 0) && (
+                        <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "15px", borderRadius: "8px", overflow: "hidden" }}>
+                            {secThead}
+                            <tbody>
+                                {secDataRows.map((row, idx) => {
+                                    const g = secOffset + idx;
+                                    return (
+                                        <tr key={idx}>
+                                            <Cell width="35px" center isAlt={g % 2 === 1}>{g + 1}</Cell>
+                                            <Cell isAlt={g % 2 === 1}>{row.data.name}</Cell>
+                                            <Cell width="50px" center bold isAlt={g % 2 === 1}>{row.data._isTypeC ? row.data._groupSize : 1}</Cell>
+                                            <Cell width="130px" center isAlt={g % 2 === 1}>{row.data._isTypeC ? "-" : (row.data.barcode || "-")}</Cell>
+                                            <Cell width="85px" center isAlt={g % 2 === 1}>{row.data.withdrawFor || ""}</Cell>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    )}
+
+                    {isLast && (
+                        <>
+                            {renderNote()}
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", paddingTop: "15px", marginTop: "auto" }}>
+                                <SignatureBlock title="Approved by Cheil" showImage={true} date={formatDateThai(doc.approvedAt)} width="220px" />
+                                <SignatureBlock title="ลงชื่อผู้ส่งของ" width="220px" />
+                                <SignatureBlock title="ลงชื่อผู้รับของ" width="220px" />
+                            </div>
+                        </>
+                    )}
+                </>
+            );
+        });
     };
 
     // ============ TRANSFER Template (with checkboxes + images) ============
@@ -998,23 +1076,59 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
     const renderBorrow = (): React.ReactNode[] => {
         const hasSecurity = documentType === "borrowSecurity" || documentType === "borrowsecurity";
         const assetRows = expandAssetRows(assets);
-        const cap: PageCapacities = { first: 6, rest: 10, last: hasSecurity ? 2 : 3 };
-        let pages = chunkRowsToPages(assetRows, cap, true);
+        const borrowSecRows = hasSecurity
+            ? expandSecurityRows(securitySets.filter((s: any) => s.qty > 0))
+            : [];
 
-        // chunkRowsToPages marks a single page as isFirst+isLast when rows.length <= cap.first,
-        // even if rows.length > cap.last. The borrow footer is large (security table + warning +
-        // 5 signatures), so split: first page(s) for asset rows, last page for the footer.
-        if (pages.length === 1 && pages[0].rows.length > cap.last) {
-            const splitAt = Math.max(1, pages[0].rows.length - cap.last);
-            pages = [
-                { rows: assetRows.slice(0, splitAt), isFirst: true, isLast: false, pageNumber: 1 },
-                { rows: assetRows.slice(splitAt), isFirst: false, isLast: true, pageNumber: 2 },
-            ];
+        // Height constants (px) — used for Word-like flow pagination
+        const FIRST_OVERHEAD = 427;  // header(107) + infocards(260) + asset-thead(60)
+        const COMPACT_OVERHEAD = 103; // compact-header(43) + asset-thead(60)
+        const FOOTER_H = 297;         // note(31) + warning(46) + sigs(220)
+        const AVAIL = 1013;           // PAGE_HEIGHT(1123) - padding_y(60) - padding_bottom(50)
+        const ASSET_ROW_H = 90;
+        const SEC_HEADER_H = 60;
+        const SEC_ROW_H = 70;
+
+        // Combined row list — asset rows + security header marker + security rows
+        type BorrowRow =
+            | { kind: 'asset'; data: any }
+            | { kind: 'sec-header' }
+            | { kind: 'security'; data: any; showImage: boolean };
+
+        const rowH = (r: BorrowRow): number =>
+            r.kind === 'asset' ? ASSET_ROW_H : r.kind === 'sec-header' ? SEC_HEADER_H :
+            (r.showImage ? SEC_ROW_H : 26);
+
+        // CONTROLBOX items that have qty > 1 get expanded to multiple rows with identical images.
+        // Only the first row per CONTROLBOX name shows the image; subsequent rows use normal height.
+        const isControlbox = (name: string) =>
+            name?.includes('CONTROLBOX 6 PORT') || name?.includes('CONTROLBOX 5 PORT');
+        const controlboxSeen = new Set<string>();
+
+        const combinedRows: BorrowRow[] = [
+            ...assetRows.map((r: any) => ({ kind: 'asset' as const, data: r })),
+            ...(borrowSecRows.length > 0 ? [{ kind: 'sec-header' as const }] : []),
+            ...borrowSecRows.map((r: any) => {
+                const showImage = !isControlbox(r.name) || !controlboxSeen.has(r.name);
+                if (isControlbox(r.name)) controlboxSeen.add(r.name);
+                return { kind: 'security' as const, data: r, showImage };
+            }),
+        ];
+
+        // Height-based chunking: fill each page to capacity before breaking
+        let pages = chunkByHeight(combinedRows, rowH, AVAIL - FIRST_OVERHEAD, AVAIL - COMPACT_OVERHEAD);
+
+        // If footer doesn't fit on last page, add an empty footer-only page
+        const lastUsed = pages[pages.length - 1].reduce((s, r) => s + rowH(r), 0);
+        const lastOverhead = pages.length === 1 ? FIRST_OVERHEAD : COMPACT_OVERHEAD;
+        if (lastUsed + lastOverhead + FOOTER_H > AVAIL) {
+            pages = [...pages, []];
         }
 
+        // ── Table headers ──────────────────────────────────────────
         const assetThead = (
             <thead>
-                <tr><th colSpan={7} style={headerStyle}><span style={{ position: "relative", top: textOffset }}>📦 รายละเอียด Asset</span></th></tr>
+                <tr><th colSpan={6} style={headerStyle}><span style={{ position: "relative", top: textOffset }}>📦 รายละเอียด Asset</span></th></tr>
                 <tr>
                     <th style={{ ...thStyle, width: "35px" }}><span style={{ position: "relative", top: textOffset }}>No.</span></th>
                     <th style={thStyle}><span style={{ position: "relative", top: textOffset }}>Asset Name</span></th>
@@ -1026,101 +1140,24 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
             </thead>
         );
 
-        const renderAssetTable = (chunk: PageChunk<any>, pageIdx: number) => (
-            <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "6px", borderRadius: "8px", overflow: "hidden" }}>
-                {assetThead}
-                <tbody>
-                    {chunk.rows.map((row: any, idx: number) => {
-                        const globalIdx = pages.slice(0, pageIdx).reduce((s, p) => s + p.rows.length, 0) + idx;
-                        return (
-                            <tr key={idx}>
-                                <Cell width="35px" center isAlt={globalIdx % 2 === 1} hasImage>{globalIdx + 1}</Cell>
-                                <td style={{ border: `1px solid ${colors.border}`, height: "90px", padding: "4px 8px", fontSize: "11px", backgroundColor: globalIdx % 2 === 1 ? colors.rowAlt : colors.white, color: colors.text, verticalAlign: "middle", fontFamily }}>
-                                    <div style={{ position: "relative", top: textOffset }}>
-                                        <div style={{ fontWeight: 500 }}>{row.name}{row.size ? ` (${row.size})` : ""}</div>
-                                        {row.kv && <div style={{ fontSize: "10px", color: colors.secondary, marginTop: "2px" }}>KV: {row.kv}</div>}
-                                    </div>
-                                </td>
-                                <td style={{ width: "100px", border: `1px solid ${colors.border}`, padding: "4px", backgroundColor: globalIdx % 2 === 1 ? colors.rowAlt : colors.white, textAlign: "center", verticalAlign: "middle" }}>
-                                    {assetImages[row.name] ? (
-                                        <img src={`${assetImages[row.name]}?t=${Date.now()}`} alt="Asset" style={{ maxHeight: "80px", maxWidth: "92px", objectFit: "contain" }} />
-                                    ) : (
-                                        <span style={{ fontSize: "9px", color: "#999" }}>No Image</span>
-                                    )}
-                                </td>
-                                <Cell width="50px" center isAlt={globalIdx % 2 === 1} hasImage>{row.grade || "-"}</Cell>
-                                <Cell width="130px" center isAlt={globalIdx % 2 === 1}>{row.barcode || "-"}</Cell>
-                                <Cell width="85px" center isAlt={globalIdx % 2 === 1} hasImage>{row.withdrawFor || "-"}</Cell>
-                            </tr>
-                        );
-                    })}
-                </tbody>
-            </table>
+        const secThead = (
+            <thead>
+                <tr><th colSpan={5} style={headerStyle}><span style={{ position: "relative", top: textOffset }}>🔐 รายละเอียด Security Set</span></th></tr>
+                <tr>
+                    <th style={{ ...thStyle, width: "35px" }}><span style={{ position: "relative", top: textOffset }}>No.</span></th>
+                    <th style={thStyle}><span style={{ position: "relative", top: textOffset }}>Asset Name</span></th>
+                    <th style={{ ...thStyle, width: "80px" }}><span style={{ position: "relative", top: textOffset }}>รูปภาพ</span></th>
+                    <th style={{ ...thStyle, width: "140px" }}><span style={{ position: "relative", top: textOffset }}>Barcode</span></th>
+                    <th style={{ ...thStyle, width: "85px" }}><span style={{ position: "relative", top: textOffset }}>เบิกที่โกดัง</span></th>
+                </tr>
+            </thead>
         );
 
-        const renderBorrowLast = () => (
+        // ── Footer (note + warning + 5 signatures) ─────────────────
+        const renderBorrowFooter = () => (
             <>
-
-                {/* Security Table (only for borrowSecurity) */}
-                {hasSecurity && (() => {
-                    const borrowSecRows = expandSecurityRows(securitySets.filter((s: any) => s.qty > 0));
-                    return (
-                        <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "6px", borderRadius: "8px", overflow: "hidden" }}>
-                            <thead>
-                                <tr><th colSpan={5} style={headerStyle}><span style={{ position: "relative", top: textOffset }}>🔐 รายละเอียด Security Set</span></th></tr>
-                                <tr>
-                                    <th style={{ ...thStyle, width: "35px" }}><span style={{ position: "relative", top: textOffset }}>No.</span></th>
-                                    <th style={thStyle}><span style={{ position: "relative", top: textOffset }}>Asset Name</span></th>
-                                    <th style={{ ...thStyle, width: "80px" }}><span style={{ position: "relative", top: textOffset }}>รูปภาพ</span></th>
-                                    <th style={{ ...thStyle, width: "140px" }}><span style={{ position: "relative", top: textOffset }}>Barcode</span></th>
-                                    <th style={{ ...thStyle, width: "85px" }}><span style={{ position: "relative", top: textOffset }}>เบิกที่โกดัง</span></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {borrowSecRows.map((row: any, idx: number) => (
-                                    <tr key={idx}>
-                                        <Cell width="35px" center isAlt={idx % 2 === 1}>{idx + 1}</Cell>
-                                        <Cell isAlt={idx % 2 === 1}>{row.name || "-"}</Cell>
-                                        <td style={{
-                                            width: "80px",
-                                            border: `1px solid ${colors.border}`,
-                                            height: "70px",
-                                            padding: "4px",
-                                            backgroundColor: idx % 2 === 1 ? colors.rowAlt : colors.white,
-                                            textAlign: "center",
-                                            verticalAlign: "middle",
-                                        }}>
-                                            {row.name?.includes("CONTROLBOX") ? (
-                                                <img src="/images/controlbox.png" alt="CONTROLBOX" style={{ maxHeight: "60px", maxWidth: "70px", objectFit: "contain" }}
-                                                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).parentElement!.innerHTML = '<span style="font-size: 9px; color: #999;">-</span>'; }} />
-                                            ) : row.name?.includes("Security Type C") ? (
-                                                <img src="/images/security-type-c.png" alt="Security Type C" style={{ maxHeight: "60px", maxWidth: "70px", objectFit: "contain" }}
-                                                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).parentElement!.innerHTML = '<span style="font-size: 9px; color: #999;">-</span>'; }} />
-                                            ) : (
-                                                <span style={{ fontSize: "9px", color: "#999" }}>-</span>
-                                            )}
-                                        </td>
-                                        <Cell width="140px" center isAlt={idx % 2 === 1}>{row._isTypeC ? `จำนวน ${row._groupSize}` : (row.barcode || "-")}</Cell>
-                                        <Cell width="85px" center isAlt={idx % 2 === 1}>{row.withdrawFor || ""}</Cell>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    );
-                })()}
-
                 {renderNote()}
-
-                {/* Important Note Section */}
-                <div style={{
-                    marginBottom: "10px",
-                    padding: "8px 10px",
-                    backgroundColor: colors.dangerBg,
-                    border: `1px solid ${colors.danger}`,
-                    borderRadius: "6px",
-                    fontSize: "10px",
-                    lineHeight: 1.5,
-                }}>
+                <div style={{ marginBottom: "10px", padding: "8px 10px", backgroundColor: colors.dangerBg, border: `1px solid ${colors.danger}`, borderRadius: "6px", fontSize: "10px", lineHeight: 1.5 }}>
                     <span style={{ position: "relative", top: textOffset }}>
                         <strong style={{ color: "#dc2626" }}>⚠️ หมายเหตุ**:</strong>{" "}
                         <span style={{ color: "#991b1b" }}>
@@ -1128,8 +1165,6 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
                         </span>
                     </span>
                 </div>
-
-                {/* Signatures - 5 (2 rows) */}
                 <div style={{ paddingTop: "8px", marginTop: "auto" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "15px" }}>
                         <SignatureBlock title="ลงชื่อเวนเดอร์ผู้รับของ / วันที่ยืม" width="220px" />
@@ -1144,13 +1179,99 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
             </>
         );
 
-        return pages.map((chunk, pageIdx) => (
-            <>
-                {chunk.isFirst ? <>{renderHeader()}{renderInfoCards()}</> : renderCompactHeader()}
-                {renderAssetTable(chunk, pageIdx)}
-                {chunk.isLast && renderBorrowLast()}
-            </>
-        ));
+        // ── Render pages ────────────────────────────────────────────
+        return pages.map((pageRows, pageIdx) => {
+            const isFirst = pageIdx === 0;
+            const isLast = pageIdx === pages.length - 1;
+
+            const assetDataRows = pageRows.filter((r): r is Extract<BorrowRow, { kind: 'asset' }> => r.kind === 'asset');
+            const secDataRows = pageRows.filter((r): r is Extract<BorrowRow, { kind: 'security' }> => r.kind === 'security');
+            const hasSecHeader = pageRows.some(r => r.kind === 'sec-header');
+
+            // Sequential numbering across pages
+            let assetOffset = 0;
+            let secOffset = 0;
+            for (let i = 0; i < pageIdx; i++) {
+                assetOffset += pages[i].filter(r => r.kind === 'asset').length;
+                secOffset += pages[i].filter(r => r.kind === 'security').length;
+            }
+
+            return (
+                <>
+                    {isFirst ? <>{renderHeader()}{renderInfoCards()}</> : renderCompactHeader()}
+
+                    {/* Asset table */}
+                    {assetDataRows.length > 0 && (
+                        <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "6px", borderRadius: "8px", overflow: "hidden" }}>
+                            {assetThead}
+                            <tbody>
+                                {assetDataRows.map((row, idx) => {
+                                    const g = assetOffset + idx;
+                                    return (
+                                        <tr key={idx}>
+                                            <Cell width="35px" center isAlt={g % 2 === 1} hasImage>{g + 1}</Cell>
+                                            <td style={{ border: `1px solid ${colors.border}`, height: "90px", padding: "4px 8px", fontSize: "11px", backgroundColor: g % 2 === 1 ? colors.rowAlt : colors.white, color: colors.text, verticalAlign: "middle", fontFamily }}>
+                                                <div style={{ position: "relative", top: textOffset }}>
+                                                    <div style={{ fontWeight: 500 }}>{row.data.name}{row.data.size ? ` (${row.data.size})` : ""}</div>
+                                                    {row.data.kv && <div style={{ fontSize: "10px", color: colors.secondary, marginTop: "2px" }}>KV: {row.data.kv}</div>}
+                                                </div>
+                                            </td>
+                                            <td style={{ width: "100px", border: `1px solid ${colors.border}`, padding: "4px", backgroundColor: g % 2 === 1 ? colors.rowAlt : colors.white, textAlign: "center", verticalAlign: "middle" }}>
+                                                {assetImages[row.data.name] ? (
+                                                    <img src={`${assetImages[row.data.name]}?t=${Date.now()}`} alt="Asset" style={{ maxHeight: "80px", maxWidth: "92px", objectFit: "contain" }} />
+                                                ) : (
+                                                    <span style={{ fontSize: "9px", color: "#999" }}>No Image</span>
+                                                )}
+                                            </td>
+                                            <Cell width="50px" center isAlt={g % 2 === 1} hasImage>{row.data.grade || "-"}</Cell>
+                                            <Cell width="130px" center isAlt={g % 2 === 1}>{row.data.barcode || "-"}</Cell>
+                                            <Cell width="85px" center isAlt={g % 2 === 1} hasImage>{row.data.withdrawFor || "-"}</Cell>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    )}
+
+                    {/* Security table — header repeats on continuation pages */}
+                    {(hasSecHeader || secDataRows.length > 0) && (
+                        <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "6px", borderRadius: "8px", overflow: "hidden" }}>
+                            {secThead}
+                            <tbody>
+                                {secDataRows.map((row, idx) => {
+                                    const g = secOffset + idx;
+                                    return (
+                                        <tr key={idx}>
+                                            <Cell width="35px" center isAlt={g % 2 === 1}>{g + 1}</Cell>
+                                            <Cell isAlt={g % 2 === 1}>{row.data.name || "-"}</Cell>
+                                            {row.showImage ? (
+                                                <td style={{ width: "80px", border: `1px solid ${colors.border}`, height: "70px", padding: "4px", backgroundColor: g % 2 === 1 ? colors.rowAlt : colors.white, textAlign: "center", verticalAlign: "middle" }}>
+                                                    {row.data.name?.includes("CONTROLBOX") ? (
+                                                        <img src="/images/controlbox.png" alt="CONTROLBOX" style={{ maxHeight: "60px", maxWidth: "70px", objectFit: "contain" }}
+                                                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).parentElement!.innerHTML = '<span style="font-size: 9px; color: #999;">-</span>'; }} />
+                                                    ) : row.data.name?.includes("Security Type C") ? (
+                                                        <img src="/images/security-type-c.png" alt="Security Type C" style={{ maxHeight: "60px", maxWidth: "70px", objectFit: "contain" }}
+                                                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).parentElement!.innerHTML = '<span style="font-size: 9px; color: #999;">-</span>'; }} />
+                                                    ) : (
+                                                        <span style={{ fontSize: "9px", color: "#999" }}>-</span>
+                                                    )}
+                                                </td>
+                                            ) : (
+                                                <Cell width="80px" center isAlt={g % 2 === 1}>-</Cell>
+                                            )}
+                                            <Cell width="140px" center isAlt={g % 2 === 1}>{row.data._isTypeC ? `จำนวน ${row.data._groupSize}` : (row.data.barcode || "-")}</Cell>
+                                            <Cell width="85px" center isAlt={g % 2 === 1}>{row.data.withdrawFor || ""}</Cell>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    )}
+
+                    {isLast && renderBorrowFooter()}
+                </>
+            );
+        });
     };
 
     // ============ RETURN Template (multi-shop, unlimited assets) ============
@@ -1338,8 +1459,19 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
     const renderShopToShop = (): React.ReactNode[] => {
         const shopSource = shops[0] || {};
         const shopDest = shops[1] || doc.destinationShop || {};
-        const cap: PageCapacities = { first: 8, rest: 12, last: 6 };
-        const pages = chunkRowsToPages(assets, cap, true);
+
+        const FIRST_OVERHEAD = 234;
+        const COMPACT_OVERHEAD = 103;
+        const ROW_H = 70;
+        const AVAIL = 1013;
+
+        let pages = chunkByHeight(assets as any[], (_: any) => ROW_H, AVAIL - FIRST_OVERHEAD, AVAIL - COMPACT_OVERHEAD);
+
+        const s2sFooterH = 327 + displaySecuritySets.length * 26;
+        const lastUsed = pages[pages.length - 1].length * ROW_H;
+        const lastOverhead = pages.length === 1 ? FIRST_OVERHEAD : COMPACT_OVERHEAD;
+        const needsFooterPage = lastUsed + lastOverhead + s2sFooterH > AVAIL;
+        if (needsFooterPage) pages = [...pages, []];
 
         const s2sHeader = (
             <>
@@ -1511,42 +1643,61 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
             </>
         );
 
-        return pages.map((chunk, pageIdx) => (
-            <>
-                {chunk.isFirst ? s2sHeader : renderCompactHeader()}
+        return pages.map((pageRows, pageIdx) => {
+            const isFirst = pageIdx === 0;
+            const isLast = pageIdx === pages.length - 1;
+            const isFooterOnlyPage = isLast && pageRows.length === 0;
+            const globalOffset = pages.slice(0, pageIdx).reduce((s, p) => s + p.length, 0);
 
-                <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "5px", borderRadius: "8px", overflow: "hidden" }}>
-                    {assetThead}
-                    <tbody>
-                        {chunk.rows.map((asset: any, idx: number) => {
-                            const globalIdx = pages.slice(0, pageIdx).reduce((s, p) => s + p.rows.length, 0) + idx;
-                            return (
-                                <tr key={idx}>
-                                    <td style={{ width: "25px", border: `1px solid ${colors.border}`, height: "70px", padding: "2px 5px", fontSize: "9px", backgroundColor: globalIdx % 2 === 1 ? colors.rowAlt : colors.white, textAlign: "center", verticalAlign: "middle" }}><span style={{ position: "relative", top: textOffset }}>{globalIdx + 1}</span></td>
-                                    <td style={{ width: "70px", border: `1px solid ${colors.border}`, height: "70px", padding: "2px 5px", fontSize: "9px", backgroundColor: globalIdx % 2 === 1 ? colors.rowAlt : colors.white, textAlign: "center", verticalAlign: "middle" }}><span style={{ position: "relative", top: textOffset }}>{asset.barcode || "-"}</span></td>
-                                    <td style={{ border: `1px solid ${colors.border}`, height: "70px", padding: "2px 5px", fontSize: "9px", backgroundColor: globalIdx % 2 === 1 ? colors.rowAlt : colors.white, verticalAlign: "middle" }}><span style={{ position: "relative", top: textOffset }}>{asset.name}</span></td>
-                                    <td style={{ width: "70px", border: `1px solid ${colors.border}`, height: "70px", padding: "3px", backgroundColor: globalIdx % 2 === 1 ? colors.rowAlt : colors.white, textAlign: "center", verticalAlign: "middle" }}>
-                                        {assetImages[asset.name] ? <img src={assetImages[asset.name]!} alt="Asset" style={{ maxHeight: "60px", maxWidth: "60px", objectFit: "contain" }} /> : <span style={{ fontSize: "8px", color: "#999" }}>-</span>}
-                                    </td>
-                                    <td style={{ width: "50px", border: `1px solid ${colors.border}`, height: "70px", padding: "2px 5px", fontSize: "9px", backgroundColor: globalIdx % 2 === 1 ? colors.rowAlt : colors.white, textAlign: "center", verticalAlign: "middle" }}><span style={{ position: "relative", top: textOffset }}>{asset.size || "-"}</span></td>
-                                    <td style={{ width: "35px", border: `1px solid ${colors.border}`, height: "70px", padding: "2px 5px", fontSize: "9px", backgroundColor: globalIdx % 2 === 1 ? colors.rowAlt : colors.white, textAlign: "center", verticalAlign: "middle" }}><span style={{ position: "relative", top: textOffset }}>{asset.grade || "-"}</span></td>
-                                    <td style={{ width: "30px", border: `1px solid ${colors.border}`, height: "70px", padding: "2px 5px", fontSize: "9px", fontWeight: 600, backgroundColor: globalIdx % 2 === 1 ? colors.rowAlt : colors.white, textAlign: "center", verticalAlign: "middle" }}><span style={{ position: "relative", top: textOffset }}>{asset.qty}</span></td>
-                                    <td style={{ width: "70px", border: `1px solid ${colors.border}`, height: "70px", padding: "2px 5px", fontSize: "9px", backgroundColor: globalIdx % 2 === 1 ? colors.rowAlt : colors.white, textAlign: "center", verticalAlign: "middle" }}><span style={{ position: "relative", top: textOffset }}>{asset.withdrawFor || "-"}</span></td>
-                                </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
+            return (
+                <>
+                    {isFirst ? s2sHeader : renderCompactHeader()}
 
-                {chunk.isLast && s2sLast}
-            </>
-        ));
+                    {!isFooterOnlyPage && (
+                        <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "5px", borderRadius: "8px", overflow: "hidden" }}>
+                            {assetThead}
+                            <tbody>
+                                {pageRows.map((asset: any, idx: number) => {
+                                    const globalIdx = globalOffset + idx;
+                                    return (
+                                        <tr key={idx}>
+                                            <td style={{ width: "25px", border: `1px solid ${colors.border}`, height: "70px", padding: "2px 5px", fontSize: "9px", backgroundColor: globalIdx % 2 === 1 ? colors.rowAlt : colors.white, textAlign: "center", verticalAlign: "middle" }}><span style={{ position: "relative", top: textOffset }}>{globalIdx + 1}</span></td>
+                                            <td style={{ width: "70px", border: `1px solid ${colors.border}`, height: "70px", padding: "2px 5px", fontSize: "9px", backgroundColor: globalIdx % 2 === 1 ? colors.rowAlt : colors.white, textAlign: "center", verticalAlign: "middle" }}><span style={{ position: "relative", top: textOffset }}>{asset.barcode || "-"}</span></td>
+                                            <td style={{ border: `1px solid ${colors.border}`, height: "70px", padding: "2px 5px", fontSize: "9px", backgroundColor: globalIdx % 2 === 1 ? colors.rowAlt : colors.white, verticalAlign: "middle" }}><span style={{ position: "relative", top: textOffset }}>{asset.name}</span></td>
+                                            <td style={{ width: "70px", border: `1px solid ${colors.border}`, height: "70px", padding: "3px", backgroundColor: globalIdx % 2 === 1 ? colors.rowAlt : colors.white, textAlign: "center", verticalAlign: "middle" }}>
+                                                {assetImages[asset.name] ? <img src={assetImages[asset.name]!} alt="Asset" style={{ maxHeight: "60px", maxWidth: "60px", objectFit: "contain" }} /> : <span style={{ fontSize: "8px", color: "#999" }}>-</span>}
+                                            </td>
+                                            <td style={{ width: "50px", border: `1px solid ${colors.border}`, height: "70px", padding: "2px 5px", fontSize: "9px", backgroundColor: globalIdx % 2 === 1 ? colors.rowAlt : colors.white, textAlign: "center", verticalAlign: "middle" }}><span style={{ position: "relative", top: textOffset }}>{asset.size || "-"}</span></td>
+                                            <td style={{ width: "35px", border: `1px solid ${colors.border}`, height: "70px", padding: "2px 5px", fontSize: "9px", backgroundColor: globalIdx % 2 === 1 ? colors.rowAlt : colors.white, textAlign: "center", verticalAlign: "middle" }}><span style={{ position: "relative", top: textOffset }}>{asset.grade || "-"}</span></td>
+                                            <td style={{ width: "30px", border: `1px solid ${colors.border}`, height: "70px", padding: "2px 5px", fontSize: "9px", fontWeight: 600, backgroundColor: globalIdx % 2 === 1 ? colors.rowAlt : colors.white, textAlign: "center", verticalAlign: "middle" }}><span style={{ position: "relative", top: textOffset }}>{asset.qty}</span></td>
+                                            <td style={{ width: "70px", border: `1px solid ${colors.border}`, height: "70px", padding: "2px 5px", fontSize: "9px", backgroundColor: globalIdx % 2 === 1 ? colors.rowAlt : colors.white, textAlign: "center", verticalAlign: "middle" }}><span style={{ position: "relative", top: textOffset }}>{asset.withdrawFor || "-"}</span></td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    )}
+
+                    {isLast && s2sLast}
+                </>
+            );
+        });
     };
 
     // ============ REPAIR Template ============
     const renderRepair = (): React.ReactNode[] => {
-        const cap: PageCapacities = { first: 6, rest: 9, last: 4 };
-        const pages = chunkRowsToPages(assets, cap, true);
+        const FIRST_OVERHEAD = 230;
+        const COMPACT_OVERHEAD = 103;
+        const ROW_H = 90;
+        const FOOTER_H = 310;
+        const AVAIL = 1013;
+
+        let pages = chunkByHeight(assets as any[], (_: any) => ROW_H, AVAIL - FIRST_OVERHEAD, AVAIL - COMPACT_OVERHEAD);
+
+        const lastUsed = pages[pages.length - 1].length * ROW_H;
+        const lastOverhead = pages.length === 1 ? FIRST_OVERHEAD : COMPACT_OVERHEAD;
+        const needsFooterPage = lastUsed + lastOverhead + FOOTER_H > AVAIL;
+        if (needsFooterPage) pages = [...pages, []];
 
         const repairHeader = (
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "15px", paddingBottom: "10px", borderBottom: `3px solid ${colors.primary}` }}>
@@ -1603,51 +1754,60 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
             </thead>
         );
 
-        return pages.map((chunk, pageIdx) => (
-            <>
-                {chunk.isFirst ? <>{repairHeader}{repairInfoCards}</> : renderCompactHeader()}
+        return pages.map((pageRows, pageIdx) => {
+            const isFirst = pageIdx === 0;
+            const isLast = pageIdx === pages.length - 1;
+            const isFooterOnlyPage = isLast && pageRows.length === 0;
+            const globalOffset = pages.slice(0, pageIdx).reduce((s, p) => s + p.length, 0);
 
-                <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "15px", borderRadius: "8px", overflow: "hidden" }}>
-                    {assetThead}
-                    <tbody>
-                        {chunk.rows.map((asset: any, idx: number) => {
-                            const globalIdx = pages.slice(0, pageIdx).reduce((s, p) => s + p.rows.length, 0) + idx;
-                            return (
-                                <tr key={idx}>
-                                    <Cell width="35px" center isAlt={globalIdx % 2 === 1} hasImage>{globalIdx + 1}</Cell>
-                                    <Cell width="90px" center isAlt={globalIdx % 2 === 1} hasImage>{asset.barcode || "-"}</Cell>
-                                    <Cell isAlt={globalIdx % 2 === 1} hasImage>{asset.name}</Cell>
-                                    <ImageCell imageUrl={assetImages[asset.name] || null} isAlt={globalIdx % 2 === 1} />
-                                    <Cell width="70px" center isAlt={globalIdx % 2 === 1} hasImage>{asset.size || "-"}</Cell>
-                                    <Cell width="50px" center isAlt={globalIdx % 2 === 1} hasImage>{asset.grade || "-"}</Cell>
-                                    <Cell width="50px" center bold isAlt={globalIdx % 2 === 1} hasImage>{asset.qty}</Cell>
-                                </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
+            return (
+                <>
+                    {isFirst ? <>{repairHeader}{repairInfoCards}</> : renderCompactHeader()}
 
-                {chunk.isLast && (
-                    <>
-                        <div style={{ marginBottom: "20px", padding: "10px 15px", backgroundColor: colors.warningBg, border: `1px solid ${colors.warning}`, borderRadius: "6px", fontSize: "11px" }}>
-                            <span style={{ position: "relative", top: textOffset }}>
-                                <strong style={{ color: "#b45309" }}>📝 รายละเอียด/อาการเสีย:</strong> {doc.note || "-"}
-                            </span>
-                        </div>
-                        <div style={{ marginTop: "auto" }}>
-                            <div style={{ display: "flex", justifyContent: "space-around", alignItems: "flex-end", marginBottom: "20px" }}>
-                                <SignatureBlock title="ลงชื่อผู้แจ้งซ่อม" width="220px" />
-                                <SignatureBlock title="ลงชื่อผู้รับเรื่อง" width="220px" />
+                    {!isFooterOnlyPage && (
+                        <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "15px", borderRadius: "8px", overflow: "hidden" }}>
+                            {assetThead}
+                            <tbody>
+                                {pageRows.map((asset: any, idx: number) => {
+                                    const globalIdx = globalOffset + idx;
+                                    return (
+                                        <tr key={idx}>
+                                            <Cell width="35px" center isAlt={globalIdx % 2 === 1} hasImage>{globalIdx + 1}</Cell>
+                                            <Cell width="90px" center isAlt={globalIdx % 2 === 1} hasImage>{asset.barcode || "-"}</Cell>
+                                            <Cell isAlt={globalIdx % 2 === 1} hasImage>{asset.name}</Cell>
+                                            <ImageCell imageUrl={assetImages[asset.name] || null} isAlt={globalIdx % 2 === 1} />
+                                            <Cell width="70px" center isAlt={globalIdx % 2 === 1} hasImage>{asset.size || "-"}</Cell>
+                                            <Cell width="50px" center isAlt={globalIdx % 2 === 1} hasImage>{asset.grade || "-"}</Cell>
+                                            <Cell width="50px" center bold isAlt={globalIdx % 2 === 1} hasImage>{asset.qty}</Cell>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    )}
+
+                    {isLast && (
+                        <>
+                            <div style={{ marginBottom: "20px", padding: "10px 15px", backgroundColor: colors.warningBg, border: `1px solid ${colors.warning}`, borderRadius: "6px", fontSize: "11px" }}>
+                                <span style={{ position: "relative", top: textOffset }}>
+                                    <strong style={{ color: "#b45309" }}>📝 รายละเอียด/อาการเสีย:</strong> {doc.note || "-"}
+                                </span>
                             </div>
-                            <div style={{ display: "flex", justifyContent: "space-around", alignItems: "flex-end" }}>
-                                <SignatureBlock title="Approved by Cheil" showImage={true} date={formatDateThai(doc.approvedAt)} width="220px" />
-                                <SignatureBlock title="ลงชื่อผู้ส่งมอบงาน (ซ่อมเสร็จ)" width="220px" />
+                            <div style={{ marginTop: "auto" }}>
+                                <div style={{ display: "flex", justifyContent: "space-around", alignItems: "flex-end", marginBottom: "20px" }}>
+                                    <SignatureBlock title="ลงชื่อผู้แจ้งซ่อม" width="220px" />
+                                    <SignatureBlock title="ลงชื่อผู้รับเรื่อง" width="220px" />
+                                </div>
+                                <div style={{ display: "flex", justifyContent: "space-around", alignItems: "flex-end" }}>
+                                    <SignatureBlock title="Approved by Cheil" showImage={true} date={formatDateThai(doc.approvedAt)} width="220px" />
+                                    <SignatureBlock title="ลงชื่อผู้ส่งมอบงาน (ซ่อมเสร็จ)" width="220px" />
+                                </div>
                             </div>
-                        </div>
-                    </>
-                )}
-            </>
-        ));
+                        </>
+                    )}
+                </>
+            );
+        });
     };
 
     // ============ Select Template by Type ============
