@@ -499,7 +499,7 @@ const FormRouting3Shops = ({ mode = "user" }: { mode?: FormMode }) => {
                 <div className="mt-3 p-3 rounded-lg bg-blue-50/40 border border-blue-200">
                   <label className="block text-xs text-blue-700 font-medium mb-2">เลือก Barcode (qty {set.qty})</label>
                   <BarcodeAssignSelector warehouse={set.withdrawFor} assetName={set.name} qty={set.qty}
-                    value={securityBarcodes[set.id] || []} onChange={(next) => setSecurityBarcodes(p => ({ ...p, [set.id]: next }))}
+                    value={securityBarcodes[set.id] || []} onChange={(next) => setSecurityBarcodes(p => ({ ...p, [set.id]: next }))} isSecuritySet
                     additionalExclude={otherBarcodesAll.flatMap(b => (b[set.id] || []).filter(Boolean))} />
                 </div>
               )}
