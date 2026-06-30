@@ -974,28 +974,34 @@ const FormRouting2Shops = ({ mode = "user" }: { mode?: FormMode }) => {
           withdrawFor: s.withdrawFor,
           assignedBarcodes: s.name.includes("Security Type C") ? [] : ((previewShopIndex === 0 ? securityBarcodes1 : securityBarcodes2)[s.id] || []),
         }))}
-        shops={shopsForPreview.map(shop => ({
-          shopCode: shop.shopCode,
-          shopName: shop.shopName,
-          startInstallDate: shop.startDate,
-          endInstallDate: shop.endDate,
-          q7b7: shop.q7b7,
-          shopFocus: shop.focus,
-          assets: shop.assets.filter(a => a.name && a.name.trim() !== "").map(a => ({
-            name: a.name,
-            size: a.size,
-            grade: "",
-            kv: a.kv,
-            qty: a.qty,
-            withdrawFor: a.withdrawFor,
-            barcode: "",
-          })),
-          securitySets: shop.securitySets.filter(s => s.qty > 0).map(s => ({
-            name: s.name,
-            qty: s.qty,
-            withdrawFor: s.withdrawFor,
-          })),
-        }))}
+        shops={shopsForPreview.map((shop, shopIdx) => {
+          const assetBcMap = (shopIdx === 0 ? assetBarcodes1 : assetBarcodes2);
+          const secBcMap = (shopIdx === 0 ? securityBarcodes1 : securityBarcodes2);
+          return {
+            shopCode: shop.shopCode,
+            shopName: shop.shopName,
+            startInstallDate: shop.startDate,
+            endInstallDate: shop.endDate,
+            q7b7: shop.q7b7,
+            shopFocus: shop.focus,
+            assets: shop.assets.filter(a => a.name && a.name.trim() !== "").map(a => ({
+              name: a.name,
+              size: a.size,
+              grade: "",
+              kv: a.kv,
+              qty: a.qty,
+              withdrawFor: a.withdrawFor,
+              barcode: "",
+              assignedBarcodes: assetBcMap[a.id] || [],
+            })),
+            securitySets: shop.securitySets.filter(s => s.qty > 0).map(s => ({
+              name: s.name,
+              qty: s.qty,
+              withdrawFor: s.withdrawFor,
+              assignedBarcodes: s.name.includes("Security Type C") ? [] : (secBcMap[s.id] || []),
+            })),
+          };
+        })}
       />
     </div>
   );
