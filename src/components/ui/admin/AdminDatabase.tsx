@@ -57,6 +57,7 @@ interface Pagination {
 }
 
 const columnGroups = {
+  doc: { color: "bg-purple-50", headerColor: "bg-purple-100 text-purple-800", columns: ["เลขที่เอกสาร"] },
   asset: { color: "bg-amber-50", headerColor: "bg-amber-100 text-amber-800", columns: ["Barcode", "Asset Name", "Start Warranty", "End Warranty", "Cheil PO", "Size", "Grade"] },
   in: { color: "bg-blue-50", headerColor: "bg-blue-100 text-blue-800", columns: ["Warehouse", "In stock Date", "Unit In", "From Vendor", "MCS Code (In)", "From Shop", "Remark IN"] },
   out: { color: "bg-rose-50", headerColor: "bg-rose-100 text-rose-800", columns: ["Out Date", "Unit Out", "To Vendor", "Status", "Shop Type", "MCS Code (Out)", "To Shop", "Remark OUT"] },
@@ -64,6 +65,7 @@ const columnGroups = {
 };
 
 const orderedColumns = [
+  { name: "เลขที่เอกสาร", group: "doc" },
   { name: "Barcode", group: "asset" }, { name: "Asset Name", group: "asset" }, { name: "Warehouse", group: "in" },
   { name: "Asset Status", group: "auto" }, { name: "In stock Date", group: "in" }, { name: "Start Warranty", group: "asset" },
   { name: "End Warranty", group: "asset" }, { name: "Cheil PO", group: "asset" }, { name: "Unit In", group: "in" },
@@ -80,6 +82,7 @@ const orderedColumns = [
 
 // ✅ Map ชื่อคอลัมน์ทั้งหมด -> field name ใน API (สำหรับการแสดงผล)
 const COLUMN_FIELD_MAP: Record<string, string> = {
+  "เลขที่เอกสาร": "docCode",
   "Barcode": "barcode",
   "Asset Name": "assetName",
   "Warehouse": "warehouseIn",

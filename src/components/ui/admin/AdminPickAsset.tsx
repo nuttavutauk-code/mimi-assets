@@ -125,6 +125,7 @@ export default function AdminPickAsset() {
                   <tr className="bg-black/2">
                     <th>Document No.</th>
                     <th>Warehouse</th>
+                    <th>MCS Code</th>
                     <th>Shop Name</th>
                     <th>ผู้รับผิดชอบ</th>
                     <th>Progress</th>
@@ -141,6 +142,7 @@ export default function AdminPickAsset() {
                       <tr key={`${item.id}-${index}`}>
                         <td className="font-medium text-primary">{item.docCode}</td>
                         <td>{item.warehouse}</td>
+                        <td>{item.shopCode || "-"}</td>
                         <td>{item.shopName}</td>
                         <td className="text-muted-foreground">{item.assignedUser || "-"}</td>
                         <td>
