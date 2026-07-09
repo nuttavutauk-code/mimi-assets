@@ -544,10 +544,10 @@ const FormBorrowSecurity = ({ mode = "user" }: { mode?: FormMode }) => {
           <div className="flex items-center gap-2">
             <div className="icon-container orange !w-8 !h-8"><Package className="w-4 h-4" /></div>
             <h2 className="font-semibold">Asset</h2>
-            <span className="text-xs text-muted-foreground">({assets.length}/3)</span>
+            <span className="text-xs text-muted-foreground">({assets.length} รายการ)</span>
             <span className="text-xs text-amber-600">(ไม่บังคับ ถ้ามี Security Set)</span>
           </div>
-          {!isReadOnly && assets.length < 3 && (
+          {!isReadOnly && (
             <button
               onClick={() => setAssets([...assets, { id: assetIdCounter.current++, name: "", size: "", kv: "", qty: 1, withdrawFor: "" }])}
               className="glass-button px-3 py-2 text-sm flex items-center gap-1"

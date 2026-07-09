@@ -264,6 +264,7 @@ const getDocumentTitle = (documentType: string): string => {
         transfer: "เอกสารขอเคลื่อนย้ายทรัพย์สิน",
         borrowSecurity: "เอกสารยืมทรัพย์สิน งานอีเวนท์ / ร้านชั่วคราว",
         borrowsecurity: "เอกสารยืมทรัพย์สิน งานอีเวนท์ / ร้านชั่วคราว",
+        borrowSecurityRouting: "เอกสารยืมทรัพย์สิน งานอีเวนท์ / ร้านชั่วคราว (Routing)",
         borrow: "เอกสารยืมทรัพย์สิน งานอีเวนท์ / ร้านชั่วคราว",
         returnAsset: "เอกสารเก็บ Asset กลับ",
         returnasset: "เอกสารเก็บ Asset กลับ",
@@ -349,16 +350,20 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
 
     // Fetch images for document types that need them
     useEffect(() => {
-        const needsImages = ["other", "transfer", "borrowSecurity", "borrowsecurity", "borrow", "repair", "shopToShop", "shoptoship", "shop-to-shop"].includes(documentType);
+        const needsImages = ["other", "transfer", "borrowSecurity", "borrowsecurity", "borrowSecurityRouting", "borrow", "repair", "shopToShop", "shoptoship", "shop-to-shop"].includes(documentType);
 
-        if (!needsImages || assets.length === 0) {
+        const allAssetsForImages = documentType === "borrowSecurityRouting"
+            ? shops.flatMap((s: any) => s.assets || [])
+            : assets;
+
+        if (!needsImages || allAssetsForImages.length === 0) {
             setIsReady(true);
             return;
         }
 
         const fetchImages = async () => {
             try {
-                const assetNames = assets.map((a: any) => a.name);
+                const assetNames = allAssetsForImages.map((a: any) => a.name);
                 const res = await fetch("/api/library/get-image", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -1070,6 +1075,225 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
                 )}
             </>
         ));
+    };
+
+    // ============ BORROW SECURITY ROUTING Template (multi-shop, each with assets + security) ============
+    const renderBorrowSecurityRouting = (): React.ReactNode[] => {
+        const FIRST_OVERHEAD = 427;
+        const COMPACT_OVERHEAD = 103;
+        const FOOTER_H = 297;
+        const SHOP_SECTION_H = 80;
+        const AVAIL = 1013;
+        const ASSET_ROW_H = 90;
+        const SEC_HEADER_H = 60;
+        const SEC_ROW_H = 70;
+
+        type BsrRow =
+            | { kind: 'shop-header'; shop: any; shopIdx: number }
+            | { kind: 'asset'; data: any }
+            | { kind: 'sec-header' }
+            | { kind: 'security'; data: any; showImage: boolean };
+
+        const rowH = (r: BsrRow): number => {
+            if (r.kind === 'shop-header') return SHOP_SECTION_H;
+            if (r.kind === 'asset') return ASSET_ROW_H;
+            if (r.kind === 'sec-header') return SEC_HEADER_H;
+            return r.showImage ? SEC_ROW_H : 26;
+        };
+
+        const isControlbox = (name: string) =>
+            name?.includes('CONTROLBOX 6 PORT') || name?.includes('CONTROLBOX 5 PORT');
+
+        const allRows: BsrRow[] = [];
+        shops.forEach((shopItem: any, shopIdx: number) => {
+            allRows.push({ kind: 'shop-header', shop: shopItem, shopIdx });
+            const assetRows = expandAssetRows(shopItem.assets || []);
+            assetRows.forEach((r: any) => allRows.push({ kind: 'asset', data: r }));
+            const secSets = (shopItem.securitySets || []).filter((s: any) => s.qty > 0);
+            const secRows = expandSecurityRows(secSets);
+            if (secRows.length > 0) {
+                const controlboxSeen = new Set<string>();
+                allRows.push({ kind: 'sec-header' });
+                secRows.forEach((r: any) => {
+                    const showImage = !isControlbox(r.name) || !controlboxSeen.has(r.name);
+                    if (isControlbox(r.name)) controlboxSeen.add(r.name);
+                    allRows.push({ kind: 'security', data: r, showImage });
+                });
+            }
+        });
+
+        let pages = chunkByHeight(allRows, rowH, AVAIL - FIRST_OVERHEAD, AVAIL - COMPACT_OVERHEAD);
+        const lastUsed = pages[pages.length - 1].reduce((s, r) => s + rowH(r), 0);
+        const lastOverhead = pages.length === 1 ? FIRST_OVERHEAD : COMPACT_OVERHEAD;
+        if (lastUsed + lastOverhead + FOOTER_H > AVAIL) {
+            pages = [...pages, []];
+        }
+
+        const assetThead = (
+            <thead>
+                <tr><th colSpan={6} style={headerStyle}><span style={{ position: "relative", top: textOffset }}>📦 รายละเอียด Asset</span></th></tr>
+                <tr>
+                    <th style={{ ...thStyle, width: "35px" }}><span style={{ position: "relative", top: textOffset }}>No.</span></th>
+                    <th style={thStyle}><span style={{ position: "relative", top: textOffset }}>Asset Name</span></th>
+                    <th style={{ ...thStyle, width: "100px" }}><span style={{ position: "relative", top: textOffset }}>รูปภาพ</span></th>
+                    <th style={{ ...thStyle, width: "50px" }}><span style={{ position: "relative", top: textOffset }}>เกรด</span></th>
+                    <th style={{ ...thStyle, width: "130px" }}><span style={{ position: "relative", top: textOffset }}>Barcode</span></th>
+                    <th style={{ ...thStyle, width: "85px" }}><span style={{ position: "relative", top: textOffset }}>เบิกที่โกดัง</span></th>
+                </tr>
+            </thead>
+        );
+
+        const secThead = (
+            <thead>
+                <tr><th colSpan={5} style={headerStyle}><span style={{ position: "relative", top: textOffset }}>🔐 รายละเอียด Security Set</span></th></tr>
+                <tr>
+                    <th style={{ ...thStyle, width: "35px" }}><span style={{ position: "relative", top: textOffset }}>No.</span></th>
+                    <th style={thStyle}><span style={{ position: "relative", top: textOffset }}>Asset Name</span></th>
+                    <th style={{ ...thStyle, width: "80px" }}><span style={{ position: "relative", top: textOffset }}>รูปภาพ</span></th>
+                    <th style={{ ...thStyle, width: "140px" }}><span style={{ position: "relative", top: textOffset }}>Barcode</span></th>
+                    <th style={{ ...thStyle, width: "85px" }}><span style={{ position: "relative", top: textOffset }}>เบิกที่โกดัง</span></th>
+                </tr>
+            </thead>
+        );
+
+        const renderBorrowFooter = () => (
+            <>
+                {renderNote()}
+                <div style={{ marginBottom: "10px", padding: "8px 10px", backgroundColor: colors.dangerBg, border: `1px solid ${colors.danger}`, borderRadius: "6px", fontSize: "10px", lineHeight: 1.5 }}>
+                    <span style={{ position: "relative", top: textOffset }}>
+                        <strong style={{ color: "#dc2626" }}>⚠️ หมายเหตุ**:</strong>{" "}
+                        <span style={{ color: "#991b1b" }}>
+                            ทาง Vendor ผู้เบิกของจะต้องรักษาของในการเคลื่อนย้าย อย่างดี หากเกิดความเสียหายขึ้นทาง Vendor จะเป็นผู้ต้องรับผิดชอบ ในการซ่อมแซม หรือผลิตใหม่ตามแต่ TSE เห็นสมควรก่อนส่งของคืน Vendor จะต้องส่งรายงานสภาพความเสียหาย และแจ้งกำหนดการคืนสินค้าโดยติดต่อ นัท 062-949-5641 / 095-246-4455
+                        </span>
+                    </span>
+                </div>
+                <div style={{ paddingTop: "8px", marginTop: "auto" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "15px" }}>
+                        <SignatureBlock title="ลงชื่อเวนเดอร์ผู้รับของ / วันที่ยืม" width="220px" />
+                        <SignatureBlock title="ลงชื่อเวนเดอร์ผู้คืนของ / วันที่คืน" width="220px" />
+                        <SignatureBlock title="Approved by Cheil" showImage={true} date={formatDateThai(doc.approvedAt)} width="220px" />
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "flex-start", alignItems: "flex-end", gap: "40px" }}>
+                        <SignatureBlock title="ลงชื่อผู้รับของทีมซัมซุง / วันที่ยืม" width="220px" />
+                        <SignatureBlock title="ลงชื่อผู้คืนของทีมซัมซุง / วันที่คืน" width="220px" />
+                    </div>
+                </div>
+            </>
+        );
+
+        // Track row offsets across pages for sequential numbering
+        let globalAssetOffset = 0;
+        let globalSecOffset = 0;
+
+        return pages.map((pageRows, pageIdx) => {
+            const isFirst = pageIdx === 0;
+            const isLast = pageIdx === pages.length - 1;
+
+            const shopHeaderRows = pageRows.filter((r): r is Extract<BsrRow, { kind: 'shop-header' }> => r.kind === 'shop-header');
+            const assetDataRows = pageRows.filter((r): r is Extract<BsrRow, { kind: 'asset' }> => r.kind === 'asset');
+            const secDataRows = pageRows.filter((r): r is Extract<BsrRow, { kind: 'security' }> => r.kind === 'security');
+            const hasSecHeader = pageRows.some(r => r.kind === 'sec-header');
+
+            const assetOffset = globalAssetOffset;
+            const secOffset = globalSecOffset;
+            globalAssetOffset += assetDataRows.length;
+            globalSecOffset += secDataRows.length;
+
+            return (
+                <>
+                    {isFirst ? <>{renderHeader()}{renderInfoCards()}</> : renderCompactHeader()}
+
+                    {shopHeaderRows.map((sh, i) => (
+                        <div key={i} style={{
+                            display: "flex", gap: "10px", marginBottom: "6px", padding: "6px 12px",
+                            backgroundColor: "#eef2ff", borderRadius: "6px",
+                            border: `1px solid #c7d2fe`, alignItems: "center",
+                        }}>
+                            <div style={{ width: "22px", height: "22px", borderRadius: "50%", backgroundColor: "#6366f1", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: 700, flexShrink: 0 }}>
+                                <span style={{ position: "relative", top: textOffset }}>{sh.shopIdx + 1}</span>
+                            </div>
+                            <div style={{ fontSize: "11px", lineHeight: 1.5 }}>
+                                <span style={{ fontWeight: 700, color: "#3730a3", position: "relative", top: textOffset }}>ร้านที่ {sh.shopIdx + 1}:</span>{" "}
+                                <span style={{ position: "relative", top: textOffset }}>{sh.shop.shopCode || "NO MCS"} — {sh.shop.shopName || "-"}</span>
+                                <span style={{ color: "#6366f1", marginLeft: "12px", position: "relative", top: textOffset }}>
+                                    {sh.shop.startInstallDate ? formatDate(sh.shop.startInstallDate) : "-"} → {sh.shop.endInstallDate ? formatDate(sh.shop.endInstallDate) : "-"}
+                                </span>
+                                {sh.shop.shopFocus && <span style={{ color: "#4338ca", marginLeft: "10px", position: "relative", top: textOffset }}>Focus: {sh.shop.shopFocus}</span>}
+                                {sh.shop.q7b7 && <span style={{ color: "#4338ca", marginLeft: "10px", position: "relative", top: textOffset }}>Q7B7: {sh.shop.q7b7}</span>}
+                            </div>
+                        </div>
+                    ))}
+
+                    {assetDataRows.length > 0 && (
+                        <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "6px", borderRadius: "8px", overflow: "hidden" }}>
+                            {assetThead}
+                            <tbody>
+                                {assetDataRows.map((row, idx) => {
+                                    const g = assetOffset + idx;
+                                    return (
+                                        <tr key={idx}>
+                                            <Cell width="35px" center isAlt={g % 2 === 1} hasImage>{g + 1}</Cell>
+                                            <td style={{ border: `1px solid ${colors.border}`, height: "90px", padding: "4px 8px", fontSize: "11px", backgroundColor: g % 2 === 1 ? colors.rowAlt : colors.white, color: colors.text, verticalAlign: "middle", fontFamily }}>
+                                                <div style={{ position: "relative", top: textOffset }}>
+                                                    <div style={{ fontWeight: 500 }}>{row.data.name}{row.data.size ? ` (${row.data.size})` : ""}</div>
+                                                    {row.data.kv && <div style={{ fontSize: "10px", color: colors.secondary, marginTop: "2px" }}>KV: {row.data.kv}</div>}
+                                                </div>
+                                            </td>
+                                            <td style={{ width: "100px", border: `1px solid ${colors.border}`, padding: "4px", backgroundColor: g % 2 === 1 ? colors.rowAlt : colors.white, textAlign: "center", verticalAlign: "middle" }}>
+                                                {assetImages[row.data.name] ? (
+                                                    <img src={`${assetImages[row.data.name]}?t=${Date.now()}`} alt="Asset" style={{ maxHeight: "80px", maxWidth: "92px", objectFit: "contain" }} />
+                                                ) : (
+                                                    <span style={{ fontSize: "9px", color: "#999" }}>No Image</span>
+                                                )}
+                                            </td>
+                                            <Cell width="50px" center isAlt={g % 2 === 1} hasImage>{row.data.grade || "-"}</Cell>
+                                            <Cell width="130px" center isAlt={g % 2 === 1}>{row.data.barcode || "-"}</Cell>
+                                            <Cell width="85px" center isAlt={g % 2 === 1} hasImage>{row.data.withdrawFor || "-"}</Cell>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    )}
+
+                    {(hasSecHeader || secDataRows.length > 0) && (
+                        <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "6px", borderRadius: "8px", overflow: "hidden" }}>
+                            {secThead}
+                            <tbody>
+                                {secDataRows.map((row, idx) => {
+                                    const g = secOffset + idx;
+                                    return (
+                                        <tr key={idx}>
+                                            <Cell width="35px" center isAlt={g % 2 === 1}>{g + 1}</Cell>
+                                            <Cell isAlt={g % 2 === 1}>{row.data.name || "-"}</Cell>
+                                            {row.showImage ? (
+                                                <td style={{ width: "80px", border: `1px solid ${colors.border}`, height: "70px", padding: "4px", backgroundColor: g % 2 === 1 ? colors.rowAlt : colors.white, textAlign: "center", verticalAlign: "middle" }}>
+                                                    {row.data.name?.includes("CONTROLBOX") ? (
+                                                        <img src="/images/controlbox.png" alt="CONTROLBOX" style={{ maxHeight: "60px", maxWidth: "70px", objectFit: "contain" }}
+                                                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).parentElement!.innerHTML = '<span style="font-size: 9px; color: #999;">-</span>'; }} />
+                                                    ) : row.data.name?.includes("Security Type C") ? (
+                                                        <img src="/images/security-type-c.png" alt="Security Type C" style={{ maxHeight: "60px", maxWidth: "70px", objectFit: "contain" }}
+                                                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).parentElement!.innerHTML = '<span style="font-size: 9px; color: #999;">-</span>'; }} />
+                                                    ) : (
+                                                        <span style={{ fontSize: "9px", color: "#999" }}>-</span>
+                                                    )}
+                                                </td>
+                                            ) : (
+                                                <Cell width="80px" center isAlt={g % 2 === 1}>-</Cell>
+                                            )}
+                                            <Cell width="140px" center isAlt={g % 2 === 1}>{row.data._isTypeC ? `จำนวน ${row.data._groupSize}` : (row.data.barcode || "-")}</Cell>
+                                            <Cell width="85px" center isAlt={g % 2 === 1}>{row.data.withdrawFor || ""}</Cell>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    )}
+
+                    {isLast && renderBorrowFooter()}
+                </>
+            );
+        });
     };
 
     // ============ BORROW Template (with/without Security, 5 signatures) ============
@@ -1827,6 +2051,8 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
             case "borrowsecurity":
             case "borrow":
                 return renderBorrow();
+            case "borrowSecurityRouting":
+                return renderBorrowSecurityRouting();
             case "returnAsset":
             case "returnasset":
             case "return":

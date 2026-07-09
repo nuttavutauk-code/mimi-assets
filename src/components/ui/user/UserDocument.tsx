@@ -14,6 +14,7 @@ import FormBorrow from "@/components/ui/user/document/FormBorrow";
 import FormReturnAsset from "@/components/ui/user/document/FormReturnAsset";
 import FormShopToShop from "@/components/ui/user/document/FormShopToShop";
 import FormRepair from "@/components/ui/user/document/FormRepair";
+import FormBorrowSecurityRouting from "@/components/ui/user/document/FormBorrowSecurityRouting";
 
 const UserDocument = () => {
   const [activeDoc, setActiveDoc] = useState<string | null>(null);
@@ -26,6 +27,7 @@ const UserDocument = () => {
     { name: "ใบเบิกของอื่นๆ", key: "other", icon: Package, color: "orange" },
     { name: "ใบย้ายของ", key: "transfer", icon: Truck, color: "cyan" },
     { name: "ใบยืม+Security", key: "borrowSecurity", icon: Shield, color: "blue" },
+    { name: "ใบยืม+Security Routing", key: "borrowSecurityRouting", icon: Shield, color: "red" },
     { name: "ใบยืม", key: "borrow", icon: Users, color: "green" },
     { name: "เก็บ Asset กลับ", key: "returnAsset", icon: RotateCcw, color: "pink" },
     { name: "Shop to Shop", key: "shopToShop", icon: ArrowLeftRight, color: "purple" },
@@ -34,6 +36,7 @@ const UserDocument = () => {
 
   const colorClasses: Record<string, string> = {
     blue: "bg-blue-50 text-blue-500",
+    red: "bg-red-50 text-red-500",
     green: "bg-green-50 text-green-500",
     pink: "bg-pink-50 text-pink-500",
     purple: "bg-purple-50 text-purple-500",
@@ -103,6 +106,13 @@ const UserDocument = () => {
         <div>
           {backButton("ใบยืม + Security")}
           <FormBorrowSecurity />
+        </div>
+      );
+    case "borrowSecurityRouting":
+      return (
+        <div>
+          {backButton("ใบยืม + Security Routing")}
+          <FormBorrowSecurityRouting />
         </div>
       );
     case "borrow":
