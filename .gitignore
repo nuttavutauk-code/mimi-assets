@@ -48,3 +48,6 @@ uploads/
 public/uploads/
 .next
 .next/
+
+# Claude Code agent worktrees (temporary, machine-local)
+.claude/worktrees/
