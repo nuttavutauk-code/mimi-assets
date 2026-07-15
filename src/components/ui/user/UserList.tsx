@@ -42,6 +42,7 @@ export default function UserList() {
       other: `/dashboard/user-document/other/${id}`,
       transfer: `/dashboard/user-document/transfer/${id}`,
       borrowsecurity: `/dashboard/user-document/borrow-security/${id}`,
+      borrowSecurityRouting: `/dashboard/user-document/borrow-security-routing/${id}`,
       borrow: `/dashboard/user-document/borrow/${id}`,
       return: `/dashboard/user-document/return-asset/${id}`,
       returnasset: `/dashboard/user-document/return-asset/${id}`,

@@ -14,6 +14,7 @@ import OtherActivitiesSelect, { OtherActivity } from "@/components/ui/admin/Othe
 import StatusSelect, { StatusOption } from "@/components/ui/admin/StatusSelect";
 import PreviewApproveModal from "@/components/ui/PreviewApproveModal";
 import BarcodeAssignSelector from "@/components/ui/admin/BarcodeAssignSelector";
+import { flattenBarcodes } from "@/lib/barcodeExclude";
 
 type ShopItem = { mcsCode: string; shopName: string };
 type AssetRow = {
@@ -378,6 +379,8 @@ const FormBorrowSecurityRouting = ({ mode = "user" }: { mode?: FormMode }) => {
       })
     );
   };
+
+  const otherShopsOf = (shopId: number) => shops.filter((s) => s.id !== shopId);
 
   // ── Validation + Preview ──────────────────────────────────────────────────
 
@@ -1063,6 +1066,10 @@ const FormBorrowSecurityRouting = ({ mode = "user" }: { mode?: FormMode }) => {
                               assetBarcodes: { ...shop.assetBarcodes, [asset.id]: next },
                             })
                           }
+                          additionalExclude={[
+                            ...flattenBarcodes(shop.assetBarcodes, asset.id),
+                            ...otherShopsOf(shop.id).flatMap((s) => flattenBarcodes(s.assetBarcodes)),
+                          ]}
                         />
                       </div>
                     )}
@@ -1179,6 +1186,10 @@ const FormBorrowSecurityRouting = ({ mode = "user" }: { mode?: FormMode }) => {
                             })
                           }
                           isSecuritySet
+                          additionalExclude={[
+                            ...flattenBarcodes(shop.securityBarcodes, set.id),
+                            ...otherShopsOf(shop.id).flatMap((s) => flattenBarcodes(s.securityBarcodes)),
+                          ]}
                         />
                       </div>
                     )}

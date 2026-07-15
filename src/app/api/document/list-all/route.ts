@@ -14,6 +14,7 @@ const NEEDS_PICK_ASSET_TYPES = [
     "transfer",
     "borrowsecurity",
     "borrow",
+    "borrowSecurityRouting",
 ];
 
 export async function GET(req: Request) {

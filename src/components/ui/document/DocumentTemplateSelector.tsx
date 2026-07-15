@@ -350,11 +350,9 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
 
     // Fetch images for document types that need them
     useEffect(() => {
-        const needsImages = ["other", "transfer", "borrowSecurity", "borrowsecurity", "borrowSecurityRouting", "borrow", "repair", "shopToShop", "shoptoship", "shop-to-shop"].includes(documentType);
+        const needsImages = ["other", "transfer", "borrowSecurity", "borrowsecurity", "borrow", "repair", "shopToShop", "shoptoship", "shop-to-shop"].includes(documentType);
 
-        const allAssetsForImages = documentType === "borrowSecurityRouting"
-            ? shops.flatMap((s: any) => s.assets || [])
-            : assets;
+        const allAssetsForImages = assets;
 
         if (!needsImages || allAssetsForImages.length === 0) {
             setIsReady(true);
@@ -478,7 +476,8 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
     const renderInfoCards = () => (
         <div style={{ display: "flex", gap: "12px", marginBottom: "12px" }}>
             <div style={{
-                width: "200px",
+                width: documentType === "borrowSecurityRouting" ? undefined : "200px",
+                flex: documentType === "borrowSecurityRouting" ? 1 : undefined,
                 backgroundColor: colors.rowAlt,
                 borderRadius: "8px",
                 padding: "10px 12px",
@@ -496,7 +495,7 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
                 </div>
             </div>
 
-            {documentType !== "repair" && (
+            {documentType !== "repair" && documentType !== "borrowSecurityRouting" && (
                 <div style={{
                     flex: 1,
                     backgroundColor: colors.rowAlt,
@@ -515,30 +514,32 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
                 </div>
             )}
 
-            <div style={{
-                width: documentType === "repair" ? "180px" : "140px",
-                backgroundColor: documentType === "repair" ? colors.dangerBg : colors.rowAlt,
-                borderRadius: "8px",
-                padding: "10px 12px",
-                border: `1px solid ${documentType === "repair" ? colors.danger : colors.border}`,
-            }}>
-                <div style={{ fontSize: "10px", fontWeight: 600, color: documentType === "repair" ? colors.danger : colors.secondary, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px", position: "relative", top: "-5px" }}>
-                    {documentType === "returnAsset" ? "กำหนดการเก็บกลับ" :
-                        documentType === "repair" ? "📅 วันที่ส่งซ่อม" : "กำหนดการติดตั้ง"}
+            {documentType !== "borrowSecurityRouting" && (
+                <div style={{
+                    width: documentType === "repair" ? "180px" : "140px",
+                    backgroundColor: documentType === "repair" ? colors.dangerBg : colors.rowAlt,
+                    borderRadius: "8px",
+                    padding: "10px 12px",
+                    border: `1px solid ${documentType === "repair" ? colors.danger : colors.border}`,
+                }}>
+                    <div style={{ fontSize: "10px", fontWeight: 600, color: documentType === "repair" ? colors.danger : colors.secondary, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px", position: "relative", top: "-5px" }}>
+                        {documentType === "returnAsset" ? "กำหนดการเก็บกลับ" :
+                            documentType === "repair" ? "📅 วันที่ส่งซ่อม" : "กำหนดการติดตั้ง"}
+                    </div>
+                    <div style={{ fontSize: "11px", lineHeight: 1.6 }}>
+                        {documentType === "repair" ? (
+                            <div style={{ fontSize: "16px", fontWeight: 700, color: "#991b1b", position: "relative", top: "-5px" }}>
+                                {formatDate(shop?.startInstallDate || doc.createdAt)}
+                            </div>
+                        ) : (
+                            <>
+                                <div style={{ position: "relative", top: "-5px" }}><strong>เริ่ม:</strong> {formatDate(shop?.startInstallDate)}</div>
+                                <div style={{ position: "relative", top: "-5px" }}><strong>เสร็จ:</strong> {formatDate(shop?.endInstallDate)}</div>
+                            </>
+                        )}
+                    </div>
                 </div>
-                <div style={{ fontSize: "11px", lineHeight: 1.6 }}>
-                    {documentType === "repair" ? (
-                        <div style={{ fontSize: "16px", fontWeight: 700, color: "#991b1b", position: "relative", top: "-5px" }}>
-                            {formatDate(shop?.startInstallDate || doc.createdAt)}
-                        </div>
-                    ) : (
-                        <>
-                            <div style={{ position: "relative", top: "-5px" }}><strong>เริ่ม:</strong> {formatDate(shop?.startInstallDate)}</div>
-                            <div style={{ position: "relative", top: "-5px" }}><strong>เสร็จ:</strong> {formatDate(shop?.endInstallDate)}</div>
-                        </>
-                    )}
-                </div>
-            </div>
+            )}
         </div>
     );
 
@@ -1081,51 +1082,52 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
     const renderBorrowSecurityRouting = (): React.ReactNode[] => {
         const FIRST_OVERHEAD = 427;
         const COMPACT_OVERHEAD = 103;
-        const FOOTER_H = 297;
         const SHOP_SECTION_H = 80;
         const AVAIL = 1013;
-        const ASSET_ROW_H = 90;
+        const ASSET_ROW_H = 26;
         const SEC_HEADER_H = 60;
-        const SEC_ROW_H = 70;
+        const SEC_ROW_H = 26;
+        const SAFETY_MARGIN = 40; // conservative per-page buffer: bias pagination toward more pages instead of risking clipped content
+
+        const FOOTER_H_BASE = 297;
+        const NOTE_CHARS_PER_LINE = 75;
+        const NOTE_LINE_H = 16;
+        const noteLen = (doc.note || "").length;
+        const noteExtraLines = Math.max(0, Math.ceil(noteLen / NOTE_CHARS_PER_LINE) - 1);
+        const FOOTER_H = FOOTER_H_BASE + noteExtraLines * NOTE_LINE_H;
 
         type BsrRow =
             | { kind: 'shop-header'; shop: any; shopIdx: number }
-            | { kind: 'asset'; data: any }
-            | { kind: 'sec-header' }
-            | { kind: 'security'; data: any; showImage: boolean };
+            | { kind: 'asset'; data: any; shopIdx: number }
+            | { kind: 'sec-header'; shopIdx: number }
+            | { kind: 'security'; data: any; shopIdx: number };
 
         const rowH = (r: BsrRow): number => {
             if (r.kind === 'shop-header') return SHOP_SECTION_H;
             if (r.kind === 'asset') return ASSET_ROW_H;
             if (r.kind === 'sec-header') return SEC_HEADER_H;
-            return r.showImage ? SEC_ROW_H : 26;
+            return SEC_ROW_H;
         };
-
-        const isControlbox = (name: string) =>
-            name?.includes('CONTROLBOX 6 PORT') || name?.includes('CONTROLBOX 5 PORT');
 
         const allRows: BsrRow[] = [];
         shops.forEach((shopItem: any, shopIdx: number) => {
             allRows.push({ kind: 'shop-header', shop: shopItem, shopIdx });
             const assetRows = expandAssetRows(shopItem.assets || []);
-            assetRows.forEach((r: any) => allRows.push({ kind: 'asset', data: r }));
+            assetRows.forEach((r: any) => allRows.push({ kind: 'asset', data: r, shopIdx }));
             const secSets = (shopItem.securitySets || []).filter((s: any) => s.qty > 0);
             const secRows = expandSecurityRows(secSets);
             if (secRows.length > 0) {
-                const controlboxSeen = new Set<string>();
-                allRows.push({ kind: 'sec-header' });
+                allRows.push({ kind: 'sec-header', shopIdx });
                 secRows.forEach((r: any) => {
-                    const showImage = !isControlbox(r.name) || !controlboxSeen.has(r.name);
-                    if (isControlbox(r.name)) controlboxSeen.add(r.name);
-                    allRows.push({ kind: 'security', data: r, showImage });
+                    allRows.push({ kind: 'security', data: r, shopIdx });
                 });
             }
         });
 
-        let pages = chunkByHeight(allRows, rowH, AVAIL - FIRST_OVERHEAD, AVAIL - COMPACT_OVERHEAD);
+        let pages = chunkByHeight(allRows, rowH, (AVAIL - SAFETY_MARGIN) - FIRST_OVERHEAD, (AVAIL - SAFETY_MARGIN) - COMPACT_OVERHEAD);
         const lastUsed = pages[pages.length - 1].reduce((s, r) => s + rowH(r), 0);
         const lastOverhead = pages.length === 1 ? FIRST_OVERHEAD : COMPACT_OVERHEAD;
-        if (lastUsed + lastOverhead + FOOTER_H > AVAIL) {
+        if (lastUsed + lastOverhead + FOOTER_H > AVAIL - SAFETY_MARGIN) {
             pages = [...pages, []];
         }
 
@@ -1135,7 +1137,7 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
                 <tr>
                     <th style={{ ...thStyle, width: "35px" }}><span style={{ position: "relative", top: textOffset }}>No.</span></th>
                     <th style={thStyle}><span style={{ position: "relative", top: textOffset }}>Asset Name</span></th>
-                    <th style={{ ...thStyle, width: "100px" }}><span style={{ position: "relative", top: textOffset }}>รูปภาพ</span></th>
+                    <th style={{ ...thStyle, width: "60px" }}><span style={{ position: "relative", top: textOffset }}>KV</span></th>
                     <th style={{ ...thStyle, width: "50px" }}><span style={{ position: "relative", top: textOffset }}>เกรด</span></th>
                     <th style={{ ...thStyle, width: "130px" }}><span style={{ position: "relative", top: textOffset }}>Barcode</span></th>
                     <th style={{ ...thStyle, width: "85px" }}><span style={{ position: "relative", top: textOffset }}>เบิกที่โกดัง</span></th>
@@ -1145,11 +1147,10 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
 
         const secThead = (
             <thead>
-                <tr><th colSpan={5} style={headerStyle}><span style={{ position: "relative", top: textOffset }}>🔐 รายละเอียด Security Set</span></th></tr>
+                <tr><th colSpan={4} style={headerStyle}><span style={{ position: "relative", top: textOffset }}>🔐 รายละเอียด Security Set</span></th></tr>
                 <tr>
                     <th style={{ ...thStyle, width: "35px" }}><span style={{ position: "relative", top: textOffset }}>No.</span></th>
                     <th style={thStyle}><span style={{ position: "relative", top: textOffset }}>Asset Name</span></th>
-                    <th style={{ ...thStyle, width: "80px" }}><span style={{ position: "relative", top: textOffset }}>รูปภาพ</span></th>
                     <th style={{ ...thStyle, width: "140px" }}><span style={{ position: "relative", top: textOffset }}>Barcode</span></th>
                     <th style={{ ...thStyle, width: "85px" }}><span style={{ position: "relative", top: textOffset }}>เบิกที่โกดัง</span></th>
                 </tr>
@@ -1185,110 +1186,104 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
         let globalAssetOffset = 0;
         let globalSecOffset = 0;
 
+        type BsrSection = { shopIdx: number; rows: BsrRow[] };
+
         return pages.map((pageRows, pageIdx) => {
             const isFirst = pageIdx === 0;
             const isLast = pageIdx === pages.length - 1;
 
-            const shopHeaderRows = pageRows.filter((r): r is Extract<BsrRow, { kind: 'shop-header' }> => r.kind === 'shop-header');
-            const assetDataRows = pageRows.filter((r): r is Extract<BsrRow, { kind: 'asset' }> => r.kind === 'asset');
-            const secDataRows = pageRows.filter((r): r is Extract<BsrRow, { kind: 'security' }> => r.kind === 'security');
-            const hasSecHeader = pageRows.some(r => r.kind === 'sec-header');
-
-            const assetOffset = globalAssetOffset;
-            const secOffset = globalSecOffset;
-            globalAssetOffset += assetDataRows.length;
-            globalSecOffset += secDataRows.length;
+            const sections: BsrSection[] = [];
+            let currentSection: BsrSection | null = null;
+            pageRows.forEach((row) => {
+                if (!currentSection || row.shopIdx !== currentSection.shopIdx) {
+                    currentSection = { shopIdx: row.shopIdx, rows: [] };
+                    sections.push(currentSection);
+                }
+                currentSection.rows.push(row);
+            });
 
             return (
                 <>
                     {isFirst ? <>{renderHeader()}{renderInfoCards()}</> : renderCompactHeader()}
 
-                    {shopHeaderRows.map((sh, i) => (
-                        <div key={i} style={{
-                            display: "flex", gap: "10px", marginBottom: "6px", padding: "6px 12px",
-                            backgroundColor: "#eef2ff", borderRadius: "6px",
-                            border: `1px solid #c7d2fe`, alignItems: "center",
-                        }}>
-                            <div style={{ width: "22px", height: "22px", borderRadius: "50%", backgroundColor: "#6366f1", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: 700, flexShrink: 0 }}>
-                                <span style={{ position: "relative", top: textOffset }}>{sh.shopIdx + 1}</span>
-                            </div>
-                            <div style={{ fontSize: "11px", lineHeight: 1.5 }}>
-                                <span style={{ fontWeight: 700, color: "#3730a3", position: "relative", top: textOffset }}>ร้านที่ {sh.shopIdx + 1}:</span>{" "}
-                                <span style={{ position: "relative", top: textOffset }}>{sh.shop.shopCode || "NO MCS"} — {sh.shop.shopName || "-"}</span>
-                                <span style={{ color: "#6366f1", marginLeft: "12px", position: "relative", top: textOffset }}>
-                                    {sh.shop.startInstallDate ? formatDate(sh.shop.startInstallDate) : "-"} → {sh.shop.endInstallDate ? formatDate(sh.shop.endInstallDate) : "-"}
-                                </span>
-                                {sh.shop.shopFocus && <span style={{ color: "#4338ca", marginLeft: "10px", position: "relative", top: textOffset }}>Focus: {sh.shop.shopFocus}</span>}
-                                {sh.shop.q7b7 && <span style={{ color: "#4338ca", marginLeft: "10px", position: "relative", top: textOffset }}>Q7B7: {sh.shop.q7b7}</span>}
-                            </div>
-                        </div>
-                    ))}
+                    {sections.map((section, sIdx) => {
+                        const shopHeaderRow = section.rows[0]?.kind === 'shop-header'
+                            ? (section.rows[0] as Extract<BsrRow, { kind: 'shop-header' }>)
+                            : null;
+                        const assetRows = section.rows.filter((r): r is Extract<BsrRow, { kind: 'asset' }> => r.kind === 'asset');
+                        const hasSecHeader = section.rows.some(r => r.kind === 'sec-header');
+                        const secRows = section.rows.filter((r): r is Extract<BsrRow, { kind: 'security' }> => r.kind === 'security');
 
-                    {assetDataRows.length > 0 && (
-                        <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "6px", borderRadius: "8px", overflow: "hidden" }}>
-                            {assetThead}
-                            <tbody>
-                                {assetDataRows.map((row, idx) => {
-                                    const g = assetOffset + idx;
-                                    return (
-                                        <tr key={idx}>
-                                            <Cell width="35px" center isAlt={g % 2 === 1} hasImage>{g + 1}</Cell>
-                                            <td style={{ border: `1px solid ${colors.border}`, height: "90px", padding: "4px 8px", fontSize: "11px", backgroundColor: g % 2 === 1 ? colors.rowAlt : colors.white, color: colors.text, verticalAlign: "middle", fontFamily }}>
-                                                <div style={{ position: "relative", top: textOffset }}>
-                                                    <div style={{ fontWeight: 500 }}>{row.data.name}{row.data.size ? ` (${row.data.size})` : ""}</div>
-                                                    {row.data.kv && <div style={{ fontSize: "10px", color: colors.secondary, marginTop: "2px" }}>KV: {row.data.kv}</div>}
-                                                </div>
-                                            </td>
-                                            <td style={{ width: "100px", border: `1px solid ${colors.border}`, padding: "4px", backgroundColor: g % 2 === 1 ? colors.rowAlt : colors.white, textAlign: "center", verticalAlign: "middle" }}>
-                                                {assetImages[row.data.name] ? (
-                                                    <img src={`${assetImages[row.data.name]}?t=${Date.now()}`} alt="Asset" style={{ maxHeight: "80px", maxWidth: "92px", objectFit: "contain" }} />
-                                                ) : (
-                                                    <span style={{ fontSize: "9px", color: "#999" }}>No Image</span>
-                                                )}
-                                            </td>
-                                            <Cell width="50px" center isAlt={g % 2 === 1} hasImage>{row.data.grade || "-"}</Cell>
-                                            <Cell width="130px" center isAlt={g % 2 === 1}>{row.data.barcode || "-"}</Cell>
-                                            <Cell width="85px" center isAlt={g % 2 === 1} hasImage>{row.data.withdrawFor || "-"}</Cell>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    )}
+                        const assetOffset = globalAssetOffset;
+                        const secOffset = globalSecOffset;
+                        globalAssetOffset += assetRows.length;
+                        globalSecOffset += secRows.length;
 
-                    {(hasSecHeader || secDataRows.length > 0) && (
-                        <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "6px", borderRadius: "8px", overflow: "hidden" }}>
-                            {secThead}
-                            <tbody>
-                                {secDataRows.map((row, idx) => {
-                                    const g = secOffset + idx;
-                                    return (
-                                        <tr key={idx}>
-                                            <Cell width="35px" center isAlt={g % 2 === 1}>{g + 1}</Cell>
-                                            <Cell isAlt={g % 2 === 1}>{row.data.name || "-"}</Cell>
-                                            {row.showImage ? (
-                                                <td style={{ width: "80px", border: `1px solid ${colors.border}`, height: "70px", padding: "4px", backgroundColor: g % 2 === 1 ? colors.rowAlt : colors.white, textAlign: "center", verticalAlign: "middle" }}>
-                                                    {row.data.name?.includes("CONTROLBOX") ? (
-                                                        <img src="/images/controlbox.png" alt="CONTROLBOX" style={{ maxHeight: "60px", maxWidth: "70px", objectFit: "contain" }}
-                                                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).parentElement!.innerHTML = '<span style="font-size: 9px; color: #999;">-</span>'; }} />
-                                                    ) : row.data.name?.includes("Security Type C") ? (
-                                                        <img src="/images/security-type-c.png" alt="Security Type C" style={{ maxHeight: "60px", maxWidth: "70px", objectFit: "contain" }}
-                                                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).parentElement!.innerHTML = '<span style="font-size: 9px; color: #999;">-</span>'; }} />
-                                                    ) : (
-                                                        <span style={{ fontSize: "9px", color: "#999" }}>-</span>
-                                                    )}
-                                                </td>
-                                            ) : (
-                                                <Cell width="80px" center isAlt={g % 2 === 1}>-</Cell>
-                                            )}
-                                            <Cell width="140px" center isAlt={g % 2 === 1}>{row.data._isTypeC ? `จำนวน ${row.data._groupSize}` : (row.data.barcode || "-")}</Cell>
-                                            <Cell width="85px" center isAlt={g % 2 === 1}>{row.data.withdrawFor || ""}</Cell>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    )}
+                        return (
+                            <Fragment key={sIdx}>
+                                {shopHeaderRow && (
+                                    <div style={{
+                                        display: "flex", gap: "10px", marginBottom: "6px", padding: "6px 12px",
+                                        backgroundColor: "#eef2ff", borderRadius: "6px",
+                                        border: `1px solid #c7d2fe`, alignItems: "center",
+                                    }}>
+                                        <div style={{ width: "22px", height: "22px", borderRadius: "50%", backgroundColor: "#6366f1", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: 700, flexShrink: 0 }}>
+                                            <span style={{ position: "relative", top: textOffset }}>{shopHeaderRow.shopIdx + 1}</span>
+                                        </div>
+                                        <div style={{ fontSize: "11px", lineHeight: 1.5 }}>
+                                            <span style={{ fontWeight: 700, color: "#3730a3", position: "relative", top: textOffset }}>ร้านที่ {shopHeaderRow.shopIdx + 1}:</span>{" "}
+                                            <span style={{ position: "relative", top: textOffset }}>{shopHeaderRow.shop.shopCode || "NO MCS"} — {shopHeaderRow.shop.shopName || "-"}</span>
+                                            <span style={{ color: "#6366f1", marginLeft: "12px", position: "relative", top: textOffset }}>
+                                                {shopHeaderRow.shop.startInstallDate ? formatDate(shopHeaderRow.shop.startInstallDate) : "-"} → {shopHeaderRow.shop.endInstallDate ? formatDate(shopHeaderRow.shop.endInstallDate) : "-"}
+                                            </span>
+                                            <span style={{ color: "#4338ca", marginLeft: "10px", position: "relative", top: textOffset }}>Focus: {shopHeaderRow.shop.shopFocus || "-"}</span>
+                                            <span style={{ color: "#4338ca", marginLeft: "10px", position: "relative", top: textOffset }}>Q7B7: {shopHeaderRow.shop.q7b7 || "-"}</span>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {assetRows.length > 0 && (
+                                    <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "6px", borderRadius: "8px", overflow: "hidden" }}>
+                                        {assetThead}
+                                        <tbody>
+                                            {assetRows.map((row, idx) => {
+                                                const g = assetOffset + idx;
+                                                return (
+                                                    <tr key={idx}>
+                                                        <Cell width="35px" center isAlt={g % 2 === 1}>{g + 1}</Cell>
+                                                        <Cell isAlt={g % 2 === 1}>{row.data.name}{row.data.size ? ` (${row.data.size})` : ""}</Cell>
+                                                        <Cell width="60px" center isAlt={g % 2 === 1}>{row.data.kv || "-"}</Cell>
+                                                        <Cell width="50px" center isAlt={g % 2 === 1}>{row.data.grade || "-"}</Cell>
+                                                        <Cell width="130px" center isAlt={g % 2 === 1}>{row.data.barcode || "-"}</Cell>
+                                                        <Cell width="85px" center isAlt={g % 2 === 1}>{row.data.withdrawFor || "-"}</Cell>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                )}
+
+                                {(hasSecHeader || secRows.length > 0) && (
+                                    <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "6px", borderRadius: "8px", overflow: "hidden" }}>
+                                        {secThead}
+                                        <tbody>
+                                            {secRows.map((row, idx) => {
+                                                const g = secOffset + idx;
+                                                return (
+                                                    <tr key={idx}>
+                                                        <Cell width="35px" center isAlt={g % 2 === 1}>{g + 1}</Cell>
+                                                        <Cell isAlt={g % 2 === 1}>{row.data.name || "-"}</Cell>
+                                                        <Cell width="140px" center isAlt={g % 2 === 1}>{row.data._isTypeC ? `จำนวน ${row.data._groupSize}` : (row.data.barcode || "-")}</Cell>
+                                                        <Cell width="85px" center isAlt={g % 2 === 1}>{row.data.withdrawFor || ""}</Cell>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                )}
+                            </Fragment>
+                        );
+                    })}
 
                     {isLast && renderBorrowFooter()}
                 </>

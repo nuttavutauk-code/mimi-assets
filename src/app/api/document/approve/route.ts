@@ -16,6 +16,7 @@ const NEEDS_PICK_ASSET_TYPES = [
     "transfer",
     "borrowsecurity",
     "borrow",
+    "borrowSecurityRouting",
 ];
 
 // ประเภทเอกสารที่บันทึกลง AssetTransactionHistory ทันที (9-11)

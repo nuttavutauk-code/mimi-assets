@@ -14,6 +14,7 @@ import OtherActivitiesSelect, { OtherActivity } from "@/components/ui/admin/Othe
 import StatusSelect, { StatusOption } from "@/components/ui/admin/StatusSelect";
 import PreviewApproveModal from "@/components/ui/PreviewApproveModal";
 import BarcodeAssignSelector from "@/components/ui/admin/BarcodeAssignSelector";
+import { flattenBarcodes } from "@/lib/barcodeExclude";
 
 type ShopItem = { mcsCode: string; shopName: string };
 type AssetRow = {
@@ -670,6 +671,7 @@ const FormBorrowSecurity = ({ mode = "user" }: { mode?: FormMode }) => {
                     qty={asset.qty}
                     value={assetBarcodes[asset.id] || []}
                     onChange={(next) => setAssetBarcodes(p => ({ ...p, [asset.id]: next }))}
+                    additionalExclude={flattenBarcodes(assetBarcodes, asset.id)}
                   />
                 </div>
               )}
@@ -818,6 +820,7 @@ const FormBorrowSecurity = ({ mode = "user" }: { mode?: FormMode }) => {
                     value={securityBarcodes[set.id] || []}
                     onChange={(next) => setSecurityBarcodes(p => ({ ...p, [set.id]: next }))}
                     isSecuritySet
+                    additionalExclude={flattenBarcodes(securityBarcodes, set.id)}
                   />
                 </div>
               )}

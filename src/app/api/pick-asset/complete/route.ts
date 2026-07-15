@@ -39,6 +39,7 @@ function getWkOutColumnForDocumentType(documentType: string): WkOutColumn {
         // ขาออก - ยืม
         case "borrow":
         case "borrowsecurity":
+        case "borrowSecurityRouting":
             return "borrow";
 
         default:
@@ -354,7 +355,7 @@ export async function POST(req: NextRequest) {
 
                 // ✅ กำหนด Remark OUT สำหรับ Security Type C
                 let securityRemarkOut = "-";
-                if ((document.documentType === "borrow" || document.documentType === "borrowsecurity") && document.borrowType) {
+                if ((document.documentType === "borrow" || document.documentType === "borrowsecurity" || document.documentType === "borrowSecurityRouting") && document.borrowType) {
                     securityRemarkOut = document.borrowType;
                 }
 
@@ -407,8 +408,8 @@ export async function POST(req: NextRequest) {
                     remarkOut = document.operation;
                 }
             }
-            // ✅ ถ้าเป็นใบยืม (borrow, borrowsecurity) ให้ใช้ borrowType
-            if ((document.documentType === "borrow" || document.documentType === "borrowsecurity") && document.borrowType) {
+            // ✅ ถ้าเป็นใบยืม (borrow, borrowsecurity, borrowSecurityRouting) ให้ใช้ borrowType
+            if ((document.documentType === "borrow" || document.documentType === "borrowsecurity" || document.documentType === "borrowSecurityRouting") && document.borrowType) {
                 remarkOut = document.borrowType;
             }
 

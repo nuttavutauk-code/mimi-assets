@@ -14,6 +14,7 @@ import OtherActivitiesSelect, { OtherActivity } from "@/components/ui/admin/Othe
 import StatusSelect, { StatusOption } from "@/components/ui/admin/StatusSelect";
 import PreviewApproveModal from "@/components/ui/PreviewApproveModal";
 import BarcodeAssignSelector from "@/components/ui/admin/BarcodeAssignSelector";
+import { flattenBarcodes } from "@/lib/barcodeExclude";
 
 type ShopItem = { mcsCode: string; shopName: string };
 type AssetRow = {
@@ -606,6 +607,7 @@ const FormRouting2Shops = ({ mode = "user" }: { mode?: FormMode }) => {
     const assetIdCounter = shopNum === 1 ? assetIdCounter1 : assetIdCounter2;
     const assetBarcodes = shopNum === 1 ? assetBarcodes1 : assetBarcodes2;
     const setAssetBarcodes = shopNum === 1 ? setAssetBarcodes1 : setAssetBarcodes2;
+    const otherShopsAssetBarcodes = [shopNum === 1 ? assetBarcodes2 : assetBarcodes1];
 
     return (
       <div className="glass-card p-4 sm:p-5">
@@ -786,7 +788,11 @@ const FormRouting2Shops = ({ mode = "user" }: { mode?: FormMode }) => {
                 <div className="mt-3 p-3 rounded-lg bg-blue-50/40 border border-blue-200">
                   <label className="block text-xs text-blue-700 font-medium mb-2">เลือก Barcode (qty {asset.qty})</label>
                   <BarcodeAssignSelector warehouse={asset.withdrawFor} assetName={asset.name} qty={asset.qty}
-                    value={assetBarcodes[asset.id] || []} onChange={(next) => setAssetBarcodes(p => ({ ...p, [asset.id]: next }))} />
+                    value={assetBarcodes[asset.id] || []} onChange={(next) => setAssetBarcodes(p => ({ ...p, [asset.id]: next }))}
+                    additionalExclude={[
+                      ...flattenBarcodes(assetBarcodes, asset.id),
+                      ...otherShopsAssetBarcodes.flatMap(rec => flattenBarcodes(rec)),
+                    ]} />
                 </div>
               )}
             </div>

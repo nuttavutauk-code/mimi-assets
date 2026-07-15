@@ -14,6 +14,7 @@ import OtherActivitiesSelect, { OtherActivity } from "@/components/ui/admin/Othe
 import StatusSelect, { StatusOption } from "@/components/ui/admin/StatusSelect";
 import PreviewApproveModal from "@/components/ui/PreviewApproveModal";
 import BarcodeAssignSelector from "@/components/ui/admin/BarcodeAssignSelector";
+import { flattenBarcodes } from "@/lib/barcodeExclude";
 
 type ShopItem = { mcsCode: string; shopName: string };
 type AssetRow = {
@@ -473,6 +474,7 @@ const FormBorrow = ({ mode = "user" }: { mode?: FormMode }) => {
                     qty={asset.qty}
                     value={assetBarcodes[asset.id] || []}
                     onChange={(next) => setAssetBarcodes(p => ({ ...p, [asset.id]: next }))}
+                    additionalExclude={flattenBarcodes(assetBarcodes, asset.id)}
                   />
                 </div>
               )}

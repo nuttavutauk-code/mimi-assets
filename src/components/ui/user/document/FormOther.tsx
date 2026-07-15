@@ -15,6 +15,7 @@ import OtherActivitiesSelect, { OtherActivity } from "@/components/ui/admin/Othe
 import StatusSelect, { StatusOption } from "@/components/ui/admin/StatusSelect";
 import PreviewApproveModal from "@/components/ui/PreviewApproveModal";
 import BarcodeAssignSelector from "@/components/ui/admin/BarcodeAssignSelector";
+import { flattenBarcodes } from "@/lib/barcodeExclude";
 
 type ShopItem = { mcsCode: string; shopName: string };
 type AssetRow = {
@@ -385,7 +386,7 @@ const FormOther = ({ mode = "user" }: { mode?: FormMode }) => {
               {mode === "admin" && !isReadOnly && asset.name && (
                 <div className="mt-3 p-3 rounded-lg bg-blue-50/40 border border-blue-200">
                   <label className="block text-xs text-blue-700 font-medium mb-2">เลือก Barcode ที่จะเบิก (qty {asset.qty})</label>
-                  <BarcodeAssignSelector warehouse={asset.withdrawFor} assetName={asset.name} qty={asset.qty} value={assetBarcodes[asset.id] || []} onChange={(next) => setAssetBarcodes(p => ({ ...p, [asset.id]: next }))} />
+                  <BarcodeAssignSelector warehouse={asset.withdrawFor} assetName={asset.name} qty={asset.qty} value={assetBarcodes[asset.id] || []} onChange={(next) => setAssetBarcodes(p => ({ ...p, [asset.id]: next }))} additionalExclude={flattenBarcodes(assetBarcodes, asset.id)} />
                 </div>
               )}
             </div>
@@ -406,7 +407,7 @@ const FormOther = ({ mode = "user" }: { mode?: FormMode }) => {
               {mode === "admin" && !isReadOnly && set.qty > 0 && !set.name.includes("Security Type C") && (
                 <div className="mt-3 p-3 rounded-lg bg-purple-50/40 border border-purple-200">
                   <label className="block text-xs text-purple-700 font-medium mb-2">เลือก Barcode CONTROLBOX ที่จะเบิก (qty {set.qty})</label>
-                  <BarcodeAssignSelector warehouse={set.withdrawFor} assetName={set.name} qty={set.qty} value={securityBarcodes[set.id] || []} onChange={(next) => setSecurityBarcodes(p => ({ ...p, [set.id]: next }))} isSecuritySet />
+                  <BarcodeAssignSelector warehouse={set.withdrawFor} assetName={set.name} qty={set.qty} value={securityBarcodes[set.id] || []} onChange={(next) => setSecurityBarcodes(p => ({ ...p, [set.id]: next }))} isSecuritySet additionalExclude={flattenBarcodes(securityBarcodes, set.id)} />
                 </div>
               )}
             </div>

@@ -44,6 +44,7 @@ export default function AdminList() {
       other: `/dashboard/admin-document/other/${id}`,
       transfer: `/dashboard/admin-document/transfer/${id}`,
       borrowsecurity: `/dashboard/admin-document/borrow-security/${id}`,
+      borrowSecurityRouting: `/dashboard/admin-document/borrow-security-routing/${id}`,
       borrow: `/dashboard/admin-document/borrow/${id}`,
       return: `/dashboard/admin-document/return-asset/${id}`,
       returnasset: `/dashboard/admin-document/return-asset/${id}`,
