@@ -11,6 +11,7 @@ import OtherActivitiesSelect, { OtherActivity } from "@/components/ui/admin/Othe
 import debounce from "lodash.debounce";
 import { getMe } from "./loader";
 import PreviewApproveModal from "@/components/ui/PreviewApproveModal";
+import { getErrorMessage } from "@/lib/utils";
 
 type AssetRow = { id: number; barcode: string; name: string; size: string; grade: string; qty: number };
 type FormMode = "user" | "admin";
@@ -167,7 +168,7 @@ const FormRepair = ({ mode = "user" }: { mode?: FormMode }) => {
       const result = await res.json();
       if (!result.success) throw new Error(result.message);
       toast.success(isEdit ? "แก้ไขสำเร็จ!" : "บันทึกสำเร็จ!"); router.push(mode === "admin" ? "/dashboard/admin-list" : "/dashboard/user-list");
-    } catch (error) { console.error(error); toast.error("เกิดข้อผิดพลาด"); }
+    } catch (error) { console.error(error); toast.error(getErrorMessage(error, "เกิดข้อผิดพลาด")); }
     finally { setIsSubmitting(false); }
   };
 
@@ -184,7 +185,7 @@ const FormRepair = ({ mode = "user" }: { mode?: FormMode }) => {
       if (!result.success) throw new Error(result.message);
       toast.success("บันทึก Draft สำเร็จ!");
       setDocStatus("reviewing");
-    } catch (err) { console.error(err); toast.error("เกิดข้อผิดพลาดในการบันทึก Draft"); }
+    } catch (err) { console.error(err); toast.error(getErrorMessage(err, "เกิดข้อผิดพลาดในการบันทึก Draft")); }
     finally { setIsSubmitting(false); }
   };
 

@@ -12,6 +12,7 @@ import { Plus, Trash2, User, Store, Package, FileText, Save, CheckCircle, XCircl
 import { toast } from "sonner";
 import OtherActivitiesSelect, { OtherActivity } from "@/components/ui/admin/OtherActivitiesSelect";
 import PreviewApproveModal from "@/components/ui/PreviewApproveModal";
+import { getErrorMessage } from "@/lib/utils";
 
 type ShopItem = { mcsCode: string; shopName: string };
 type AssetRow = { id: number; barcode: string; name: string; size: string; grade: string; qty: number };
@@ -124,7 +125,7 @@ const FormShopToShop = ({ mode = "user" }: { mode?: FormMode }) => {
       const payload = { documentType: "shop-to-shop", docCode: formData.docNumber, fullName: formData.fullName, company: formData.company, phone: formData.phone, note, status: "submitted", shops: [{ shopCode: shopCodeFrom, shopName: shopNameFrom, startInstallDate: transferDate, assets: assets.map(a => ({ barcode: a.barcode, name: a.name, size: a.size, grade: a.grade, qty: a.qty })), securitySets: securitySets.filter(s => s.qty > 0).map(s => ({ name: s.name, qty: s.qty })) }, { shopCode: shopCodeTo, shopName: shopNameTo }] };
       await fetch(isEdit ? `/api/document/update/${editId}` : "/api/document/create", { method: isEdit ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       toast.success(isEdit ? "แก้ไขสำเร็จ!" : "บันทึกสำเร็จ!"); router.push(mode === "admin" ? "/dashboard/admin-list" : "/dashboard/user-list");
-    } catch (e) { toast.error("เกิดข้อผิดพลาด"); }
+    } catch (e) { toast.error(getErrorMessage(e, "เกิดข้อผิดพลาด")); }
     finally { setIsSubmitting(false); }
   };
 
@@ -139,7 +140,7 @@ const FormShopToShop = ({ mode = "user" }: { mode?: FormMode }) => {
       if (!result.success) throw new Error(result.message);
       toast.success("บันทึก Draft สำเร็จ!");
       setDocStatus("reviewing");
-    } catch (err) { console.error(err); toast.error("เกิดข้อผิดพลาดในการบันทึก Draft"); }
+    } catch (err) { console.error(err); toast.error(getErrorMessage(err, "เกิดข้อผิดพลาดในการบันทึก Draft")); }
     finally { setIsSubmitting(false); }
   };
 

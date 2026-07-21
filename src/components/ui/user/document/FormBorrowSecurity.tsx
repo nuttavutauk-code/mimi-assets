@@ -15,6 +15,7 @@ import StatusSelect, { StatusOption } from "@/components/ui/admin/StatusSelect";
 import PreviewApproveModal from "@/components/ui/PreviewApproveModal";
 import BarcodeAssignSelector from "@/components/ui/admin/BarcodeAssignSelector";
 import { flattenBarcodes } from "@/lib/barcodeExclude";
+import { getErrorMessage } from "@/lib/utils";
 
 type ShopItem = { mcsCode: string; shopName: string };
 type AssetRow = {
@@ -389,7 +390,7 @@ const FormBorrowSecurity = ({ mode = "user" }: { mode?: FormMode }) => {
       toast.success(isEdit ? "แก้ไขสำเร็จ!" : "บันทึกสำเร็จ!");
       router.push(mode === "admin" ? "/dashboard/admin-list" : "/dashboard/user-list");
     } catch (e) {
-      toast.error("เกิดข้อผิดพลาด");
+      toast.error(getErrorMessage(e, "เกิดข้อผิดพลาด"));
       console.error(e);
     } finally {
       setIsSubmitting(false);
@@ -415,7 +416,7 @@ const FormBorrowSecurity = ({ mode = "user" }: { mode?: FormMode }) => {
       if (!result.success) throw new Error(result.message);
       toast.success("บันทึก Draft สำเร็จ!");
       setDocStatus("reviewing");
-    } catch (err) { console.error(err); toast.error("เกิดข้อผิดพลาดในการบันทึก Draft"); }
+    } catch (err) { console.error(err); toast.error(getErrorMessage(err, "เกิดข้อผิดพลาดในการบันทึก Draft")); }
     finally { setIsSubmitting(false); }
   };
 

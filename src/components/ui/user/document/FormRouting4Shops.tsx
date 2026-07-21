@@ -15,6 +15,7 @@ import StatusSelect, { StatusOption } from "@/components/ui/admin/StatusSelect";
 import PreviewApproveModal from "@/components/ui/PreviewApproveModal";
 import BarcodeAssignSelector from "@/components/ui/admin/BarcodeAssignSelector";
 import { flattenBarcodes } from "@/lib/barcodeExclude";
+import { getErrorMessage } from "@/lib/utils";
 
 type ShopItem = { mcsCode: string; shopName: string };
 type AssetRow = { id: number; name: string; size: string; kv: string; qty: number; withdrawFor: string; autoWarehouse?: boolean; useCustomSize?: boolean; customW?: string; customD?: string; customH?: string; customXX?: string; isSelected?: boolean; };
@@ -228,7 +229,7 @@ const FormRouting4Shops = ({ mode = "user" }: { mode?: FormMode }) => {
       if (action === "reject" && editId) { const res = await fetch(`/api/document/update/${editId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: "rejected", note }) }); const r = await res.json(); if (!r.success) throw new Error(r.message); toast.success("ปฏิเสธสำเร็จ!"); router.push("/dashboard/admin-list"); return; }
       const payload = { documentType: "routing4shops", docCode: formData.docNumber, fullName: formData.fullName, company: formData.company, phone: formData.phone, note, status: "submitted", shops: shopsPayload };
       const res = await fetch(isEdit ? `/api/document/update/${editId}` : "/api/document/create", { method: isEdit ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }); const r = await res.json(); if (!r.success) throw new Error(r.message); toast.success(isEdit ? "แก้ไขสำเร็จ!" : "บันทึกสำเร็จ!"); router.push(mode === "admin" ? "/dashboard/admin-list" : "/dashboard/user-list");
-    } catch (e) { toast.error("เกิดข้อผิดพลาด"); console.error(e); }
+    } catch (e) { toast.error(getErrorMessage(e, "เกิดข้อผิดพลาด")); console.error(e); }
     finally { setIsSubmitting(false); }
   };
 
@@ -256,7 +257,7 @@ const FormRouting4Shops = ({ mode = "user" }: { mode?: FormMode }) => {
       if (!result.success) throw new Error(result.message);
       toast.success("บันทึก Draft สำเร็จ!");
       setDocStatus("reviewing");
-    } catch (err) { console.error(err); toast.error("เกิดข้อผิดพลาดในการบันทึก Draft"); }
+    } catch (err) { console.error(err); toast.error(getErrorMessage(err, "เกิดข้อผิดพลาดในการบันทึก Draft")); }
     finally { setIsSubmitting(false); }
   };
 
