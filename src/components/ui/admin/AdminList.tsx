@@ -143,8 +143,13 @@ export default function AdminList() {
       setDocumentToDownload(json.document);
       await new Promise((resolve) => setTimeout(resolve, 200));
       const result = await downloadDocumentPages("document-to-print", item.docCode);
-      if (result.success) toast.success("ดาวน์โหลดเอกสารสำเร็จ");
-      else toast.error("ไม่สามารถสร้างรูปภาพได้");
+      if (result.cancelled) {
+        // ผู้ใช้กดปิดหน้าต่างแชร์เอง ไม่ถือว่าเป็นความสำเร็จหรือความล้มเหลว
+      } else if (result.success) {
+        toast.success("ดาวน์โหลดเอกสารสำเร็จ");
+      } else {
+        toast.error("ไม่สามารถสร้างรูปภาพได้");
+      }
     } catch (err) {
       toast.error("เกิดข้อผิดพลาดในการดาวน์โหลด");
     } finally {

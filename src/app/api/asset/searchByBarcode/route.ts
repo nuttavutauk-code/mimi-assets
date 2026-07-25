@@ -53,19 +53,16 @@ export async function GET(req: Request) {
           assetName: true,
           size: true,
         },
-        orderBy: { id: "desc" },
-        take: 50,
+        // ✅ distinct ที่ระดับ DB (DISTINCT ON) แทนการ take แถวดิบแล้ว dedupe ทีหลัง
+        // เพื่อไม่ให้ barcode ที่ยังใช้งานได้จริงหลุดออกไปเมื่อมี transaction เก่าเกิน take
+        orderBy: [{ barcode: "asc" }, { id: "desc" }],
+        distinct: ["barcode"],
+        take: 500,
       });
 
-      // กรอง duplicate barcode (เอาเฉพาะ transaction ล่าสุดของแต่ละ barcode)
-      const uniqueBarcodes = new Map<string, { barcode: string; assetName: string; size: string | null }>();
-      for (const t of transactions) {
-        if (!uniqueBarcodes.has(t.barcode)) {
-          uniqueBarcodes.set(t.barcode, { barcode: t.barcode, assetName: t.assetName, size: t.size });
-        }
-      }
+      const uniqueBarcodes = transactions.map((t) => ({ barcode: t.barcode, assetName: t.assetName, size: t.size }));
 
-      return NextResponse.json({ assets: Array.from(uniqueBarcodes.values()).slice(0, 20) }, { status: 200 });
+      return NextResponse.json({ assets: uniqueBarcodes.slice(0, 20) }, { status: 200 });
     }
 
     // ✅ isSecuritySet + balanceFilter=0 → CONTROLBOX ที่ออกไปแล้ว (balance=0) สำหรับ Return Asset
@@ -77,18 +74,17 @@ export async function GET(req: Request) {
           ...(query ? { barcode: { startsWith: query, mode: "insensitive" } } : {}),
         },
         select: { barcode: true, assetName: true },
-        orderBy: { id: "desc" },
-        take: 200,
+        orderBy: [{ barcode: "asc" }, { id: "desc" }],
+        distinct: ["barcode"],
+        take: 500,
       });
 
-      const uniqueSec = new Map<string, { barcode: string; assetName: string; size: string | null }>();
+      const uniqueSec: { barcode: string; assetName: string; size: string | null }[] = [];
       for (const t of secTransactions) {
         if (!t.barcode) continue;
-        if (!uniqueSec.has(t.barcode)) {
-          uniqueSec.set(t.barcode, { barcode: t.barcode, assetName: t.assetName, size: null });
-        }
+        uniqueSec.push({ barcode: t.barcode, assetName: t.assetName, size: null });
       }
-      return NextResponse.json({ assets: Array.from(uniqueSec.values()).slice(0, 50) }, { status: 200 });
+      return NextResponse.json({ assets: uniqueSec.slice(0, 50) }, { status: 200 });
     }
 
     // ✅ ถ้ามี warehouse + balanceFilter=1 → ค้นหา Barcode ที่อยู่ในโกดังนั้น (ไม่ต้องมี query)
@@ -104,20 +100,19 @@ export async function GET(req: Request) {
             ...(query ? { barcode: { startsWith: query, mode: "insensitive" } } : {}),
           },
           select: { barcode: true, assetName: true },
-          orderBy: { id: "desc" },
-          take: 200,
+          orderBy: [{ barcode: "asc" }, { id: "desc" }],
+          distinct: ["barcode"],
+          take: 500,
         });
 
         const assignedSet = await getAssignedBarcodes();
-        const uniqueSec = new Map<string, { barcode: string; assetName: string; size: string | null }>();
+        const uniqueSec: { barcode: string; assetName: string; size: string | null }[] = [];
         for (const t of secTransactions) {
           if (!t.barcode) continue;
           if (assignedSet.has(t.barcode)) continue;
-          if (!uniqueSec.has(t.barcode)) {
-            uniqueSec.set(t.barcode, { barcode: t.barcode, assetName: t.assetName, size: null });
-          }
+          uniqueSec.push({ barcode: t.barcode, assetName: t.assetName, size: null });
         }
-        return NextResponse.json({ assets: Array.from(uniqueSec.values()).slice(0, 50) }, { status: 200 });
+        return NextResponse.json({ assets: uniqueSec.slice(0, 50) }, { status: 200 });
       }
 
       const transactions = await prisma.assetTransactionHistory.findMany({
@@ -133,22 +128,20 @@ export async function GET(req: Request) {
           size: true,
           grade: true,
         },
-        orderBy: { id: "desc" },
-        take: 200,
+        orderBy: [{ barcode: "asc" }, { id: "desc" }],
+        distinct: ["barcode"],
+        take: 500,
       });
 
       const assignedSet = await getAssignedBarcodes();
 
-      // กรอง duplicate barcode (เอาเฉพาะ transaction ล่าสุดของแต่ละ barcode)
-      const uniqueBarcodes = new Map<string, { barcode: string; assetName: string; size: string | null; grade: string | null }>();
+      const uniqueBarcodes: { barcode: string; assetName: string; size: string | null; grade: string | null }[] = [];
       for (const t of transactions) {
         if (assignedSet.has(t.barcode)) continue;
-        if (!uniqueBarcodes.has(t.barcode)) {
-          uniqueBarcodes.set(t.barcode, { barcode: t.barcode, assetName: t.assetName, size: t.size, grade: t.grade });
-        }
+        uniqueBarcodes.push({ barcode: t.barcode, assetName: t.assetName, size: t.size, grade: t.grade });
       }
 
-      return NextResponse.json({ assets: Array.from(uniqueBarcodes.values()).slice(0, 50) }, { status: 200 });
+      return NextResponse.json({ assets: uniqueBarcodes.slice(0, 50) }, { status: 200 });
     }
 
     // ✅ ถ้ามี balanceFilter=0 → ค้นหา Barcode ที่ออกไปแล้ว (สำหรับ Return Asset)
@@ -163,19 +156,14 @@ export async function GET(req: Request) {
           assetName: true,
           size: true,
         },
-        orderBy: { id: "desc" },
-        take: 50,
+        orderBy: [{ barcode: "asc" }, { id: "desc" }],
+        distinct: ["barcode"],
+        take: 500,
       });
 
-      // กรอง duplicate barcode (เอาเฉพาะ transaction ล่าสุดของแต่ละ barcode)
-      const uniqueBarcodes = new Map<string, { barcode: string; assetName: string; size: string | null }>();
-      for (const t of transactions) {
-        if (!uniqueBarcodes.has(t.barcode)) {
-          uniqueBarcodes.set(t.barcode, { barcode: t.barcode, assetName: t.assetName, size: t.size });
-        }
-      }
+      const uniqueBarcodes = transactions.map((t) => ({ barcode: t.barcode, assetName: t.assetName, size: t.size }));
 
-      return NextResponse.json({ assets: Array.from(uniqueBarcodes.values()).slice(0, 20) }, { status: 200 });
+      return NextResponse.json({ assets: uniqueBarcodes.slice(0, 20) }, { status: 200 });
     }
 
     // ✅ ถ้า query ว่าง และไม่มี filter พิเศษ → ไม่ต้อง query DB
