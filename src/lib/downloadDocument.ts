@@ -6,37 +6,24 @@ function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob | null> {
 }
 
 /**
- * ส่งไฟล์ให้ผู้ใช้: ใช้ Web Share API ก่อน (เปิด share sheet ให้ "บันทึกรูปภาพ" บนมือถือ
- * ได้อย่างน่าเชื่อถือกว่าการ click ลิงก์ดาวน์โหลดที่มาจากโค้ด async)
- * ถ้าเบราว์เซอร์ไม่รองรับ หรือ share ถูก reject ด้วยเหตุผลอื่นที่ไม่ใช่ผู้ใช้ยกเลิกเอง
- * จะ fallback ไปดาวน์โหลดผ่าน Blob URL ตามปกติ
+ * ดาวน์โหลดไฟล์ผ่าน Blob URL (แทน data URL ที่ Safari/เบราว์เซอร์มือถือหลายตัว
+ * ไม่ยอม trigger การดาวน์โหลดจริง แค่เปิด/นำทางไปแสดงรูปแทน)
  */
-async function shareOrDownloadFiles(
+async function downloadFiles(
     files: { blob: Blob; filename: string }[]
-): Promise<{ success: boolean; cancelled?: boolean }> {
-    const shareFiles = files.map(
-        ({ blob, filename }) => new File([blob], filename, { type: "image/png" })
-    );
-
-    if (typeof navigator !== "undefined" && navigator.canShare?.({ files: shareFiles })) {
-        try {
-            await navigator.share({ files: shareFiles });
-            return { success: true };
-        } catch (err) {
-            if (err instanceof Error && err.name === "AbortError") {
-                return { success: true, cancelled: true };
-            }
-            // ไม่รองรับ/ถูก reject ด้วยเหตุผลอื่น -> fallback ไปดาวน์โหลดแบบปกติด้านล่าง
-        }
-    }
-
+): Promise<{ success: boolean }> {
     for (const { blob, filename } of files) {
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.download = filename;
         link.href = url;
+        document.body.appendChild(link);
         link.click();
+        link.remove();
         setTimeout(() => URL.revokeObjectURL(url), 1000);
+        if (files.length > 1) {
+            await new Promise((r) => setTimeout(r, 200));
+        }
     }
     return { success: true };
 }
@@ -50,7 +37,7 @@ export async function downloadDocumentPages(
     elementId: string,
     filename: string,
     maxWaitMs: number = 5000
-): Promise<{ success: boolean; pages: number; cancelled?: boolean }> {
+): Promise<{ success: boolean; pages: number }> {
     const root = await waitForElement(elementId, maxWaitMs);
     if (!root) {
         console.error(`Element with id "${elementId}" not found`);
@@ -90,7 +77,7 @@ export async function downloadDocumentPages(
             return { success: false, pages: 0 };
         }
 
-        const result = await shareOrDownloadFiles(files);
+        const result = await downloadFiles(files);
         return { ...result, pages: files.length };
     } catch (error) {
         console.error("Error generating pages:", error);
