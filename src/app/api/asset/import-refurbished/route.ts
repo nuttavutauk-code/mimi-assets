@@ -7,6 +7,21 @@ import { authOptions } from "@/lib/authOptions";
 import prisma from "@/lib/prisma";
 import * as XLSX from "xlsx";
 
+// ✅ รายชื่อ Asset ที่ต้องบันทึกลงตารางรอง (SecuritySetTransaction)
+const SECURITY_SET_NAMES = [
+    "CONTROLBOX 6 PORT (M-60000R) with power cable",
+    "CONTROLBOX 5 PORT (M-50000R) with power cable",
+    "Security Type C Ver.7.1",
+    "Security Type C Ver.7.0",
+];
+
+// ฟังก์ชันเช็คว่าเป็น Security Set หรือไม่
+const isSecuritySetAsset = (assetName: string): boolean => {
+    return SECURITY_SET_NAMES.some(name =>
+        assetName.toLowerCase().trim() === name.toLowerCase().trim()
+    );
+};
+
 // ✅ ฟังก์ชันแปลงวันที่ให้เป็น DD/MM/YYYY string
 function formatDateToDDMMYYYY(dateValue: any): string | null {
     if (!dateValue) return null;
@@ -135,6 +150,32 @@ export async function POST(request: NextRequest) {
         });
         const validVendors = [...new Set(users.map(u => u.vendor).filter(Boolean))] as string[];
 
+        // ✅ หาหรือสร้าง Import Document สำหรับ Security Set Transaction (ตารางรอง)
+        let importDocument = await prisma.document.findFirst({
+            where: { documentType: "IMPORT_REFURBISHED" },
+        });
+
+        if (!importDocument) {
+            // adminId จาก session อาจไม่ตรงกับ User.id จริง (session.user.id ไม่ได้ถูก set ใน authOptions)
+            // จึงต้องดึง User จริงจาก DB มาใช้เป็น createdById เพื่อไม่ให้ชน Foreign Key
+            const adminUser = await prisma.user.findFirst({ where: { role: "ADMIN" } });
+            const anyUser = adminUser || (await prisma.user.findFirst());
+
+            if (!anyUser) {
+                return NextResponse.json({ error: "No user found in database" }, { status: 400 });
+            }
+
+            importDocument = await prisma.document.create({
+                data: {
+                    docCode: `IMPORT_REFURBISHED-${Date.now()}`,
+                    documentType: "IMPORT_REFURBISHED",
+                    fullName: "System Import REFURBISHED",
+                    createdById: anyUser.id,
+                    status: "approved",
+                },
+            });
+        }
+
         // ✅ 6. Validate Warehouse In ทุกแถวก่อน Import
         const invalidWarehouses: { row: number; warehouse: string }[] = [];
 
@@ -203,6 +244,50 @@ export async function POST(request: NextRequest) {
             if (!assetName) {
                 errors.push(`แถว ${rowNum}: ไม่มี Asset Name`);
                 skipped++;
+                continue;
+            }
+
+            // ✅ เช็คว่าเป็น Security Set หรือไม่ (บันทึกลงตารางรองแทน)
+            if (isSecuritySetAsset(assetName)) {
+                const existingSecurityTransaction = await prisma.securitySetTransaction.findFirst({
+                    where: { barcode },
+                });
+
+                if (existingSecurityTransaction) {
+                    errors.push(`แถว ${rowNum}: Barcode ${barcode} มีอยู่แล้วใน Security Set`);
+                    skipped++;
+                    continue;
+                }
+
+                try {
+                    await prisma.securitySetTransaction.create({
+                        data: {
+                            docCode: importDocument.docCode,
+                            documentId: importDocument.id,
+                            assetName,
+                            barcode,
+                            size: size || null,
+                            grade: grade || null,
+                            startWarranty: startWarranty || null,
+                            endWarranty: endWarranty || null,
+                            cheilPO: cheilPO || null,
+                            warehouseIn: warehouseIn || null,
+                            inStockDate: inStockDate || new Date(),
+                            unitIn: 1,
+                            fromVendor: fromVendor || null,
+                            mcsCodeIn: mcsCodeIn || null,
+                            fromShop: fromShop || null,
+                            remarkIn: remarkIn || "Import Security Set REFURBISHED",
+                        },
+                    });
+
+                    imported++;
+                } catch (err) {
+                    console.error(`Error importing security set row ${rowNum}:`, err);
+                    errors.push(`แถว ${rowNum}: เกิดข้อผิดพลาดในการบันทึก Security Set`);
+                    skipped++;
+                }
+
                 continue;
             }
 
