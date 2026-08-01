@@ -157,7 +157,7 @@ const FormBorrowSecurity = ({ mode = "user" }: { mode?: FormMode }) => {
 
   useEffect(() => {
     if (dataLoaded || isEdit || !data?.user) return;
-    getMe(data.user.email ?? '').then(me => {
+    getMe(data.user.id ?? '').then(me => {
       fetch("/api/document/generate").then(r => r.json()).then(json => {
         setFormData({
           docNumber: json.docCode || "",

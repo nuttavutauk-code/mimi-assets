@@ -96,6 +96,19 @@ export async function PUT(
 
     const body = await req.json();
 
+    // ตรวจสอบว่า email ซ้ำกับผู้ใช้คนอื่นไหม (ถ้ามีการกรอก)
+    if (body.email && body.email.trim()) {
+      const existingEmail = await prisma.user.findFirst({
+        where: { email: body.email.trim(), NOT: { id } },
+      });
+      if (existingEmail) {
+        return NextResponse.json(
+          { error: "Email already exists" },
+          { status: 409 }
+        );
+      }
+    }
+
     // เข้ารหัส password ถ้ามีส่งมา
     if (body.password) {
       body.password = await bcrypt.hash(body.password, 10);

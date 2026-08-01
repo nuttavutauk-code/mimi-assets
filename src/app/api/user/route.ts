@@ -117,6 +117,19 @@ export async function POST(req: Request) {
       );
     }
 
+    // ตรวจสอบว่า email ซ้ำไหม (ถ้ามีการกรอก)
+    if (body.email && body.email.trim()) {
+      const existingEmail = await prisma.user.findFirst({
+        where: { email: body.email.trim() },
+      });
+      if (existingEmail) {
+        return NextResponse.json(
+          { error: "Email already exists" },
+          { status: 409 }
+        );
+      }
+    }
+
     // เข้ารหัสรหัสผ่าน
     const hashedPassword = await bcrypt.hash(body.password, 10);
 
@@ -170,6 +183,19 @@ export async function PUT(req: Request) {
     }
 
     const body = await req.json();
+
+    // ตรวจสอบว่า email ซ้ำกับผู้ใช้คนอื่นไหม (ถ้ามีการกรอก)
+    if (body.email && body.email.trim()) {
+      const existingEmail = await prisma.user.findFirst({
+        where: { email: body.email.trim(), NOT: { id: Number(id) } },
+      });
+      if (existingEmail) {
+        return NextResponse.json(
+          { error: "Email already exists" },
+          { status: 409 }
+        );
+      }
+    }
 
     // เข้ารหัส password ถ้ามีส่งมา
     if (body.password) {

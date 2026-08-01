@@ -190,7 +190,7 @@ const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {
     const initForm = async () => {
       setLoading(true);
       try {
-        const me = await getMe(data?.user?.email ?? "");
+        const me = await getMe(data?.user?.id ?? "");
         const { user } = me;
         const docRes = await fetch("/api/document/generate");
         const { docCode } = await docRes.json();

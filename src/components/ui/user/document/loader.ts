@@ -2,14 +2,15 @@
 
 import { prisma } from "@/lib/prisma";
 
-export const getMe = async (email: string) => {
+export const getMe = async (userId: string) => {
   try {
-    if (!email) {
+    const id = Number(userId);
+    if (!userId || Number.isNaN(id)) {
       return { status: 500, error: "Unauthorized" }
     }
 
-    const user = await prisma.user.findFirst({
-      where: { email },
+    const user = await prisma.user.findUnique({
+      where: { id },
       select: {
         id: true,
         username: true,

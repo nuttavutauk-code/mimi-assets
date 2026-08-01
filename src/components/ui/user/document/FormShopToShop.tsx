@@ -60,7 +60,7 @@ const FormShopToShop = ({ mode = "user" }: { mode?: FormMode }) => {
     }).finally(() => setLoading(false));
   }, [editIdFromUrl, dataLoaded]);
 
-  useEffect(() => { if (dataLoaded || isEdit) return; getMe(data?.user?.email ?? '').then(me => { fetch("/api/document/generate").then(r => r.json()).then(json => { setFormData({ docNumber: json.docCode || "", fullName: `${me?.user?.firstName || ""} ${me?.user?.lastName || ""}`.trim() || "", company: me?.user?.company || "", phone: me?.user?.phone || "" }); setUserVendor(me?.user?.vendor || ""); }); }); }, [dataLoaded, isEdit]);
+  useEffect(() => { if (dataLoaded || isEdit) return; getMe(data?.user?.id ?? '').then(me => { fetch("/api/document/generate").then(r => r.json()).then(json => { setFormData({ docNumber: json.docCode || "", fullName: `${me?.user?.firstName || ""} ${me?.user?.lastName || ""}`.trim() || "", company: me?.user?.company || "", phone: me?.user?.phone || "" }); setUserVendor(me?.user?.vendor || ""); }); }); }, [dataLoaded, isEdit]);
 
   const searchShop = async (q: string) => { if (!q || q.length < 2) { setSearchResults([]); setShowDropdown(null); return; } const res = await fetch(`/api/shop/search?query=${encodeURIComponent(q)}&status=OPEN`); const json = await res.json(); const list = Array.isArray(json?.shops) ? json.shops : []; setSearchResults(list); if (list.length > 0) setShowDropdown; };
   const debouncedSearch = useMemo(() => debounce(searchShop, 300), []);

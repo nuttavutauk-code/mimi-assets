@@ -250,7 +250,7 @@ const FormRouting2Shops = ({ mode = "user" }: { mode?: FormMode }) => {
   useEffect(() => {
     if (isEdit || dataLoaded || !data?.user) return;
     setLoading(true);
-    getMe(data.user.email ?? "").then(me => {
+    getMe(data.user.id ?? "").then(me => {
       const { user } = me;
       fetch("/api/document/generate").then(r => r.json()).then(json => {
         setFormData({

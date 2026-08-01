@@ -93,7 +93,7 @@ const FormRepair = ({ mode = "user" }: { mode?: FormMode }) => {
     if (dataLoaded || isEdit) return;
     const initForm = async () => {
       try {
-        const me = await getMe(data?.user?.email ?? "");
+        const me = await getMe(data?.user?.id ?? "");
         const res = await fetch("/api/document/generate");
         const json = await res.json();
         setFormData({ docNumber: json.docCode || "", fullName: `${me?.user?.firstName || ""} ${me?.user?.lastName || ""}`.trim() || "", company: me?.user?.company || "", phone: me?.user?.phone || "" });
