@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { SimplePagination } from "@/components/ui/SimplePagination";
 import { Search, Package, Loader2, Eye } from "lucide-react";
@@ -21,7 +21,6 @@ interface PickTask {
 }
 
 export default function AdminPickAsset() {
-  const router = useRouter();
   const [search, setSearch] = useState("");
   const [tasks, setTasks] = useState<PickTask[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,10 +60,6 @@ export default function AdminPickAsset() {
     pending: { text: "รอดำเนินการ", className: "status-badge pending" },
     picking: { text: "กำลังดำเนินการ", className: "status-badge completed" },
     completed: { text: "เสร็จสิ้น", className: "status-badge approved" },
-  };
-
-  const handleViewTask = (documentId: number, shopCode: string) => {
-    router.push(`/dashboard/admin-pick/${documentId}?shopCode=${encodeURIComponent(shopCode)}`);
   };
 
   const formatDate = (dateString: string) => {
@@ -165,13 +160,13 @@ export default function AdminPickAsset() {
                         </td>
                         <td>
                           <div className="flex justify-center">
-                            <button
-                              onClick={() => handleViewTask(item.documentId, item.shopCode || "")}
-                              className="p-2 rounded-lg hover:bg-blue-50 text-blue-500 transition-colors"
+                            <Link
+                              href={`/dashboard/admin-pick/${item.documentId}?shopCode=${encodeURIComponent(item.shopCode || "")}`}
+                              className="p-2 rounded-lg hover:bg-blue-50 text-blue-500 transition-colors inline-flex"
                               title="ดูรายละเอียด"
                             >
-                              <Eye className="w-4 h-4" />
-                            </button>
+                              <Eye className="w-4 h-4 pointer-events-none" />
+                            </Link>
                           </div>
                         </td>
                       </tr>
@@ -242,13 +237,13 @@ export default function AdminPickAsset() {
                     </div>
                   </div>
 
-                  <button
-                    onClick={() => handleViewTask(item.documentId, item.shopCode || "")}
+                  <Link
+                    href={`/dashboard/admin-pick/${item.documentId}?shopCode=${encodeURIComponent(item.shopCode || "")}`}
                     className="w-full py-2.5 rounded-lg bg-blue-50 text-blue-600 font-medium text-sm flex items-center justify-center gap-2"
                   >
-                    <Eye className="w-4 h-4" />
+                    <Eye className="w-4 h-4 pointer-events-none" />
                     ดูรายละเอียด
-                  </button>
+                  </Link>
                 </div>
               );
             })}
