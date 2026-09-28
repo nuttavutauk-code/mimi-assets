@@ -41,6 +41,7 @@ import {
     Truck,
     ScrollText,
     ScanBarcode,
+    Receipt,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 
@@ -69,6 +70,7 @@ const ADMIN_MENU = [
     { href: "/dashboard/admin-database", label: "Database", icon: Database },
     { href: "/dashboard/admin-database-security-set", label: "Database Security Set", icon: ShieldCheck },
     { href: "/dashboard/admin-barcode-check", label: "ตรวจสอบ Barcode", icon: ScanBarcode },
+    { href: "/dashboard/admin-po-tracking", label: "PO Cost Tracking", icon: Receipt },
     {
         group: "ดูรายการทำงาน",
         icon: Eye,

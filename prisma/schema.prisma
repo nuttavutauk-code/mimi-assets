@@ -463,6 +463,53 @@ model AuditLog {
   @@index([createdAt])
 }
 
+// ✅ ========== PoTrackingRow Model (PO Cost Tracking — 1 แถวต่อ 1 asset line, ไม่ผูกกับตารางเดิม) ==========
+model PoTrackingRow {
+  id         Int    @id @default(autoincrement())
+  jobGroupId String @db.VarChar(50) // รวมแถวที่มาจากการอัปโหลด PDF ชุดเดียวกัน
+
+  // 28 คอลัมน์ตาม template Excel (เรียงตามลำดับ)
+  no                     String?
+  vendor                 String?
+  jobType                String?
+  assetType              String?  @db.Text
+  assetType2             String?
+  orderQty               Float?
+  estimate               String? // D/M/YYYY
+  totalCost              Float?
+  costPerUnit            Float?
+  newProductionUnitPrice String?
+  savingCostPerUnit      String?
+  savingCostPerUnitPct   String?
+  totalNewProduction     String?
+  totalSavingCost        String?
+  ssPo                   String?
+  ssPoDate               String? // DATE (D/M/YYYY)
+  quarter                String?
+  month                  String?
+  chPo                   String?
+  chPoDate               String? // DATE3 (D/M/YYYY)
+  jobNo                  String?
+  doneBy                 String?
+  actualLeadtime         String?
+  targetingLeadtime      String?
+  status                 String?
+  pm                     String?
+  sentReportToTse        String?
+  remark1                String?  @db.Text
+
+  aiRaw       Json? // ผลดิบจาก AI ไว้ตรวจสอบย้อนหลัง
+  createdById Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([jobGroupId])
+  @@index([jobNo])
+  @@index([chPo])
+  @@index([ssPo])
+  @@index([createdAt])
+}
+
 // ✅ ========== TransferReceiveTask Model (งานรับของโอนย้าย) ==========
 model TransferReceiveTask {
   id         Int      @id @default(autoincrement())

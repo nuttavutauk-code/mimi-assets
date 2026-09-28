@@ -56,6 +56,7 @@ export async function middleware(req: NextRequest) {
         "/api/document/approve",
         "/api/library/ses/import",
         "/api/library/sis/import",
+        "/api/po-tracking",
     ];
 
     const isAdminPath = adminOnlyPaths.some(p => path.startsWith(p));
