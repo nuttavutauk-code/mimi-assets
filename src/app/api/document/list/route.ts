@@ -37,6 +37,7 @@ export async function GET(req: Request) {
     const docCode = searchParams.get("docCode")?.trim() || "";
     const vendor = searchParams.get("vendor")?.trim() || "";
     const documentType = searchParams.get("documentType")?.trim() || "";
+    const documentTypes = documentType ? documentType.split(",").map((t) => t.trim()).filter(Boolean) : [];
     const status = searchParams.get("status")?.trim() || "";
     const page = parseInt(searchParams.get("page") || "1", 10);
     const limit = parseInt(searchParams.get("limit") || "10", 10);
@@ -60,7 +61,11 @@ export async function GET(req: Request) {
       AND: [
         docCode ? { docCode: { contains: docCode, mode: Prisma.QueryMode.insensitive } } : {},
         vendor ? { company: { contains: vendor, mode: Prisma.QueryMode.insensitive } } : {},
-        documentType ? { documentType: { equals: documentType } } : {},
+        documentTypes.length > 1
+          ? { documentType: { in: documentTypes } }
+          : documentTypes.length === 1
+          ? { documentType: { equals: documentTypes[0] } }
+          : {},
         status ? { status: { equals: status } } : {},
       ],
     };

@@ -253,13 +253,13 @@ const FormReturnAsset = ({ mode = "user" }: { mode?: FormMode }) => {
       setBorrowDocError("");
       return;
     }
-    const docType = condition === "from_borrow_security" ? "borrowsecurity" : "borrow";
+    const docType = condition === "from_borrow_security" ? "borrowsecurity,borrowSecurityRouting" : "borrow";
     setBorrowDocLoading(true);
     setBorrowDocError("");
     setBorrowDocData(null);
     try {
       const listEndpoint = mode === "admin" ? "/api/document/list-all" : "/api/document/list";
-      const listRes = await fetch(`${listEndpoint}?docCode=${encodeURIComponent(docNum.trim())}&documentType=${docType}&limit=20`);
+      const listRes = await fetch(`${listEndpoint}?docCode=${encodeURIComponent(docNum.trim())}&documentType=${encodeURIComponent(docType)}&limit=20`);
       const listJson = await listRes.json();
       const found = (listJson.documents || []).find((d: any) => d.docCode === docNum.trim());
       if (!found) {

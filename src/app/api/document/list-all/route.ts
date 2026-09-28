@@ -43,6 +43,7 @@ export async function GET(req: Request) {
         const docCode = searchParams.get("docCode")?.trim() || "";
         const vendor = searchParams.get("vendor")?.trim() || "";
         const documentType = searchParams.get("documentType")?.trim() || "";
+        const documentTypes = documentType ? documentType.split(",").map((t) => t.trim()).filter(Boolean) : [];
         const status = searchParams.get("status")?.trim() || "";
         const createdBy = searchParams.get("createdBy")?.trim() || "";
         const dateFrom = searchParams.get("dateFrom")?.trim() || "";
@@ -56,7 +57,11 @@ export async function GET(req: Request) {
             AND: [
                 docCode ? { docCode: { contains: docCode, mode: Prisma.QueryMode.insensitive } } : {},
                 vendor ? { company: { contains: vendor, mode: Prisma.QueryMode.insensitive } } : {},
-                documentType ? { documentType: { equals: documentType } } : {},
+                documentTypes.length > 1
+                    ? { documentType: { in: documentTypes } }
+                    : documentTypes.length === 1
+                    ? { documentType: { equals: documentTypes[0] } }
+                    : {},
                 status ? { status: { equals: status } } : {},
                 createdBy ? { fullName: { contains: createdBy, mode: Prisma.QueryMode.insensitive } } : {},
                 dateFrom ? { createdAt: { gte: new Date(dateFrom + "T00:00:00.000+07:00") } } : {},
