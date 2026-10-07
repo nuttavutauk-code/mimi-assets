@@ -253,7 +253,7 @@ export default function AdminList() {
           <>
             <div className="overflow-x-auto">
               <table className="glass-table w-full">
-                <thead><tr className="bg-black/2"><th className="text-center">เลขเอกสาร</th><th className="text-center">ผู้สร้าง</th><th className="text-center">Vendor</th><th className="text-center">วันที่</th><th className="text-center">ประเภท</th><th className="text-center">สถานะ</th><th className="text-center">สถานะ Pick Asset</th><th className="text-center">จัดการ</th></tr></thead>
+                <thead><tr className="bg-black/2"><th className="text-center w-[120px] min-w-[120px] whitespace-nowrap">เลขเอกสาร</th><th className="text-center">Vendor</th><th className="text-center min-w-[240px]">Shop Name</th><th className="text-center">วันที่</th><th className="text-center">ประเภท</th><th className="text-center">สถานะ</th><th className="text-center">สถานะ Pick Asset</th><th className="text-center">จัดการ</th></tr></thead>
                 <tbody>
                   {data.map((item, i) => {
                     const statusInfo = statusConfig[item.status] || { text: item.status, className: "status-badge" };
@@ -265,16 +265,17 @@ export default function AdminList() {
                     const pickStatus = pickStatusConfig[item.pickAssetStatus] || { text: "-", className: "text-gray-400" };
                     return (
                       <tr key={i}>
-                        <td className="font-medium text-primary">{item.docCode}</td>
-                        <td>
-                          <div className="flex items-center gap-2">
-                            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-pink-400 to-orange-400 flex items-center justify-center text-white text-xs font-medium">
-                              {item.createdByUsername?.substring(0, 1).toUpperCase() || "?"}
-                            </div>
-                            <span className="text-sm">{item.createdByUsername || "-"}</span>
-                          </div>
+                        <td className="w-[120px] min-w-[120px] whitespace-nowrap font-medium text-primary">{item.docCode}</td>
+                        <td className="whitespace-nowrap" title={item.company || undefined}>
+                          {item.company ? (item.company.length > 10 ? `${item.company.slice(0, 10)}...` : item.company) : "-"}
                         </td>
-                        <td>{item.company || "-"}</td>
+                        <td>
+                          {item.shopNames?.length ? (
+                            <div className="flex flex-col gap-0.5 text-sm min-w-[240px]">
+                              {item.shopNames.map((name: string) => (<span key={name}>{name}</span>))}
+                            </div>
+                          ) : "-"}
+                        </td>
                         <td>{new Date(item.createdAt).toLocaleDateString("th-TH", { day: "2-digit", month: "short", year: "numeric" })}</td>
                         <td>{typeMap[item.documentType] || item.documentType}</td>
                         <td><span className={statusInfo.className}><span className="w-1.5 h-1.5 rounded-full bg-current" />{statusInfo.text}</span></td>
@@ -322,6 +323,9 @@ export default function AdminList() {
                     <div>
                       <p className="font-semibold text-foreground">{item.docCode}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">โดย {item.createdByUsername || "-"}</p>
+                      {item.shopNames?.length > 0 && (
+                        <p className="text-xs text-muted-foreground mt-0.5">ร้าน: {item.shopNames.join(", ")}</p>
+                      )}
                     </div>
                     <span className={statusInfo.className}>{statusInfo.text}</span>
                   </div>

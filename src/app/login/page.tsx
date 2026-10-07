@@ -167,7 +167,7 @@ export default function LoginPage() {
 
         {/* Version */}
         <p className="text-center text-xs text-muted-foreground mt-4">
-          v1.0.62 MiMi-Assets
+          v1.0.63 MiMi-Assets
         </p>
       </div>
     </div>

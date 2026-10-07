@@ -55,6 +55,8 @@ export async function GET(req: Request) {
         // ✅ กำหนด where เงื่อนไข
         const where: Prisma.DocumentWhereInput = {
             AND: [
+                // ซ่อนเอกสารที่ระบบสร้างเองตอน Import Asset มือสอง
+                { documentType: { not: "IMPORT_USED" } },
                 docCode ? { docCode: { contains: docCode, mode: Prisma.QueryMode.insensitive } } : {},
                 vendor ? { company: { contains: vendor, mode: Prisma.QueryMode.insensitive } } : {},
                 documentTypes.length > 1
@@ -91,6 +93,12 @@ export async function GET(req: Request) {
                             status: true,
                         },
                     },
+                    shops: {
+                        select: {
+                            shopName: true,
+                        },
+                        orderBy: { id: "asc" },
+                    },
                 },
             }),
             prisma.document.count({ where }),
@@ -120,12 +128,18 @@ export async function GET(req: Request) {
                 }
             }
 
-            // ลบ pickTasks และเพิ่ม createdByUsername
-            const { pickTasks, createdBy: creator, ...docWithoutTasks } = doc;
+            // ลบ pickTasks และเพิ่ม createdByUsername + shopNames (ไม่ซ้ำ/ไม่ว่าง)
+            const { pickTasks, createdBy: creator, shops, ...docWithoutTasks } = doc;
+            const shopNames = [
+                ...new Set(
+                    shops.map((s) => s.shopName?.trim()).filter((name): name is string => !!name)
+                ),
+            ];
 
             return {
                 ...docWithoutTasks,
                 createdByUsername: creator?.username || creator?.firstName || "-",
+                shopNames,
                 pickAssetStatus,
             };
         });
