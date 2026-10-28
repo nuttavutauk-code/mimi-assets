@@ -51,3 +51,6 @@ public/uploads/
 
 # Claude Code agent worktrees (temporary, machine-local)
 .claude/worktrees/
+# ไฟล์ที่มีข้อมูลลับ (ห้าม commit)
+mimi-assets.zip
+prisma/data/User.json

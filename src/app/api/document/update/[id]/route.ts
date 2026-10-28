@@ -27,6 +27,23 @@ export async function PUT(
         const documentId = parseInt(id);
         const body = await req.json();
 
+        // ✅ User ทั่วไปแก้ได้เฉพาะเอกสารของตัวเอง และส่งได้แค่ status "submitted"
+        if (session.user.role !== "ADMIN") {
+            const existing = await prisma.document.findUnique({
+                where: { id: documentId },
+                select: { createdById: true },
+            });
+            if (!existing) {
+                return NextResponse.json({ success: false, message: "ไม่พบเอกสาร" }, { status: 404 });
+            }
+            if (String(existing.createdById) !== String(session.user.id)) {
+                return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
+            }
+            if (body.status && body.status !== "submitted") {
+                return NextResponse.json({ success: false, message: "Forbidden: Admin only" }, { status: 403 });
+            }
+        }
+
         const {
             documentType,
             docCode,

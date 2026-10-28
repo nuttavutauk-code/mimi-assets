@@ -47,6 +47,11 @@ export async function GET(
             return NextResponse.json({ success: false, message: "ไม่พบเอกสาร" }, { status: 404 });
         }
 
+        // ✅ User ทั่วไปดูได้เฉพาะเอกสารของตัวเอง
+        if (session.user.role !== "ADMIN" && String(doc.createdById) !== String(session.user.id)) {
+            return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
+        }
+
         // ✅ ดึง PickAssetTask มาผูก barcode กลับให้แต่ละ asset/security row (สำหรับ download/preview)
         // จัดกลุ่ม tasks ตาม assetName + shopCode → array ของ barcode ตามลำดับ
         const pickTasks = await prisma.pickAssetTask.findMany({
