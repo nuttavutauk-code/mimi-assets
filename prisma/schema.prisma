@@ -548,3 +548,14 @@ model TransferReceiveTask {
   @@index([status])
   @@index([pickAssetTaskId])
 }
+
+// ✅ ========== AutoBarcodeRule Model (ตั้งค่าการเลือก Barcode อัตโนมัติตาม Asset Name) ==========
+model AutoBarcodeRule {
+  id            Int      @id @default(autoincrement())
+  assetName     String   @unique // ชื่อ Asset (หรือชื่อ CONTROLBOX)
+  warehouse1    String // โกดังลำดับที่ 1
+  warehouse2    String? // โกดังลำดับที่ 2 (ไม่บังคับ)
+  isSecuritySet Boolean  @default(false) // true = CONTROLBOX (ดึงจาก SecuritySetTransaction)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}

@@ -42,6 +42,7 @@ import {
     ScrollText,
     ScanBarcode,
     Receipt,
+    Wand2,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 
@@ -89,6 +90,7 @@ const ADMIN_MENU = [
             { href: "/dashboard/admin-asset", label: "Asset", icon: PackageOpen },
             { href: "/dashboard/admin-library-ses", label: "Library SES", icon: Library },
             { href: "/dashboard/admin-library-sis", label: "Library SIS", icon: Library },
+            { href: "/dashboard/admin-auto-barcode", label: "ตั้งค่า Auto Barcode", icon: Wand2 },
         ],
     },
     { href: "/dashboard/admin-audit-log", label: "Audit Log", icon: ScrollText },

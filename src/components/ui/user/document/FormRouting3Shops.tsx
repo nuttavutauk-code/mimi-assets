@@ -14,6 +14,8 @@ import OtherActivitiesSelect, { OtherActivity } from "@/components/ui/admin/Othe
 import StatusSelect, { StatusOption } from "@/components/ui/admin/StatusSelect";
 import PreviewApproveModal from "@/components/ui/PreviewApproveModal";
 import BarcodeAssignSelector from "@/components/ui/admin/BarcodeAssignSelector";
+import AutoBarcodeButton from "@/components/ui/admin/AutoBarcodeButton";
+import { runAutoForAssetRow, runAutoForSecuritySet } from "@/lib/autoBarcodeClient";
 import { flattenBarcodes } from "@/lib/barcodeExclude";
 import { getErrorMessage } from "@/lib/utils";
 
@@ -433,6 +435,8 @@ const FormRouting3Shops = ({ mode = "user" }: { mode?: FormMode }) => {
     const assetBarcodes = shopNum === 1 ? assetBarcodes1 : shopNum === 2 ? assetBarcodes2 : assetBarcodes3;
     const setAssetBarcodes = shopNum === 1 ? setAssetBarcodes1 : shopNum === 2 ? setAssetBarcodes2 : setAssetBarcodes3;
     const otherShopsAssetBarcodes = [shopNum !== 1 ? assetBarcodes1 : null, shopNum !== 2 ? assetBarcodes2 : null, shopNum !== 3 ? assetBarcodes3 : null].filter((b): b is Record<number, string[]> => b !== null);
+    const setSizeOptions = shopNum === 1 ? setSizeOptions1 : shopNum === 2 ? setSizeOptions2 : setSizeOptions3;
+    const showAuto = mode === "admin" && !isReadOnly;
 
     return (
       <div className="glass-card p-4 sm:p-5">
@@ -444,7 +448,7 @@ const FormRouting3Shops = ({ mode = "user" }: { mode?: FormMode }) => {
           {assets.map((asset) => (
             <div key={asset.id} className="p-4 rounded-xl bg-black/2 border border-black/5">
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-                <div className="sm:col-span-4 relative">
+                <div className={`${showAuto ? "sm:col-span-3" : "sm:col-span-4"} relative`}>
                   <label className="block text-xs text-muted-foreground mb-1">Asset Name <span className="text-red-500">*</span></label>
                   <div className="relative">
                     <Input value={asset.name} onChange={(e) => { if (!asset.isSelected) { setAssets(p => p.map(a => a.id === asset.id ? { ...a, name: e.target.value } : a)); debouncedAssetSearch(e.target.value, asset.id); } }} onFocus={() => !asset.isSelected && assetSearchResults.length > 0 && setShowAssetDropdown(p => ({ ...p, [asset.id]: true }))} onBlur={() => setTimeout(() => setShowAssetDropdown(p => ({ ...p, [asset.id]: false })), 200)} placeholder="พิมพ์ชื่อ Asset..." readOnly={asset.isSelected} className={`glass-input ${asset.isSelected ? "pr-10 bg-gray-50" : ""}`} />
@@ -464,7 +468,7 @@ const FormRouting3Shops = ({ mode = "user" }: { mode?: FormMode }) => {
                 <div className="sm:col-span-2"><label className="block text-xs text-muted-foreground mb-1">KV</label><Input value={asset.kv} onChange={(e) => setAssets(p => p.map(a => a.id === asset.id ? { ...a, kv: e.target.value } : a))} placeholder="KV" className="glass-input text-center" /></div>
                 <div className="sm:col-span-1"><label className="block text-xs text-muted-foreground mb-1">จำนวน</label><Input type="number" min={1} value={asset.qty} onChange={(e) => setAssets(p => p.map(a => a.id === asset.id ? { ...a, qty: Math.max(1, +e.target.value) } : a))} className="glass-input text-center" /></div>
                 {mode === "admin" && (<div className="sm:col-span-2"><label className="block text-xs text-muted-foreground mb-1">โกดัง</label><Select value={asset.withdrawFor} onValueChange={(v) => setAssets(p => p.map(a => a.id === asset.id ? { ...a, withdrawFor: v } : a))}><SelectTrigger className="glass-input"><SelectValue placeholder="เลือก" /></SelectTrigger><SelectContent>{vendors.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent></Select></div>)}
-                {assets.length > 1 && (<div className="flex items-end"><button onClick={() => setAssets(p => p.filter(a => a.id !== asset.id))} className="p-2 rounded-lg bg-red-50 text-red-500 hover:bg-red-100"><Trash2 className="w-4 h-4" /></button></div>)}
+                {(assets.length > 1 || showAuto) && (<div className={`${showAuto ? "sm:col-span-2" : ""} flex items-end gap-1`}>{showAuto && asset.name && (<AutoBarcodeButton onAuto={() => runAutoForAssetRow({ row: asset, rows: assets, maxRows: 6, exclude: [...flattenBarcodes(assetBarcodes, asset.id), ...otherShopsAssetBarcodes.flatMap(rec => flattenBarcodes(rec))], idCounter: assetIdCounter, setRows: setAssets, setBarcodes: setAssetBarcodes, setSizeOptions })} />)}{assets.length > 1 && (<button onClick={() => setAssets(p => p.filter(a => a.id !== asset.id))} className="p-2 rounded-lg bg-red-50 text-red-500 hover:bg-red-100"><Trash2 className="w-4 h-4" /></button>)}</div>)}
               </div>
               {mode === "admin" && asset.name && (
                 <div className="mt-3 p-3 rounded-lg bg-blue-50/40 border border-blue-200">
@@ -490,6 +494,7 @@ const FormRouting3Shops = ({ mode = "user" }: { mode?: FormMode }) => {
     const securityBarcodes = shopNum === 1 ? securityBarcodes1 : shopNum === 2 ? securityBarcodes2 : securityBarcodes3;
     const setSecurityBarcodes = shopNum === 1 ? setSecurityBarcodes1 : shopNum === 2 ? setSecurityBarcodes2 : setSecurityBarcodes3;
     const otherBarcodesAll = [shopNum !== 1 ? securityBarcodes1 : null, shopNum !== 2 ? securityBarcodes2 : null, shopNum !== 3 ? securityBarcodes3 : null].filter((b): b is Record<number, string[]> => b !== null);
+    const showAuto = mode === "admin" && !isReadOnly;
 
     return (
       <div className="glass-card p-4 sm:p-5">
@@ -498,10 +503,10 @@ const FormRouting3Shops = ({ mode = "user" }: { mode?: FormMode }) => {
           {securitySets.map(set => (
             <div key={set.id} className="p-4 rounded-xl bg-black/2 border border-black/5">
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
-                <div className="sm:col-span-6"><label className="block text-xs text-muted-foreground mb-1">ชื่อ Security</label><Input value={set.name} readOnly className="glass-input bg-black/5" /></div>
+                <div className={showAuto ? "sm:col-span-5" : "sm:col-span-6"}><label className="block text-xs text-muted-foreground mb-1">ชื่อ Security</label><Input value={set.name} readOnly className="glass-input bg-black/5" /></div>
                 <div className="sm:col-span-2"><label className="block text-xs text-muted-foreground mb-1">จำนวน</label><Input type="number" min={0} value={set.qty} onChange={(e) => { const newQty = Math.max(0, +e.target.value); const defaultVendor = vendors.find(v => v === "NEWLOOK") || vendors[0] || ""; setSecuritySets(p => p.map(s => s.id === set.id ? { ...s, qty: newQty, withdrawFor: newQty > 0 && !s.withdrawFor && defaultVendor ? defaultVendor : (newQty === 0 ? "" : s.withdrawFor) } : s)); }} className="glass-input text-center" /></div>
                 {mode === "admin" && (<div className="sm:col-span-4"><label className="block text-xs text-muted-foreground mb-1">โกดัง</label><Select value={set.withdrawFor} onValueChange={(v) => setSecuritySets(p => p.map(s => s.id === set.id ? { ...s, withdrawFor: v } : s))}><SelectTrigger className="glass-input"><SelectValue placeholder="เลือก" /></SelectTrigger><SelectContent>{vendors.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent></Select></div>)}
-              </div>
+              {showAuto && (<div className="sm:col-span-1 flex items-end">{set.qty > 0 && !set.name.includes("Security Type C") && (<AutoBarcodeButton onAuto={() => runAutoForSecuritySet({ set, exclude: otherBarcodesAll.flatMap(b => (b[set.id] || []).filter(Boolean)), setSets: setSecuritySets, setBarcodes: setSecurityBarcodes })} />)}</div>)}</div>
               {mode === "admin" && set.qty > 0 && !set.name.includes("Security Type C") && (
                 <div className="mt-3 p-3 rounded-lg bg-blue-50/40 border border-blue-200">
                   <label className="block text-xs text-blue-700 font-medium mb-2">เลือก Barcode (qty {set.qty})</label>

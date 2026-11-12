@@ -14,6 +14,8 @@ import OtherActivitiesSelect, { OtherActivity } from "@/components/ui/admin/Othe
 import StatusSelect, { StatusOption } from "@/components/ui/admin/StatusSelect";
 import PreviewApproveModal from "@/components/ui/PreviewApproveModal";
 import BarcodeAssignSelector from "@/components/ui/admin/BarcodeAssignSelector";
+import AutoBarcodeButton from "@/components/ui/admin/AutoBarcodeButton";
+import { runAutoForAssetRow, runAutoForSecuritySet } from "@/lib/autoBarcodeClient";
 import { flattenBarcodes } from "@/lib/barcodeExclude";
 import { getErrorMessage } from "@/lib/utils";
 
@@ -609,6 +611,8 @@ const FormRouting2Shops = ({ mode = "user" }: { mode?: FormMode }) => {
     const assetBarcodes = shopNum === 1 ? assetBarcodes1 : assetBarcodes2;
     const setAssetBarcodes = shopNum === 1 ? setAssetBarcodes1 : setAssetBarcodes2;
     const otherShopsAssetBarcodes = [shopNum === 1 ? assetBarcodes2 : assetBarcodes1];
+    const setSizeOptions = shopNum === 1 ? setSizeOptions1 : setSizeOptions2;
+    const showAuto = mode === "admin" && !isReadOnly;
 
     return (
       <div className="glass-card p-4 sm:p-5">
@@ -625,7 +629,7 @@ const FormRouting2Shops = ({ mode = "user" }: { mode?: FormMode }) => {
           {assets.map((asset, idx) => (
             <div key={asset.id} className="p-4 rounded-xl bg-black/2 border border-black/5">
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-                <div className="sm:col-span-4 relative">
+                <div className={`${showAuto ? "sm:col-span-3" : "sm:col-span-4"} relative`}>
                   <label className="block text-xs text-muted-foreground mb-1">Asset Name <span className="text-red-500">*</span></label>
                   <div className="relative">
                     <Input 
@@ -777,11 +781,20 @@ const FormRouting2Shops = ({ mode = "user" }: { mode?: FormMode }) => {
                     </Select>
                   </div>
                 )}
-                {assets.length > 1 && (
-                  <div className="flex items-end">
-                    <button onClick={() => setAssets(p => p.filter(a => a.id !== asset.id))} className="p-2 rounded-lg bg-red-50 text-red-500 hover:bg-red-100">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                {(assets.length > 1 || showAuto) && (
+                  <div className={`${showAuto ? "sm:col-span-2" : ""} flex items-end gap-1`}>
+                    {showAuto && asset.name && (
+                      <AutoBarcodeButton onAuto={() => runAutoForAssetRow({
+                        row: asset, rows: assets, maxRows: 9,
+                        exclude: [...flattenBarcodes(assetBarcodes, asset.id), ...otherShopsAssetBarcodes.flatMap(rec => flattenBarcodes(rec))],
+                        idCounter: assetIdCounter, setRows: setAssets, setBarcodes: setAssetBarcodes, setSizeOptions,
+                      })} />
+                    )}
+                    {assets.length > 1 && (
+                      <button onClick={() => setAssets(p => p.filter(a => a.id !== asset.id))} className="p-2 rounded-lg bg-red-50 text-red-500 hover:bg-red-100">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -810,6 +823,7 @@ const FormRouting2Shops = ({ mode = "user" }: { mode?: FormMode }) => {
     const securityBarcodes = shopNum === 1 ? securityBarcodes1 : securityBarcodes2;
     const setSecurityBarcodes = shopNum === 1 ? setSecurityBarcodes1 : setSecurityBarcodes2;
     const otherBarcodes = shopNum === 1 ? securityBarcodes2 : securityBarcodes1;
+    const showAuto = mode === "admin" && !isReadOnly;
 
     return (
       <div className="glass-card p-4 sm:p-5">
@@ -821,7 +835,7 @@ const FormRouting2Shops = ({ mode = "user" }: { mode?: FormMode }) => {
           {securitySets.map(set => (
             <div key={set.id} className="p-4 rounded-xl bg-black/2 border border-black/5">
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
-                <div className="sm:col-span-6">
+                <div className={showAuto ? "sm:col-span-5" : "sm:col-span-6"}>
                   <label className="block text-xs text-muted-foreground mb-1">ชื่อ Security</label>
                   <Input value={set.name} readOnly className="glass-input bg-black/5" />
                 </div>
@@ -836,6 +850,15 @@ const FormRouting2Shops = ({ mode = "user" }: { mode?: FormMode }) => {
                       <SelectTrigger className="glass-input"><SelectValue placeholder="เลือก" /></SelectTrigger>
                       <SelectContent>{vendors.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent>
                     </Select>
+                  </div>
+                )}
+                {showAuto && (
+                  <div className="sm:col-span-1 flex items-end">
+                    {set.qty > 0 && !set.name.includes("Security Type C") && (
+                      <AutoBarcodeButton onAuto={() => runAutoForSecuritySet({
+                        set, exclude: (otherBarcodes[set.id] || []).filter(Boolean), setSets: setSecuritySets, setBarcodes: setSecurityBarcodes,
+                      })} />
+                    )}
                   </div>
                 )}
               </div>

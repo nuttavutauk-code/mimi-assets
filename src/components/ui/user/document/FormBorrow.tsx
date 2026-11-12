@@ -14,6 +14,8 @@ import OtherActivitiesSelect, { OtherActivity } from "@/components/ui/admin/Othe
 import StatusSelect, { StatusOption } from "@/components/ui/admin/StatusSelect";
 import PreviewApproveModal from "@/components/ui/PreviewApproveModal";
 import BarcodeAssignSelector from "@/components/ui/admin/BarcodeAssignSelector";
+import AutoBarcodeButton from "@/components/ui/admin/AutoBarcodeButton";
+import { runAutoForAssetRow } from "@/lib/autoBarcodeClient";
 import { flattenBarcodes } from "@/lib/barcodeExclude";
 import { getErrorMessage } from "@/lib/utils";
 
@@ -429,7 +431,7 @@ const FormBorrow = ({ mode = "user" }: { mode?: FormMode }) => {
           {assets.map((asset, idx) => (
             <div key={asset.id} className="p-4 rounded-xl bg-black/2 border border-black/5">
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-                <div className={`${mode === "admin" ? "sm:col-span-4" : "sm:col-span-5"} relative`}>
+                <div className={`${mode === "admin" && !isReadOnly ? "sm:col-span-3" : mode === "admin" ? "sm:col-span-4" : "sm:col-span-5"} relative`}>
                   <label className="block text-xs text-muted-foreground mb-1">Asset Name <span className="text-red-500">*</span></label>
                   <div className="relative">
                     <Input 
@@ -464,7 +466,17 @@ const FormBorrow = ({ mode = "user" }: { mode?: FormMode }) => {
                 <div className="sm:col-span-2"><label className="block text-xs text-muted-foreground mb-1">KV</label><Input value={asset.kv} onChange={(e) => setAssets(p => p.map(a => a.id === asset.id ? { ...a, kv: e.target.value } : a))} placeholder="KV" className="glass-input" /></div>
                 <div className={mode === "admin" ? "sm:col-span-1" : "sm:col-span-2"}><label className="block text-xs text-muted-foreground mb-1">จำนวน</label><Input type="number" min={1} value={asset.qty} onChange={(e) => setAssets(p => p.map(a => a.id === asset.id ? { ...a, qty: Math.max(1, +e.target.value) } : a))} placeholder="1" className="glass-input text-center" /></div>
                 {mode === "admin" && (<div className="sm:col-span-2"><label className="block text-xs text-muted-foreground mb-1">โกดัง</label><Select value={asset.withdrawFor} onValueChange={(v) => setAssets(p => p.map(a => a.id === asset.id ? { ...a, withdrawFor: v } : a))}><SelectTrigger className="glass-input"><SelectValue placeholder="เลือก" /></SelectTrigger><SelectContent>{vendors.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent></Select></div>)}
-                {assets.length > 1 && <div className="flex items-end"><button onClick={() => setAssets(p => p.filter(a => a.id !== asset.id))} className="p-2 rounded-lg bg-red-50 text-red-500 hover:bg-red-100"><Trash2 className="w-4 h-4" /></button></div>}
+                {(assets.length > 1 || (mode === "admin" && !isReadOnly)) && (
+                  <div className={`${mode === "admin" && !isReadOnly ? "sm:col-span-2" : ""} flex items-end gap-1`}>
+                    {mode === "admin" && !isReadOnly && asset.name && (
+                      <AutoBarcodeButton onAuto={() => runAutoForAssetRow({
+                        row: asset, rows: assets, maxRows: 5, exclude: flattenBarcodes(assetBarcodes, asset.id),
+                        idCounter: assetIdCounter, setRows: setAssets, setBarcodes: setAssetBarcodes, setSizeOptions,
+                      })} />
+                    )}
+                    {assets.length > 1 && <button onClick={() => setAssets(p => p.filter(a => a.id !== asset.id))} className="p-2 rounded-lg bg-red-50 text-red-500 hover:bg-red-100"><Trash2 className="w-4 h-4" /></button>}
+                  </div>
+                )}
               </div>
               {mode === "admin" && !isReadOnly && asset.name && (
                 <div className="mt-3 p-3 rounded-lg bg-blue-50/40 border border-blue-200">

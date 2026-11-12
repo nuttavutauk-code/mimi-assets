@@ -14,6 +14,8 @@ import OtherActivitiesSelect, { OtherActivity } from "@/components/ui/admin/Othe
 import StatusSelect, { StatusOption } from "@/components/ui/admin/StatusSelect";
 import PreviewApproveModal from "@/components/ui/PreviewApproveModal";
 import BarcodeAssignSelector from "@/components/ui/admin/BarcodeAssignSelector";
+import AutoBarcodeButton from "@/components/ui/admin/AutoBarcodeButton";
+import { applyAutoPlanToRows, autoPlanBarcodes, planAutoForAssetRow, runAutoForSecuritySet } from "@/lib/autoBarcodeClient";
 import { flattenBarcodes } from "@/lib/barcodeExclude";
 import { getErrorMessage } from "@/lib/utils";
 
@@ -382,6 +384,51 @@ const FormBorrowSecurityRouting = ({ mode = "user" }: { mode?: FormMode }) => {
   };
 
   const otherShopsOf = (shopId: number) => shops.filter((s) => s.id !== shopId);
+
+  // ── Auto Barcode ───────────────────────────────────────────────────────────
+  const handleAutoAsset = async (shopId: number, asset: AssetRow) => {
+    const shop = shops.find((s) => s.id === shopId);
+    if (!shop) return;
+    const exclude = [
+      ...flattenBarcodes(shop.assetBarcodes, asset.id),
+      ...otherShopsOf(shopId).flatMap((s) => flattenBarcodes(s.assetBarcodes)),
+    ];
+    const plan = await planAutoForAssetRow(asset, exclude, true);
+    if (!plan) return;
+    let newRowId: number | undefined;
+    if (plan.split) {
+      // id ต้องไม่ชนกับแถวที่โหลดมาจากเอกสาร
+      newRowId = Math.max(globalAssetIdCounter, ...shops.flatMap((s) => s.assets.map((a) => a.id + 1)));
+      globalAssetIdCounter = newRowId + 1;
+    }
+    setShops((prev) =>
+      prev.map((s) =>
+        s.id !== shopId
+          ? s
+          : {
+              ...s,
+              assets: applyAutoPlanToRows(s.assets, asset.id, plan, newRowId),
+              assetBarcodes: { ...s.assetBarcodes, ...autoPlanBarcodes(asset.id, plan, newRowId) },
+              sizeOptions:
+                newRowId !== undefined ? { ...s.sizeOptions, [newRowId]: s.sizeOptions[asset.id] || [] } : s.sizeOptions,
+            }
+      )
+    );
+  };
+
+  const handleAutoSecurity = async (shopId: number, set: SecuritySet) => {
+    const shop = shops.find((s) => s.id === shopId);
+    if (!shop) return;
+    await runAutoForSecuritySet({
+      set,
+      exclude: [
+        ...flattenBarcodes(shop.securityBarcodes, set.id),
+        ...otherShopsOf(shopId).flatMap((s) => flattenBarcodes(s.securityBarcodes)),
+      ],
+      setSets: (fn) => setShops((prev) => prev.map((s) => (s.id !== shopId ? s : { ...s, securitySets: fn(s.securitySets) }))),
+      setBarcodes: (fn) => setShops((prev) => prev.map((s) => (s.id !== shopId ? s : { ...s, securityBarcodes: fn(s.securityBarcodes) }))),
+    });
+  };
 
   // ── Validation + Preview ──────────────────────────────────────────────────
 
@@ -896,7 +943,7 @@ const FormBorrowSecurityRouting = ({ mode = "user" }: { mode?: FormMode }) => {
                 {shop.assets.map((asset) => (
                   <div key={asset.id} className="p-4 rounded-xl bg-black/2 border border-black/5">
                     <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-                      <div className={`${mode === "admin" ? "sm:col-span-4" : "sm:col-span-4"} relative`}>
+                      <div className={`${mode === "admin" && !isReadOnly ? "sm:col-span-3" : "sm:col-span-4"} relative`}>
                         <label className="block text-xs text-muted-foreground mb-1">
                           Asset Name <span className="text-red-500">*</span>
                         </label>
@@ -1041,7 +1088,10 @@ const FormBorrowSecurityRouting = ({ mode = "user" }: { mode?: FormMode }) => {
                       )}
 
                       {!isReadOnly && (
-                        <div className="flex items-end">
+                        <div className={`${mode === "admin" ? "sm:col-span-2" : ""} flex items-end gap-1`}>
+                          {mode === "admin" && asset.name && (
+                            <AutoBarcodeButton onAuto={() => handleAutoAsset(shop.id, asset)} />
+                          )}
                           <button
                             onClick={() => removeAsset(shop.id, asset.id)}
                             className="p-2 rounded-lg bg-red-50 text-red-500 hover:bg-red-100"
@@ -1126,7 +1176,7 @@ const FormBorrowSecurityRouting = ({ mode = "user" }: { mode?: FormMode }) => {
               {shop.securitySets.map((set) => (
                 <div key={set.id} className="p-4 rounded-xl bg-black/2 border border-black/5">
                   <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
-                    <div className="sm:col-span-6">
+                    <div className={mode === "admin" && !isReadOnly ? "sm:col-span-5" : "sm:col-span-6"}>
                       <label className="block text-xs text-muted-foreground mb-1">Security Name</label>
                       <Input value={set.name} readOnly className="glass-input bg-black/5" />
                     </div>
@@ -1165,6 +1215,13 @@ const FormBorrowSecurityRouting = ({ mode = "user" }: { mode?: FormMode }) => {
                             ))}
                           </SelectContent>
                         </Select>
+                      </div>
+                    )}
+                    {mode === "admin" && !isReadOnly && (
+                      <div className="sm:col-span-1 flex items-end">
+                        {set.qty > 0 && !set.name.includes("Security Type C") && (
+                          <AutoBarcodeButton onAuto={() => handleAutoSecurity(shop.id, set)} />
+                        )}
                       </div>
                     )}
                   </div>

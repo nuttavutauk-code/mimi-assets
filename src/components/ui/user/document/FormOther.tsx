@@ -15,6 +15,8 @@ import OtherActivitiesSelect, { OtherActivity } from "@/components/ui/admin/Othe
 import StatusSelect, { StatusOption } from "@/components/ui/admin/StatusSelect";
 import PreviewApproveModal from "@/components/ui/PreviewApproveModal";
 import BarcodeAssignSelector from "@/components/ui/admin/BarcodeAssignSelector";
+import AutoBarcodeButton from "@/components/ui/admin/AutoBarcodeButton";
+import { runAutoForAssetRow, runAutoForSecuritySet } from "@/lib/autoBarcodeClient";
 import { flattenBarcodes } from "@/lib/barcodeExclude";
 import { getErrorMessage } from "@/lib/utils";
 
@@ -368,7 +370,7 @@ const FormOther = ({ mode = "user" }: { mode?: FormMode }) => {
           {assets.map((asset) => (
             <div key={asset.id} className="p-4 rounded-xl bg-black/2 border border-black/5">
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-                <div className="sm:col-span-4 relative">
+                <div className={`${mode === "admin" && !isReadOnly ? "sm:col-span-3" : "sm:col-span-4"} relative`}>
                   <label className="block text-xs text-muted-foreground mb-1">Asset Name</label>
                   <div className="relative">
                     <Input value={asset.name} onChange={(e) => { if (!asset.isSelected) { setAssets(p => p.map(a => a.id === asset.id ? { ...a, name: e.target.value } : a)); debouncedAsset(e.target.value, asset.id); } }} onFocus={() => !asset.isSelected && assetSearchResults.length > 0 && setShowAssetDropdown(p => ({ ...p, [asset.id]: true }))} onBlur={() => setTimeout(() => setShowAssetDropdown(p => ({ ...p, [asset.id]: false })), 200)} placeholder="พิมพ์ชื่อ Asset..." readOnly={asset.isSelected} className={`glass-input ${asset.isSelected ? "pr-10 bg-gray-50" : ""}`} />
@@ -382,7 +384,17 @@ const FormOther = ({ mode = "user" }: { mode?: FormMode }) => {
                 {asset.useCustomSize && isCustomSizeAsset(asset.name) && (<div className="sm:col-span-12 mt-2 p-3 rounded-lg bg-amber-50 border border-amber-200"><label className="block text-xs text-amber-700 font-medium mb-2">กรอกขนาด (W*D*H(XX))</label><div className="grid grid-cols-4 gap-2"><Input value={asset.customW || ""} onChange={(e) => { const newW = e.target.value; setAssets(p => p.map(a => a.id !== asset.id ? a : { ...a, customW: newW, size: `${newW}*${a.customD || ""}*${a.customH || ""}(${a.customXX || ""})` })); }} placeholder="W" className="glass-input text-center" /><Input value={asset.customD || ""} onChange={(e) => { const newD = e.target.value; setAssets(p => p.map(a => a.id !== asset.id ? a : { ...a, customD: newD, size: `${a.customW || ""}*${newD}*${a.customH || ""}(${a.customXX || ""})` })); }} placeholder="D" className="glass-input text-center" /><Input value={asset.customH || ""} onChange={(e) => { const newH = e.target.value; setAssets(p => p.map(a => a.id !== asset.id ? a : { ...a, customH: newH, size: `${a.customW || ""}*${a.customD || ""}*${newH}(${a.customXX || ""})` })); }} placeholder="H" className="glass-input text-center" /><Input value={asset.customXX || ""} onChange={(e) => { const newXX = e.target.value; setAssets(p => p.map(a => a.id !== asset.id ? a : { ...a, customXX: newXX, size: `${a.customW || ""}*${a.customD || ""}*${a.customH || ""}(${newXX})` })); }} placeholder="XX" className="glass-input text-center" /></div></div>)}
                 <div className="sm:col-span-2"><label className="block text-xs text-muted-foreground mb-1">จำนวน</label><Input type="number" min={1} value={asset.qty} onChange={(e) => setAssets(p => p.map(a => a.id === asset.id ? { ...a, qty: Math.max(1, +e.target.value) } : a))} placeholder="1" className="glass-input text-center" /></div>
                 {mode === "admin" && <div className="sm:col-span-3"><label className="block text-xs text-muted-foreground mb-1">โกดัง</label><Select value={asset.withdrawFor} onValueChange={(v) => setAssets(p => p.map(a => a.id === asset.id ? { ...a, withdrawFor: v } : a))}><SelectTrigger className="glass-input"><SelectValue placeholder="เลือก" /></SelectTrigger><SelectContent>{vendors.filter(v => v?.trim()).map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent></Select></div>}
-                {assets.length > 1 && <div className="flex items-end"><button onClick={() => setAssets(p => p.filter(a => a.id !== asset.id))} className="p-2 rounded-lg bg-red-50 text-red-500 hover:bg-red-100"><Trash2 className="w-4 h-4" /></button></div>}
+                {(assets.length > 1 || (mode === "admin" && !isReadOnly)) && (
+                  <div className={`${mode === "admin" && !isReadOnly ? "sm:col-span-2" : ""} flex items-end gap-1`}>
+                    {mode === "admin" && !isReadOnly && asset.name && (
+                      <AutoBarcodeButton onAuto={() => runAutoForAssetRow({
+                        row: asset, rows: assets, maxRows: 4, exclude: flattenBarcodes(assetBarcodes, asset.id),
+                        idCounter: assetIdCounter, setRows: setAssets, setBarcodes: setAssetBarcodes, setSizeOptions,
+                      })} />
+                    )}
+                    {assets.length > 1 && <button onClick={() => setAssets(p => p.filter(a => a.id !== asset.id))} className="p-2 rounded-lg bg-red-50 text-red-500 hover:bg-red-100"><Trash2 className="w-4 h-4" /></button>}
+                  </div>
+                )}
               </div>
               {mode === "admin" && !isReadOnly && asset.name && (
                 <div className="mt-3 p-3 rounded-lg bg-blue-50/40 border border-blue-200">
@@ -401,9 +413,18 @@ const FormOther = ({ mode = "user" }: { mode?: FormMode }) => {
           {securitySets.map((set) => (
             <div key={set.id} className="p-4 rounded-xl bg-black/2 border border-black/5">
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
-                <div className="sm:col-span-6"><label className="block text-xs text-muted-foreground mb-1">Security Name</label><Input value={set.name} readOnly className="glass-input bg-black/5" /></div>
+                <div className={mode === "admin" && !isReadOnly ? "sm:col-span-5" : "sm:col-span-6"}><label className="block text-xs text-muted-foreground mb-1">Security Name</label><Input value={set.name} readOnly className="glass-input bg-black/5" /></div>
                 <div className="sm:col-span-2"><label className="block text-xs text-muted-foreground mb-1">จำนวน</label><Input type="number" min={0} value={set.qty} onChange={(e) => { const newQty = Math.max(0, +e.target.value); const defaultVendor = vendors.find(v => v === "NEWLOOK") || vendors[0] || ""; setSecuritySets(p => p.map(s => s.id === set.id ? { ...s, qty: newQty, withdrawFor: newQty > 0 && !s.withdrawFor && defaultVendor ? defaultVendor : (newQty === 0 ? "" : s.withdrawFor) } : s)); }} placeholder="0" className="glass-input text-center" /></div>
                 {mode === "admin" && <div className="sm:col-span-4"><label className="block text-xs text-muted-foreground mb-1">โกดัง</label><Select value={set.withdrawFor} onValueChange={(v) => setSecuritySets(p => p.map(s => s.id === set.id ? { ...s, withdrawFor: v } : s))}><SelectTrigger className="glass-input"><SelectValue placeholder="เลือก" /></SelectTrigger><SelectContent>{vendors.filter(v => v?.trim()).map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent></Select></div>}
+                {mode === "admin" && !isReadOnly && (
+                  <div className="sm:col-span-1 flex items-end">
+                    {set.qty > 0 && !set.name.includes("Security Type C") && (
+                      <AutoBarcodeButton onAuto={() => runAutoForSecuritySet({
+                        set, exclude: flattenBarcodes(securityBarcodes, set.id), setSets: setSecuritySets, setBarcodes: setSecurityBarcodes,
+                      })} />
+                    )}
+                  </div>
+                )}
               </div>
               {mode === "admin" && !isReadOnly && set.qty > 0 && !set.name.includes("Security Type C") && (
                 <div className="mt-3 p-3 rounded-lg bg-purple-50/40 border border-purple-200">

@@ -14,6 +14,8 @@ import OtherActivitiesSelect, { OtherActivity } from "@/components/ui/admin/Othe
 import StatusSelect, { StatusOption } from "@/components/ui/admin/StatusSelect";
 import PreviewApproveModal from "@/components/ui/PreviewApproveModal";
 import BarcodeAssignSelector from "@/components/ui/admin/BarcodeAssignSelector";
+import AutoBarcodeButton from "@/components/ui/admin/AutoBarcodeButton";
+import { runAutoForAssetRow, runAutoForSecuritySet } from "@/lib/autoBarcodeClient";
 import { flattenBarcodes } from "@/lib/barcodeExclude";
 import { getErrorMessage } from "@/lib/utils";
 
@@ -567,7 +569,7 @@ const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {
           {assets.map((asset, idx) => (
             <div key={asset.id} className="p-4 rounded-xl bg-black/2 border border-black/5">
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-                <div className="sm:col-span-4 relative">
+                <div className={`${mode === "admin" && !isReadOnly ? "sm:col-span-3" : "sm:col-span-4"} relative`}>
                   <label className="block text-xs text-muted-foreground mb-1">Asset Name <span className="text-red-500">*</span></label>
                   <Input value={asset.name} onChange={(e) => { setAssets(p => p.map(a => a.id === asset.id ? { ...a, name: e.target.value } : a)); debouncedAssetSearch(e.target.value, asset.id); }}
                     onFocus={() => assetSearchResults.length > 0 && setShowAssetDropdown(p => ({ ...p, [asset.id]: true }))}
@@ -619,7 +621,13 @@ const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {
                     </Select>
                   </div>
                 )}
-                <div className="sm:col-span-1 flex items-end">
+                <div className={`${mode === "admin" && !isReadOnly ? "sm:col-span-2" : "sm:col-span-1"} flex items-end gap-1`}>
+                  {mode === "admin" && !isReadOnly && asset.name && (
+                    <AutoBarcodeButton onAuto={() => runAutoForAssetRow({
+                      row: asset, rows: assets, maxRows: 15, exclude: flattenBarcodes(assetBarcodes, asset.id),
+                      idCounter: assetIdCounter, setRows: setAssets, setBarcodes: setAssetBarcodes, setSizeOptions,
+                    })} />
+                  )}
                   {!isReadOnly && (
                     <button onClick={() => setAssets(p => p.filter(a => a.id !== asset.id))} className="p-2 rounded-lg bg-red-50 text-red-500 hover:bg-red-100">
                       <Trash2 className="w-4 h-4" />
@@ -739,7 +747,7 @@ const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {
           {securitySets.map((set) => (
             <div key={set.id} className="p-4 rounded-xl bg-black/2 border border-black/5">
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
-                <div className="sm:col-span-6">
+                <div className={mode === "admin" && !isReadOnly ? "sm:col-span-5" : "sm:col-span-6"}>
                   <label className="block text-xs text-muted-foreground mb-1">Security Name</label>
                   <Input value={set.name} readOnly className="glass-input bg-black/5" />
                 </div>
@@ -754,6 +762,15 @@ const FormWithdrawAsset = ({ mode = "user" }: { mode?: FormMode }) => {
                       <SelectTrigger className="glass-input"><SelectValue placeholder="เลือก" /></SelectTrigger>
                       <SelectContent>{vendors.filter(v => v?.trim()).map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent>
                     </Select>
+                  </div>
+                )}
+                {mode === "admin" && !isReadOnly && (
+                  <div className="sm:col-span-1 flex items-end">
+                    {set.qty > 0 && !set.name.includes("Security Type C") && (
+                      <AutoBarcodeButton onAuto={() => runAutoForSecuritySet({
+                        set, exclude: flattenBarcodes(securityBarcodes, set.id), setSets: setSecuritySets, setBarcodes: setSecurityBarcodes,
+                      })} />
+                    )}
                   </div>
                 )}
               </div>
