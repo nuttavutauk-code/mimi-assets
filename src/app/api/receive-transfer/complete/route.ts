@@ -6,6 +6,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { writeAuditLog, AuditAction, getSessionUser } from "@/lib/audit-log";
+import { resolveOriginalAssetStatus } from "@/lib/assetStatus";
 
 // ✅ ฟังก์ชันคำนวณ Week Number
 function getWeekNumber(date: Date): string {
@@ -124,6 +125,9 @@ export async function POST(req: NextRequest) {
                         }
                     }
 
+                    // ✅ ใช้ Status เดิมของชิ้นนั้น (NEW/USED/REFURBISHED) ถ้าหาไม่ได้ใช้ "-"
+                    const originalStatus = await resolveOriginalAssetStatus(task.barcode);
+
                     // สร้าง Transaction ขาเข้า
                     await prisma.assetTransactionHistory.create({
                         data: {
@@ -148,7 +152,7 @@ export async function POST(req: NextRequest) {
                             remarkIn,
 
                             // ===== Auto by Logic =====
-                            assetStatus: "-",
+                            assetStatus: originalStatus ?? "-",
                             balance: 1, // เข้าโกดังปลายทางแล้ว (พร้อมใช้งาน)
                             wkInForRepair: getWeekNumber(new Date()),
                         },

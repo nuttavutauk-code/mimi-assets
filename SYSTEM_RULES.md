@@ -20,6 +20,7 @@
 ### 1.2 ค่า enum สำคัญ
 
 - `assetStatus`: `NEW`, `USED`, `REFURBISHED`, `REFURBISH`, `-`
+  - `-` = ของออกจากโกดังแล้ว (balance=0) — ของที่อยู่ในสต็อก (balance=1) ต้องมี Status จริงเสมอ
 - `balance`: `1` = มีของในสต๊อก, `0` = ออกไปแล้ว
 - `Asset.statusAsset`: `Ready`, `NO Barcode`
 - `Role`: `ADMIN`, `USER`
@@ -38,6 +39,19 @@
 | `shoptoshop` | ย้ายร้าน-ร้าน | Direct approve |
 | `repair` | ส่งซ่อม | Direct approve + Repair complete |
 
+### 1.4 หา Asset Status เดิม (`src/lib/assetStatus.ts`)
+
+ตอนเบิกออก `assetStatus` ถูกเขียนทับเป็น `-` → เมื่อของกลับเข้าสต็อก (ลบเอกสาร / edit-barcode / รับโอนย้าย) ใช้ `resolveOriginalAssetStatus()` ไล่ประวัติ barcode จากใหม่ไปเก่า:
+- `assetStatus` เป็นค่าจริง → ใช้ค่านั้น
+- `remarkIn = "New Asset add to WH"` หรือมี `newInStock` → `NEW`
+- `remarkIn = "Import Asset USED"` → `USED` / `"Import Asset REFURBISHED"` → `REFURBISHED`
+- `remarkIn = "ซ่อมเสร็จ"` หรือมี `refurbishedInStock` → `REFURBISH`
+- `remarkIn = "-"` (อนุมัติใบเก็บกลับ) → `USED` / `remarkIn` ว่าง + มี MCS Code ร้าน → `USED`
+- แถวรับโอนย้าย (`wkInForRepair` + `mcsCodeIn = "-"`) → ดูแถวก่อนหน้าต่อ
+- แถวอื่นที่ไม่รู้ที่มา → หยุด คืน `null`
+
+Security Set (`SecuritySetTransaction`): Import New/Used/Refurbished บันทึก `NEW`/`USED`/`REFURBISHED`, เก็บกลับ → `USED`
+
 ---
 
 ## 2. กฎการสร้าง Transaction (CREATE)
@@ -50,7 +64,7 @@
 | `POST /api/asset/import-used` | Admin upload ของมือสอง | `USED` | — | `Import Asset USED` |
 | `POST /api/asset/import-refurbished` | Admin upload ของซ่อมแล้ว | `REFURBISHED` | — | `Import Asset REFURBISHED` |
 | `POST /api/repair-asset/complete` | ช่างซ่อมเสร็จ | `REFURBISH` | `refurbishedInStock` | `ซ่อมเสร็จ` |
-| `POST /api/receive-transfer/complete` | โกดังปลายทางรับโอน | `-` | `wkInForRepair` | จาก `document.operation` |
+| `POST /api/receive-transfer/complete` | โกดังปลายทางรับโอน | Status เดิมของชิ้นนั้น (ดู 1.4) ถ้าหาไม่ได้ `-` | `wkInForRepair` | จาก `document.operation` |
 | `POST /api/document/approve` (return/returnasset) | Admin อนุมัติใบเก็บกลับ | `USED` | `wkIn` หรือ `return` | — |
 
 **กฎ return WK column** (`returnasset` / `return`):
@@ -134,13 +148,14 @@ DIRECT_TRANSACTION_TYPES = `["return", "returnasset", "shoptoshop", "repair"]`
 - OUT fields → `null`: `outDate`, `unitOut`, `toVendor`, `status`, `shopType`, `mcsCodeOut`, `toShop`, `remarkOut`
 - WK OUT cols → `null`: `wkOut`, `wkOutForRepair`, `borrow`, `outToRentalWarehouse`, `inToRentalWarehouse`, `discarded`, `adjustError`
 - `balance → 1`
+- `assetStatus` → คืน Status เดิม (ดู 1.4) ถ้าหาไม่ได้คงค่าเดิม
 - Cascade delete: `PickAssetTask`, `RepairTask`, `TransferReceiveTask`, `DocumentShop`, `DocumentAsset`, `DocumentSecuritySet`
 
 ### 4.2 แก้ barcode หลัง pick เสร็จ
 
 `POST /api/pick-asset/edit-barcode`:
 - เงื่อนไข: `PickAssetTask.status === "completed"` + barcode ใหม่ต้องอยู่ใน table มี `balance=1`
-- Revert barcode เก่า (`balance=1`, เคลียร์ OUT)
+- Revert barcode เก่า (`balance=1`, เคลียร์ OUT, คืน `assetStatus` เดิม — ดู 1.4)
 - Transfer OUT-leg data ไป barcode ใหม่ (`balance=0`)
 - Update `PickAssetTask.barcode`
 

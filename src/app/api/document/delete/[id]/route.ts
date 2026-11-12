@@ -7,6 +7,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { writeAuditLog, AuditAction, getSessionUser } from "@/lib/audit-log";
+import { isRealAssetStatus, resolveOriginalAssetStatus } from "@/lib/assetStatus";
 
 // ✅ Next.js 15: params เป็น Promise
 export async function DELETE(
@@ -57,6 +58,11 @@ export async function DELETE(
 
         // 1. Reset AssetTransactionHistory ที่เกี่ยวข้องกับเอกสารนี้
         // แทนที่จะลบ → Reset ขา OUT กลับ และ balance = 1
+        const rowsToReset = await prisma.assetTransactionHistory.findMany({
+            where: { documentId: id },
+            select: { id: true, barcode: true, assetStatus: true },
+        });
+
         const resetTransactions = await prisma.assetTransactionHistory.updateMany({
             where: { documentId: id },
             data: {
@@ -80,6 +86,18 @@ export async function DELETE(
                 adjustError: null,
             },
         });
+
+        // 1.1 คืน Asset Status เดิม (ตอนเบิกออกถูกเขียนทับเป็น "-")
+        for (const row of rowsToReset) {
+            if (isRealAssetStatus(row.assetStatus)) continue;
+            const originalStatus = await resolveOriginalAssetStatus(row.barcode, row.id);
+            if (originalStatus) {
+                await prisma.assetTransactionHistory.update({
+                    where: { id: row.id },
+                    data: { assetStatus: originalStatus },
+                });
+            }
+        }
 
         // 2. Reset SecuritySetTransaction ที่เกี่ยวข้องกับเอกสารนี้
         const resetSecurityTransactions = await prisma.securitySetTransaction.updateMany({

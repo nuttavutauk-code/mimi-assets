@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { resolveOriginalAssetStatus } from "@/lib/assetStatus";
 
 // ✅ ฟังก์ชันคำนวณ Week Number
 function getWeekNumber(date: Date): string {
@@ -277,6 +278,9 @@ export async function POST(req: NextRequest) {
             );
         }
 
+        // ✅ Status เดิมของ Barcode เก่า (ตอนเบิกออกถูกเขียนทับเป็น "-")
+        const oldOriginalStatus = await resolveOriginalAssetStatus(oldOutTransaction.barcode, oldOutTransaction.id);
+
         // 7. ดำเนินการแก้ไข (ใช้ Transaction)
         await prisma.$transaction(async (tx) => {
             // 7.1 อัปเดต PickAssetTask
@@ -312,6 +316,8 @@ export async function POST(req: NextRequest) {
                     shopType: null,
                     status: null,
                     balance: 1,
+                    // คืน Status เดิม (ถ้าหาไม่ได้ คงค่าเดิมไว้)
+                    ...(oldOriginalStatus ? { assetStatus: oldOriginalStatus } : {}),
                 },
             });
 
