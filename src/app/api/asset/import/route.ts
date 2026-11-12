@@ -266,6 +266,7 @@ export async function POST(req: Request) {
             mcsCodeIn: "-",
             fromShop: validWarehouse,
             remarkIn: "New Security Set add to WH",
+            assetStatus: "NEW",
           });
           // เพิ่มเข้า Set เพื่อป้องกัน duplicate ในไฟล์เดียวกัน
           existingSecurityBarcodes.add(barcode);

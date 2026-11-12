@@ -278,6 +278,7 @@ export async function POST(request: NextRequest) {
                             mcsCodeIn: mcsCodeIn || null,
                             fromShop: fromShop || null,
                             remarkIn: remarkIn || "Import Security Set REFURBISHED",
+                            assetStatus: "REFURBISHED",
                         },
                     });
 

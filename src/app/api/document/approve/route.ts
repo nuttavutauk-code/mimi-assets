@@ -708,6 +708,7 @@ async function createDirectTransactions(documentId: number): Promise<{ created: 
                                 mcsCodeIn: shop.shopCode || null,
                                 fromShop: shop.shopName || null,
                                 remarkIn: "-",
+                                assetStatus: "USED", // เก็บกลับจากร้าน = USED (เหมือน Asset ปกติ)
                             },
                         });
                         securityTransactionsCreated++;
@@ -729,6 +730,7 @@ async function createDirectTransactions(documentId: number): Promise<{ created: 
                                     mcsCodeIn: shop.shopCode || null,
                                     fromShop: shop.shopName || null,
                                     remarkIn: "-",
+                                    assetStatus: "USED", // เก็บกลับจากร้าน = USED (เหมือน Asset ปกติ)
                                 },
                             });
                             securityTransactionsCreated++;
@@ -751,6 +753,7 @@ async function createDirectTransactions(documentId: number): Promise<{ created: 
                             mcsCodeIn: shop.shopCode || null,
                             fromShop: shop.shopName || null,
                             remarkIn: "-",
+                            assetStatus: "USED", // เก็บกลับจากร้าน = USED (เหมือน Asset ปกติ)
 
                             // ===== ขา OUT (ปล่อยว่าง) =====
                             // ไม่ต้องใส่ค่า
