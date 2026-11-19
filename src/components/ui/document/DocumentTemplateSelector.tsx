@@ -348,6 +348,15 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
     const securitySets = shop?.securitySets || [];
     const vendorName = doc?.createdBy?.vendor || "N/A";
 
+    // ✅ เวอร์ชันเอกสาร: Ver.1 = ต้นฉบับ (ไม่แสดง), Ver.2+ = มีการแก้ Barcode หลังอนุมัติ
+    const docVersion = Number(doc?.version) || 1;
+    // ใช้ตัวอักษรสีล้วน (ไม่มีพื้นหลัง/กรอบ) เพราะ html2canvas วาดพื้นหลัง inline เหลื่อมกับตัวอักษร
+    const versionTag = docVersion > 1 ? (
+        <span style={{ marginLeft: "8px", color: "#dc2626", fontWeight: 700 }}>
+            (Ver.{docVersion})
+        </span>
+    ) : null;
+
     // Fetch images for document types that need them
     useEffect(() => {
         const needsImages = ["other", "transfer", "borrowSecurity", "borrowsecurity", "borrow", "repair", "shopToShop", "shoptoship", "shop-to-shop"].includes(documentType);
@@ -447,7 +456,7 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
                     <span style={{ position: "relative", top: textOffset }}>{getDocumentTitle(documentType)}</span>
                 </h1>
                 <div style={{ fontSize: "12px", color: colors.secondary, fontWeight: 500 }}>
-                    <span style={{ position: "relative", top: textOffset }}>เลขที่: <span style={{ fontWeight: 700 }}>{doc.docCode}</span></span>
+                    <span style={{ position: "relative", top: textOffset }}>เลขที่: <span style={{ fontWeight: 700 }}>{doc.docCode}</span>{versionTag}</span>
                 </div>
             </div>
 
@@ -573,7 +582,7 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
                 <span style={{ position: "relative", top: textOffset }}>{getDocumentTitle(documentType)}</span>
             </div>
             <div style={{ fontSize: "11px", color: colors.secondary }}>
-                <span style={{ position: "relative", top: textOffset }}>เลขที่: <span style={{ fontWeight: 700 }}>{doc.docCode}</span></span>
+                <span style={{ position: "relative", top: textOffset }}>เลขที่: <span style={{ fontWeight: 700 }}>{doc.docCode}</span>{versionTag}</span>
             </div>
         </div>
     );
@@ -1708,7 +1717,7 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
                             <span style={{ position: "relative", top: textOffset }}>เอกสารย้าย Asset ระหว่างร้าน (Shop To Shop)</span>
                         </h1>
                         <div style={{ fontSize: "12px", color: colors.secondary, fontWeight: 500 }}>
-                            <span style={{ position: "relative", top: textOffset }}>เลขที่: <span style={{ fontWeight: 700 }}>{doc.docCode}</span></span>
+                            <span style={{ position: "relative", top: textOffset }}>เลขที่: <span style={{ fontWeight: 700 }}>{doc.docCode}</span>{versionTag}</span>
                         </div>
                     </div>
                     <div style={{ textAlign: "right" }}>
@@ -1925,7 +1934,7 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
                         <span style={{ position: "relative", top: textOffset }}>🔧 เอกสารแจ้งซ่อม Asset</span>
                     </h1>
                     <div style={{ fontSize: "14px", color: colors.secondary, fontWeight: 500 }}>
-                        <span style={{ position: "relative", top: textOffset }}>เลขที่: <span style={{ fontWeight: 700 }}>{doc.docCode}</span></span>
+                        <span style={{ position: "relative", top: textOffset }}>เลขที่: <span style={{ fontWeight: 700 }}>{doc.docCode}</span>{versionTag}</span>
                     </div>
                 </div>
                 <div style={{ textAlign: "right" }}>
@@ -2086,12 +2095,13 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
                             totalPages={pages.length}
                             docTitle={docTitle}
                             docCode={doc.docCode}
+                            docVersion={docVersion}
                         >
                             {page}
                         </DocumentPage>
                     ))
                     : (
-                        <DocumentPage pageNumber={1} totalPages={1} docTitle={docTitle} docCode={doc.docCode}>
+                        <DocumentPage pageNumber={1} totalPages={1} docTitle={docTitle} docCode={doc.docCode} docVersion={docVersion}>
                             {pages}
                         </DocumentPage>
                     )
@@ -2108,12 +2118,14 @@ function DocumentPage({
     totalPages,
     docTitle,
     docCode,
+    docVersion = 1,
     children,
 }: {
     pageNumber: number;
     totalPages: number;
     docTitle: string;
     docCode: string;
+    docVersion?: number;
     children: React.ReactNode;
 }) {
     return (
@@ -2147,7 +2159,7 @@ function DocumentPage({
                     whiteSpace: "nowrap",
                 }}
             >
-                {docTitle} - {docCode || "-"} - {pageNumber}/{totalPages}
+                {docTitle} - {docCode || "-"}{docVersion > 1 ? ` Ver.${docVersion}` : ""} - {pageNumber}/{totalPages}
             </div>
         </div>
     );

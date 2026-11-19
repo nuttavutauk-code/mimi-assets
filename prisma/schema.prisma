@@ -107,6 +107,7 @@ model Document {
   note       String?
   status     String? // draft | submitted | approved | rejected
   approvedAt DateTime? // วันที่อนุมัติ
+  version    Int       @default(1) // เวอร์ชันเอกสาร: +1 ทุกครั้งที่ Admin แก้ Barcode หลังอนุมัติ (แสดง Ver.2, Ver.3 ... ตอนโหลดรูป)
 
   // 🔹 ข้อมูลเพิ่มเติมสำหรับใบย้ายของ (transfer)
   operation   String? // Event, ส่งคืนผู้ผลิต, ส่งคืนโกดังเช่า, อื่นๆ

@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import { resolveOriginalAssetStatus } from "@/lib/assetStatus";
 import { writeAuditLog, AuditAction, getSessionUser } from "@/lib/audit-log";
 import { getWkOutColumnsWritten } from "@/lib/wkOut";
@@ -17,6 +18,16 @@ function getWeekNumber(date: Date): string {
     const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
     const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
     return `${d.getUTCFullYear()} WK ${weekNo.toString().padStart(2, "0")}`;
+}
+
+// ✅ เพิ่มเวอร์ชันเอกสาร (Ver.2, Ver.3 ...) ทุกครั้งที่แก้ Barcode ที่เคยกำหนดไปแล้ว
+async function bumpDocumentVersion(tx: Prisma.TransactionClient, documentId: number): Promise<number> {
+    const updated = await tx.document.update({
+        where: { id: documentId },
+        data: { version: { increment: 1 } },
+        select: { version: true },
+    });
+    return updated.version;
 }
 
 export async function POST(req: NextRequest) {
@@ -213,16 +224,20 @@ export async function POST(req: NextRequest) {
                 return NextResponse.json({ success: false, message: "Barcode ถูกใช้งานอยู่ใน task อื่น" }, { status: 400 });
             }
 
-            await prisma.pickAssetTask.update({
-                where: { id: Number(pickTaskId) },
-                data: { barcode: newBarcode },
+            const docVersion = await prisma.$transaction(async (tx) => {
+                await tx.pickAssetTask.update({
+                    where: { id: Number(pickTaskId) },
+                    data: { barcode: newBarcode },
+                });
+                return bumpDocumentVersion(tx, pickTask.documentId);
             });
 
             return NextResponse.json({
                 success: true,
-                message: `แก้ไข Barcode สำเร็จ: ${oldBarcode} → ${newBarcode}`,
+                message: `แก้ไข Barcode สำเร็จ: ${oldBarcode} → ${newBarcode} (เอกสาร Ver.${docVersion})`,
                 oldBarcode,
                 newBarcode,
+                documentVersion: docVersion,
             });
         }
 
@@ -302,6 +317,7 @@ export async function POST(req: NextRequest) {
                 wkClear[col] = null;
             }
 
+            let docVersion = 1;
             await prisma.$transaction(async (tx) => {
                 // ล็อกด้วยเงื่อนไข: Barcode ใหม่ต้องยัง balance=1 ณ ตอนเขียน (กันชนกับการ Pick พร้อมกัน)
                 const claimed = await tx.securitySetTransaction.updateMany({
@@ -347,6 +363,8 @@ export async function POST(req: NextRequest) {
                     where: { id: Number(pickTaskId) },
                     data: { barcode: newBarcode },
                 });
+
+                docVersion = await bumpDocumentVersion(tx, pickTask.documentId);
             });
 
             const { userId, username, userRole } = getSessionUser(session);
@@ -365,15 +383,17 @@ export async function POST(req: NextRequest) {
                     oldBarcode,
                     newBarcode,
                     taskStatus: pickTask.status,
+                    documentVersion: docVersion,
                 },
                 req,
             });
 
             return NextResponse.json({
                 success: true,
-                message: `แก้ไข Barcode สำเร็จ: ${oldBarcode} → ${newBarcode}`,
+                message: `แก้ไข Barcode สำเร็จ: ${oldBarcode} → ${newBarcode} (เอกสาร Ver.${docVersion})`,
                 oldBarcode,
                 newBarcode,
+                documentVersion: docVersion,
             });
         }
 
@@ -484,6 +504,7 @@ export async function POST(req: NextRequest) {
             !!pickTask.size && pickTask.size.includes("*");
 
         // 7. ดำเนินการแก้ไข (ใช้ Transaction)
+        let docVersion = 1;
         await prisma.$transaction(async (tx) => {
             // 7.1 บันทึกขา OUT ให้ Barcode ใหม่ (เงื่อนไข balance=1 กันชนกับการ Pick พร้อมกัน)
             const claimed = await tx.assetTransactionHistory.updateMany({
@@ -537,6 +558,8 @@ export async function POST(req: NextRequest) {
                 data: { barcode: newBarcode },
             });
 
+            docVersion = await bumpDocumentVersion(tx, pickTask.documentId);
+
             // 7.4 Transfer: ให้โกดังปลายทางรอรับ Barcode ใหม่
             if (transferTask) {
                 await tx.transferReceiveTask.update({
@@ -568,6 +591,7 @@ export async function POST(req: NextRequest) {
                 oldBarcode,
                 newBarcode,
                 taskStatus: pickTask.status,
+                documentVersion: docVersion,
                 transferReceiveTaskId: transferTask?.id ?? null,
             },
             req,
@@ -575,9 +599,10 @@ export async function POST(req: NextRequest) {
 
         return NextResponse.json({
             success: true,
-            message: `แก้ไข Barcode สำเร็จ: ${oldBarcode} → ${newBarcode}`,
+            message: `แก้ไข Barcode สำเร็จ: ${oldBarcode} → ${newBarcode} (เอกสาร Ver.${docVersion})`,
             oldBarcode,
             newBarcode,
+            documentVersion: docVersion,
         });
 
     } catch (error) {

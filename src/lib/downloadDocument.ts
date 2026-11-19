@@ -1,4 +1,13 @@
 /**
+ * ชื่อไฟล์เอกสาร: Ver.1 → `{docCode}`, Ver.2+ → `{docCode}_Ver{n}`
+ * (เวอร์ชันเพิ่มเมื่อ Admin แก้ Barcode หลังอนุมัติ)
+ */
+export function documentFilename(docCode: string, version?: number | null): string {
+    const v = Number(version) || 1;
+    return v > 1 ? `${docCode}_Ver${v}` : docCode;
+}
+
+/**
  * แปลง canvas เป็น Blob (แทนที่จะเป็น data URL ที่มือถือหลายรุ่นจัดการไม่ได้ดี)
  */
 function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob | null> {
