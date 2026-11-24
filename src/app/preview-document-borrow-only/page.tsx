@@ -27,7 +27,7 @@ const mockDocument = {
                 { name: "Counter Stand", size: "L", grade: "B", qty: 3, withdrawFor: "WH Bangkok" },
             ],
             securitySets: [
-                { name: "CONTROLBOX 6 PORT (M-60000R) with power cable", qty: 2, withdrawFor: "WH Bangkok" },
+                { name: "CONTROLBOX 6 PORT (M-6000BS) with power cable", qty: 2, withdrawFor: "WH Bangkok" },
                 { name: "Security Type C Ver.7.1", qty: 5, withdrawFor: "WH Bangkok" },
                 { name: "Security Type C Ver.7.0", qty: 0, withdrawFor: "" },
             ],

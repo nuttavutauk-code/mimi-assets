@@ -25,7 +25,7 @@ const mockDocument = {
                 { barcode: "AST002", name: "Digital Signage 43\"", kv: "KV002", qty: 1, withdrawFor: "WH Bangkok" },
             ],
             securitySets: [
-                { name: "CONTROLBOX 6 PORT (M-60000R) with power cable", qty: 2, withdrawFor: "WH Bangkok" },
+                { name: "CONTROLBOX 6 PORT (M-6000BS) with power cable", qty: 2, withdrawFor: "WH Bangkok" },
                 { name: "Security Type C Ver.7.1", qty: 5, withdrawFor: "WH Bangkok" },
                 { name: "Security Type C Ver.7.0", qty: 0, withdrawFor: "" },
             ],
@@ -41,7 +41,7 @@ const mockDocument = {
                 { barcode: "AST003", name: "Monitor Stand", kv: "-", qty: 3, withdrawFor: "WH Bangkok" },
             ],
             securitySets: [
-                { name: "CONTROLBOX 6 PORT (M-60000R) with power cable", qty: 1, withdrawFor: "WH Bangkok" },
+                { name: "CONTROLBOX 6 PORT (M-6000BS) with power cable", qty: 1, withdrawFor: "WH Bangkok" },
                 { name: "Security Type C Ver.7.1", qty: 3, withdrawFor: "WH Bangkok" },
                 { name: "Security Type C Ver.7.0", qty: 0, withdrawFor: "" },
             ],
@@ -57,7 +57,7 @@ const mockDocument = {
                 { barcode: "AST004", name: "LED Display 65\"", kv: "KV003", qty: 1, withdrawFor: "WH Bangkok" },
             ],
             securitySets: [
-                { name: "CONTROLBOX 6 PORT (M-60000R) with power cable", qty: 1, withdrawFor: "WH Bangkok" },
+                { name: "CONTROLBOX 6 PORT (M-6000BS) with power cable", qty: 1, withdrawFor: "WH Bangkok" },
                 { name: "Security Type C Ver.7.1", qty: 2, withdrawFor: "WH Bangkok" },
                 { name: "Security Type C Ver.7.0", qty: 0, withdrawFor: "" },
             ],
@@ -73,7 +73,7 @@ const mockDocument = {
                 { barcode: "AST005", name: "Smart TV 50\"", kv: "KV004", qty: 2, withdrawFor: "WH Bangkok" },
             ],
             securitySets: [
-                { name: "CONTROLBOX 6 PORT (M-60000R) with power cable", qty: 1, withdrawFor: "WH Bangkok" },
+                { name: "CONTROLBOX 6 PORT (M-6000BS) with power cable", qty: 1, withdrawFor: "WH Bangkok" },
                 { name: "Security Type C Ver.7.1", qty: 4, withdrawFor: "WH Bangkok" },
                 { name: "Security Type C Ver.7.0", qty: 0, withdrawFor: "" },
             ],
@@ -197,7 +197,7 @@ const ShopSection = ({
     const emptyAssetRows = Math.max(0, totalAssetRows - assets.length);
 
     const defaultSecuritySets = [
-        { name: "CONTROLBOX 6 PORT (M-60000R) with power cable", qty: 0, withdrawFor: "" },
+        { name: "CONTROLBOX 6 PORT (M-6000BS) with power cable", qty: 0, withdrawFor: "" },
         { name: "Security Type C Ver.7.1", qty: 0, withdrawFor: "" },
         { name: "Security Type C Ver.7.0", qty: 0, withdrawFor: "" },
     ];

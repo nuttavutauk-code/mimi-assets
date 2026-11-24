@@ -17,8 +17,8 @@ interface Rule {
 }
 
 const CONTROLBOX_NAMES = [
-  "CONTROLBOX 6 PORT (M-60000R) with power cable",
-  "CONTROLBOX 5 PORT (M-50000R) with power cable",
+  "CONTROLBOX 6 PORT (M-6000BS) with power cable",
+  "CONTROLBOX 5 PORT (M-5000L) with power cable",
 ];
 
 const NONE = "__none__";

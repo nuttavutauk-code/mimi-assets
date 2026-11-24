@@ -221,7 +221,7 @@ Format: `"2025 WK 23"` (`getWeekNumber()`)
 
 | Asset Name | Barcode | qty |
 |---|---|---|
-| `CONTROLBOX 6 PORT (M-60000R) with power cable` | มี | 1 ต่อ row |
+| `CONTROLBOX 6 PORT (M-6000BS) with power cable` | มี | 1 ต่อ row |
 | `Security Type C Ver.7.1` | ไม่มี | aggregate ได้ |
 | `Security Type C Ver.7.0` | ไม่มี | aggregate ได้ |
 

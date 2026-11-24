@@ -24,8 +24,8 @@ const sampleAssets = [
 ];
 
 const sampleSecuritySets = [
-  { name: "CONTROLBOX 6 PORT (M-60000R) with power cable", qty: 2, withdrawFor: "NEWLOOK", assignedBarcodes: ["SEC-CB6-001", "SEC-CB6-002"] },
-  { name: "CONTROLBOX 5 PORT (M-60000R) with power cable", qty: 0, withdrawFor: "" },
+  { name: "CONTROLBOX 6 PORT (M-6000BS) with power cable", qty: 2, withdrawFor: "NEWLOOK", assignedBarcodes: ["SEC-CB6-001", "SEC-CB6-002"] },
+  { name: "CONTROLBOX 5 PORT (M-5000L) with power cable", qty: 0, withdrawFor: "" },
   { name: "Security Type C Ver.7.1", qty: 3, withdrawFor: "NEWLOOK" },
   { name: "Security Type C Ver.7.0", qty: 0, withdrawFor: "" },
 ];

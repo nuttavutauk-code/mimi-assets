@@ -205,7 +205,7 @@ Index: documentId, barcode, inStockDate, outDate, assetStatus, balance
 โครงสร้างใกล้เคียง `AssetTransactionHistory` แต่สำหรับ Security Set
 
 รองรับเฉพาะ 3 Asset Names:
-1. `CONTROLBOX 6 PORT (M-60000R) with power cable` (มี Barcode)
+1. `CONTROLBOX 6 PORT (M-6000BS) with power cable` (มี Barcode)
 2. `Security Type C Ver.7.1` (ไม่มี Barcode)
 3. `Security Type C Ver.7.0` (ไม่มี Barcode)
 

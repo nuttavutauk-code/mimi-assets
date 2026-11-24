@@ -9,8 +9,8 @@ import * as XLSX from "xlsx";
 
 // ✅ รายชื่อ Asset ที่ต้องบันทึกลงตารางรอง (SecuritySetTransaction)
 const SECURITY_SET_NAMES = [
-    "CONTROLBOX 6 PORT (M-60000R) with power cable",
-    "CONTROLBOX 5 PORT (M-50000R) with power cable",
+    "CONTROLBOX 6 PORT (M-6000BS) with power cable",
+    "CONTROLBOX 5 PORT (M-5000L) with power cable",
     "Security Type C Ver.7.1",
     "Security Type C Ver.7.0",
 ];

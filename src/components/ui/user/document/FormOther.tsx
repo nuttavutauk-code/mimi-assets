@@ -56,8 +56,8 @@ const FormOther = ({ mode = "user" }: { mode?: FormMode }) => {
 
   const [assets, setAssets] = useState<AssetRow[]>([{ id: assetIdCounter.current++, name: "", size: "", grade: "", qty: 1, withdrawFor: "" }]);
   const defaultSecuritySets: SecuritySet[] = [
-    { id: 1, name: "CONTROLBOX 6 PORT (M-60000R) with power cable", qty: 0, withdrawFor: "" },
-    { id: 2, name: "CONTROLBOX 5 PORT (M-50000R) with power cable", qty: 0, withdrawFor: "" },
+    { id: 1, name: "CONTROLBOX 6 PORT (M-6000BS) with power cable", qty: 0, withdrawFor: "" },
+    { id: 2, name: "CONTROLBOX 5 PORT (M-5000L) with power cable", qty: 0, withdrawFor: "" },
     { id: 3, name: "Security Type C Ver.7.1", qty: 0, withdrawFor: "" },
     { id: 4, name: "Security Type C Ver.7.0", qty: 0, withdrawFor: "" },
   ];

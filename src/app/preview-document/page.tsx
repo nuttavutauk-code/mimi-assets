@@ -27,7 +27,7 @@ const mockDocument = {
                 { name: "Monitor Stand", size: "L", grade: "B", kv: "-", qty: 3, withdrawFor: "WH Bangkok" },
             ],
             securitySets: [
-                { name: "CONTROLBOX 6 PORT (M-60000R) with power cable", qty: 2, withdrawFor: "WH Bangkok" },
+                { name: "CONTROLBOX 6 PORT (M-6000BS) with power cable", qty: 2, withdrawFor: "WH Bangkok" },
                 { name: "Security Type C Ver.7.1", qty: 5, withdrawFor: "WH Bangkok" },
                 { name: "Security Type C Ver.7.0", qty: 0, withdrawFor: "" },
             ],
@@ -115,7 +115,7 @@ export default function PreviewDocumentPage() {
     const emptyAssetRows = Math.max(0, totalAssetRows - assets.length);
 
     const defaultSecuritySets = [
-        { name: "CONTROLBOX 6 PORT (M-60000R) with power cable", qty: 0, withdrawFor: "" },
+        { name: "CONTROLBOX 6 PORT (M-6000BS) with power cable", qty: 0, withdrawFor: "" },
         { name: "Security Type C Ver.7.1", qty: 0, withdrawFor: "" },
         { name: "Security Type C Ver.7.0", qty: 0, withdrawFor: "" },
     ];
