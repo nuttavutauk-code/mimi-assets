@@ -592,22 +592,42 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
         const assetRows = expandAssetRows(assets);
         const secRows = expandSecurityRows(securitySets);
 
-        const cap: PageCapacities = { first: 28, rest: 33, last: 22 };
-        let pages = chunkRowsToPages(assetRows, cap, true);
+        // แบ่งหน้าตามความสูงจริง (px) ไม่ใช่นับจำนวนแถว — Asset กับ Security ไหลต่อกันในหน้าเดียวได้
+        // และตารางที่ต่อหน้าใหม่จะมีหัวตารางซ้ำ จึงคิดความสูงหัวตารางทุกครั้งที่ตารางเริ่มในหน้านั้น
+        const AVAIL = PAGE_HEIGHT - PAGE_PADDING_Y - PAGE_PADDING_BOTTOM; // 1043 (ขอบบน 30 + ล่าง 50)
+        const FIRST_BASE = 220;   // header + info cards (เผื่อชื่อร้านยาวขึ้นบรรทัดใหม่)
+        const COMPACT_BASE = 55;  // compact header หน้าถัดไป
+        const THEAD_H = 60;       // แถบหัวตาราง (28) + หัวคอลัมน์ (32)
+        const ROW_H = 26;
+        const TABLE_GAP = 15;     // marginBottom ของตาราง
+        const FOOTER_H = 190;     // หมายเหตุ + ลายเซ็น
 
-        // If last page's asset rows + security rows would push signature off the bottom,
-        // demote last page to non-final and add a new overflow page for secTable + signature.
-        // Threshold 18 = cap.last(22) minus ~4 rows overhead for sec header + note.
-        const lastPage = pages[pages.length - 1];
-        const needsOverflowPage =
-            secRows.length > 0 && lastPage.rows.length + secRows.length > 18;
-        if (needsOverflowPage) {
-            pages = [
-                ...pages.slice(0, -1),
-                { ...lastPage, isLast: false },
-                { rows: [] as typeof assetRows, isFirst: false, isLast: true, pageNumber: pages.length + 1 },
-            ];
+        type WithdrawRow = { kind: 'asset' | 'security'; data: any };
+        const combinedRows: WithdrawRow[] = [
+            ...assetRows.map((r: any) => ({ kind: 'asset' as const, data: r })),
+            ...secRows.map((r: any) => ({ kind: 'security' as const, data: r })),
+        ];
+
+        const pages: WithdrawRow[][] = [];
+        let page: WithdrawRow[] = [];
+        let used = FIRST_BASE;
+        for (const row of combinedRows) {
+            const startsTable = !page.some(r => r.kind === row.kind);
+            const h = ROW_H + (startsTable ? THEAD_H + TABLE_GAP : 0);
+            if (page.length > 0 && used + h > AVAIL) {
+                pages.push(page);
+                page = [];
+                used = COMPACT_BASE + THEAD_H + TABLE_GAP + ROW_H;
+            } else {
+                used += h;
+            }
+            page.push(row);
         }
+        // ถ้าไม่มีแถวเลย จะแสดงตาราง Asset เปล่า
+        if (combinedRows.length === 0) used += THEAD_H + ROW_H + TABLE_GAP;
+        pages.push(page);
+        // ลายเซ็นไม่พอในหน้าสุดท้าย → เพิ่มหน้าสำหรับลายเซ็น
+        if (used + FOOTER_H > AVAIL) pages.push([]);
 
         const assetThead = (
             <thead>
@@ -622,59 +642,57 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
             </thead>
         );
 
-        const secTable = secRows.length > 0 && (
-            <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "15px", borderRadius: "8px", overflow: "hidden" }}>
-                <thead>
-                    <tr><th colSpan={5} style={headerStyle}><span style={{ position: "relative", top: textOffset }}>🔐 รายละเอียด Security Set</span></th></tr>
-                    <tr>
-                        <th style={{ ...thStyle, width: "35px" }}><span style={{ position: "relative", top: textOffset }}>No.</span></th>
-                        <th style={thStyle}><span style={{ position: "relative", top: textOffset }}>Asset Name</span></th>
-                        <th style={{ ...thStyle, width: "50px" }}><span style={{ position: "relative", top: textOffset }}>จำนวน</span></th>
-                        <th style={{ ...thStyle, width: "150px" }}><span style={{ position: "relative", top: textOffset }}>Barcode</span></th>
-                        <th style={{ ...thStyle, width: "85px" }}><span style={{ position: "relative", top: textOffset }}>เบิกที่โกดัง</span></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {secRows.map((row: any, idx: number) => (
-                        <tr key={idx}>
-                            <Cell width="35px" center isAlt={idx % 2 === 1}>{idx + 1}</Cell>
-                            <Cell isAlt={idx % 2 === 1}>{row.name}</Cell>
-                            <Cell width="50px" center bold isAlt={idx % 2 === 1}>{row._isTypeC ? row._groupSize : 1}</Cell>
-                            <Cell width="150px" center isAlt={idx % 2 === 1}>{row._isTypeC ? "-" : (row.barcode || "-")}</Cell>
-                            <Cell width="85px" center isAlt={idx % 2 === 1}>{row.withdrawFor || ""}</Cell>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
+        const secThead = (
+            <thead>
+                <tr><th colSpan={5} style={headerStyle}><span style={{ position: "relative", top: textOffset }}>🔐 รายละเอียด Security Set</span></th></tr>
+                <tr>
+                    <th style={{ ...thStyle, width: "35px" }}><span style={{ position: "relative", top: textOffset }}>No.</span></th>
+                    <th style={thStyle}><span style={{ position: "relative", top: textOffset }}>Asset Name</span></th>
+                    <th style={{ ...thStyle, width: "50px" }}><span style={{ position: "relative", top: textOffset }}>จำนวน</span></th>
+                    <th style={{ ...thStyle, width: "150px" }}><span style={{ position: "relative", top: textOffset }}>Barcode</span></th>
+                    <th style={{ ...thStyle, width: "85px" }}><span style={{ position: "relative", top: textOffset }}>เบิกที่โกดัง</span></th>
+                </tr>
+            </thead>
         );
 
-        return pages.map((chunk, pageIdx) => {
-            const isOverflowPage = needsOverflowPage && pageIdx === pages.length - 1;
+        let assetOffset = 0;
+        let secOffset = 0;
+        return pages.map((pageRows, pageIdx) => {
+            const isFirst = pageIdx === 0;
+            const isLast = pageIdx === pages.length - 1;
+            const pageAssets = pageRows.filter(r => r.kind === 'asset').map(r => r.data);
+            const pageSecs = pageRows.filter(r => r.kind === 'security').map(r => r.data);
+            const aStart = assetOffset;
+            const sStart = secOffset;
+            assetOffset += pageAssets.length;
+            secOffset += pageSecs.length;
+            const showEmptyAssetTable = isFirst && combinedRows.length === 0;
+
             return (
                 <>
-                    {chunk.isFirst ? <>{renderHeader()}{renderInfoCards()}</> : renderCompactHeader()}
+                    {isFirst ? <>{renderHeader()}{renderInfoCards()}</> : renderCompactHeader()}
 
-                    {!isOverflowPage && (
-                        <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "10px", borderRadius: "8px", overflow: "hidden" }}>
+                    {(pageAssets.length > 0 || showEmptyAssetTable) && (
+                        <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "15px", borderRadius: "8px", overflow: "hidden" }}>
                             {assetThead}
                             <tbody>
-                                {chunk.rows.length === 0 ? (
+                                {showEmptyAssetTable ? (
                                     <tr>
                                         <Cell width="35px" center>{" "}</Cell><Cell>{" "}</Cell>
                                         <Cell width="50px" /><Cell width="150px" /><Cell width="85px" />
                                     </tr>
                                 ) : (
-                                    chunk.rows.map((row: any, idx: number) => {
-                                        const globalIdx = pages.slice(0, pageIdx).reduce((s, p) => s + p.rows.length, 0) + idx;
+                                    pageAssets.map((row: any, idx: number) => {
+                                        const g = aStart + idx;
                                         return (
                                             <tr key={idx}>
-                                                <Cell width="35px" center isAlt={globalIdx % 2 === 1}>{globalIdx + 1}</Cell>
-                                                <Cell isAlt={globalIdx % 2 === 1}>
+                                                <Cell width="35px" center isAlt={g % 2 === 1}>{g + 1}</Cell>
+                                                <Cell isAlt={g % 2 === 1}>
                                                     {row.name}{row.size ? ` (${row.size})` : ""}{row.grade ? ` [${row.grade}]` : ""}
                                                 </Cell>
-                                                <Cell width="50px" center isAlt={globalIdx % 2 === 1}>{row.kv || "-"}</Cell>
-                                                <Cell width="150px" center isAlt={globalIdx % 2 === 1}>{row.barcode || "-"}</Cell>
-                                                <Cell width="85px" center isAlt={globalIdx % 2 === 1}>{row.withdrawFor || "-"}</Cell>
+                                                <Cell width="50px" center isAlt={g % 2 === 1}>{row.kv || "-"}</Cell>
+                                                <Cell width="150px" center isAlt={g % 2 === 1}>{row.barcode || "-"}</Cell>
+                                                <Cell width="85px" center isAlt={g % 2 === 1}>{row.withdrawFor || "-"}</Cell>
                                             </tr>
                                         );
                                     })
@@ -683,9 +701,28 @@ export default function DocumentTemplateSelector({ document: doc }: DocumentTemp
                         </table>
                     )}
 
-                    {chunk.isLast && (
+                    {pageSecs.length > 0 && (
+                        <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "15px", borderRadius: "8px", overflow: "hidden" }}>
+                            {secThead}
+                            <tbody>
+                                {pageSecs.map((row: any, idx: number) => {
+                                    const g = sStart + idx;
+                                    return (
+                                        <tr key={idx}>
+                                            <Cell width="35px" center isAlt={g % 2 === 1}>{g + 1}</Cell>
+                                            <Cell isAlt={g % 2 === 1}>{row.name}</Cell>
+                                            <Cell width="50px" center bold isAlt={g % 2 === 1}>{row._isTypeC ? row._groupSize : 1}</Cell>
+                                            <Cell width="150px" center isAlt={g % 2 === 1}>{row._isTypeC ? "-" : (row.barcode || "-")}</Cell>
+                                            <Cell width="85px" center isAlt={g % 2 === 1}>{row.withdrawFor || ""}</Cell>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    )}
+
+                    {isLast && (
                         <>
-                            {secTable}
                             {renderNote()}
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", paddingTop: "15px", marginTop: "auto" }}>
                                 <SignatureBlock title="Approved by Cheil" showImage={true} date={formatDateThai(doc.approvedAt)} width="280px" />
